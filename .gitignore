@@ -1,0 +1,16 @@
+# Personal user data
+people/
+
+# App config with credentials/personal paths
+profiles.yml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# AI assistant local settings
+.claude/
