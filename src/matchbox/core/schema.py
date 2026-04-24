@@ -6,7 +6,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
 # ──────────────────────────────────────────────
 # Profile sub-models (what lives in profile.yaml)
 # ──────────────────────────────────────────────
@@ -179,7 +178,7 @@ class VoiceRules(BaseModel):
     opener_patterns: list[str] = Field(default_factory=list)
 
     @classmethod
-    def merge(cls, defaults: dict[str, Any], overrides: dict[str, Any]) -> "VoiceRules":
+    def merge(cls, defaults: dict[str, Any], overrides: dict[str, Any]) -> VoiceRules:
         """
         Merge shared defaults with per-profile overrides.
         Lists append unless override sets replace: true.

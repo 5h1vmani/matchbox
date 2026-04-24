@@ -8,7 +8,6 @@ canonical tier: no call — handled by paths.py directly
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -114,7 +113,7 @@ def generate_content(
     log.info("content_gen tier=%s company=%s model=%s", tier, job.company, model)
 
     client = anthropic.Anthropic()
-    response = client.messages.create(
+    response = client.messages.create(  # type: ignore[call-overload]
         model=model,
         max_tokens=max_tokens,
         tools=[_CONTENT_TOOL],
@@ -129,7 +128,7 @@ def generate_content(
     if tool_use_block is None:
         raise RuntimeError("LLM did not return tool_use block — check prompt or model")
 
-    content: dict[str, Any] = tool_use_block.input  # type: ignore[union-attr]
+    content: dict[str, Any] = tool_use_block.input
     cost = _estimate_cost(response, model)
     log.info(
         "content_gen done input_tokens=%d output_tokens=%d est_cost_usd=%.4f",

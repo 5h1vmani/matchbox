@@ -8,8 +8,8 @@ so the operator sees the full picture and can decide to override or re-generate.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from matchbox.core.exceptions import GateFailureError
 from matchbox.core.schema import VoiceRules
@@ -148,6 +148,6 @@ def run_all_gates(
 
     if raise_on_fail and violations:
         msg = "\n".join(str(v) for v in violations)
-        raise GateFailureError(f"{len(violations)} gate violation(s):\n{msg}")
+        raise GateFailureError("aggregate", f"{len(violations)} violation(s):\n{msg}")
 
     return violations

@@ -5,28 +5,21 @@ Uses fake candidate data only. No real PII.
 
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
-
 from matchbox.core.schema import (
+    VALID_GEOS,
+    VALID_RESPONSE_TYPES,
+    VALID_STATES,
+    VALID_TIERS,
     Application,
     Candidate,
     ExclusionRule,
-    Filters,
     Job,
-    Person,
     Profile,
     ProfileMeta,
     Response,
     ScanRun,
-    Targets,
     VoiceRules,
-    VALID_STATES,
-    VALID_TIERS,
-    VALID_GEOS,
-    VALID_RESPONSE_TYPES,
 )
-
 
 # ──────────────────────────────────────────────
 # Helpers
@@ -255,13 +248,13 @@ class TestConstants:
             "skip",
             "cooling",
         }
-        assert VALID_STATES == expected
+        assert expected == VALID_STATES
 
     def test_valid_tiers(self) -> None:
-        assert VALID_TIERS == {"bespoke", "template", "canonical", "skip"}
+        assert {"bespoke", "template", "canonical", "skip"} == VALID_TIERS
 
     def test_valid_geos(self) -> None:
-        assert VALID_GEOS == {"uk", "india", "relocate"}
+        assert {"uk", "india", "relocate"} == VALID_GEOS
 
     def test_valid_response_types(self) -> None:
-        assert VALID_RESPONSE_TYPES == {"interview", "rejection", "offer", "ghosted", "other"}
+        assert {"interview", "rejection", "offer", "ghosted", "other"} == VALID_RESPONSE_TYPES

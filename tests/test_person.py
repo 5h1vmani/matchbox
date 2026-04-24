@@ -34,10 +34,10 @@ class TestShivaProfileLoads:
         assert "Hyderabad" in shiva.profile.candidate.location
 
     def test_languages(self, shiva: Person) -> None:
-        langs = [l.lower() for l in shiva.profile.candidate.languages]
-        assert any("telugu" in l for l in langs)
-        assert any("hindi" in l for l in langs)
-        assert any("english" in l for l in langs)
+        langs = [lang.lower() for lang in shiva.profile.candidate.languages]
+        assert any("telugu" in lang for lang in langs)
+        assert any("hindi" in lang for lang in langs)
+        assert any("english" in lang for lang in langs)
 
     def test_voice_rules_loaded(self, shiva: Person) -> None:
         assert shiva.voice.no_em_dashes is True

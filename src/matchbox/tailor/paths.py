@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 import shutil
 from pathlib import Path
-from typing import Any
 
 from matchbox.core import db
 from matchbox.core.schema import Application, Job, Person
@@ -141,7 +140,7 @@ def _llm_path(
         if gate_mode == "raise":
             from matchbox.core.exceptions import GateFailureError
 
-            raise GateFailureError(f"{len(violations)} gate violation(s):\n{violation_str}")
+            raise GateFailureError("aggregate", f"{len(violations)} violation(s):\n{violation_str}")
         elif gate_mode == "skip":
             log.warning(
                 "gate_mode=skip, abandoning tailor for job_id=%s\n%s", job.id, violation_str

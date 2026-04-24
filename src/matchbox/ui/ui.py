@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
 
 import streamlit as st
 
@@ -17,7 +16,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from matchbox.core import db
 from matchbox.core.schema import Job
-
 
 # ──────────────────────────────────────────────
 # Page config
@@ -260,7 +258,7 @@ def page_analytics(profile: str) -> None:
     # Tier breakdown
     if tier_costs:
         st.subheader("Cost by tier")
-        import pandas as pd
+        import pandas as pd  # type: ignore[import-untyped]
 
         rows = [
             {"Tier": t, "Jobs": v["count"], "Total $": v["total_usd"], "Avg $": v["avg_usd"]}

@@ -10,14 +10,14 @@ Path convention (v0.2): people/{name}/db.sqlite
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any
 
 from matchbox.core.exceptions import InvalidStateError
-from matchbox.core.schema import VALID_STATES, Application, Job, ScanRun
-
+from matchbox.core.schema import VALID_STATES, Job, ScanRun
 
 # ──────────────────────────────────────────────
 # Path resolution
@@ -189,7 +189,7 @@ def _assert_state(state: str) -> None:
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
+    return datetime.now(UTC).date().isoformat()
 
 
 def _job_from_row(row: sqlite3.Row) -> Job:
@@ -526,7 +526,7 @@ def list_jobs(
             where.append(f"{col}=?")
             params.append(val)
         else:
-            where.append(f"{col} IN ({','.join('?'*len(val))})")
+            where.append(f"{col} IN ({','.join('?' * len(val))})")
             params.extend(val)
 
     if state is not None:

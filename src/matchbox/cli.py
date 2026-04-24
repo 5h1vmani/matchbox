@@ -13,11 +13,8 @@ Commands:
 
 from __future__ import annotations
 
-import json
 import logging
-import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich import print as rprint
@@ -40,7 +37,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 @app.command()
 def scan(
     profile: str = typer.Argument(..., help="Person name (e.g. shiva)"),
-    country: Optional[str] = typer.Option(
+    country: str | None = typer.Option(
         None, "--country", "-c", help="Filter by country (uk/india/us)"
     ),
     trial: bool = typer.Option(False, "--trial", help="Mark scan run as trial"),
@@ -110,7 +107,7 @@ def tailor(
 def apply(
     profile: str = typer.Argument(...),
     job_id: int = typer.Argument(...),
-    note: Optional[str] = typer.Option(None, "--note", "-n"),
+    note: str | None = typer.Option(None, "--note", "-n"),
 ) -> None:
     """Mark a job as applied and record today's date."""
     from matchbox.core import db
@@ -182,10 +179,10 @@ def log_response(
     response_type: str = typer.Argument(
         ..., help="interview | rejection | offer | ghosted | other"
     ),
-    response_date: Optional[str] = typer.Option(
+    response_date: str | None = typer.Option(
         None, "--date", "-d", help="ISO date (default: today)"
     ),
-    note: Optional[str] = typer.Option(None, "--note", "-n"),
+    note: str | None = typer.Option(None, "--note", "-n"),
 ) -> None:
     """Record an outcome response (interview invite, rejection, offer, etc.)."""
     from matchbox.outcome.response import log_response as _log

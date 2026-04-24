@@ -45,7 +45,6 @@ def score_job(job: Job, person: Person, jd_text: str = "") -> Job:
     Phase 3 will replace placeholders with LLM-assisted scoring where needed.
     """
     weights = _weights(person)
-    rubric = _shared_rubric()
     tier_baselines: dict[str, float] = {
         "tier_1_dream": 5.0,
         "tier_2_target": 4.0,

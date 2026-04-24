@@ -30,6 +30,10 @@ from matchbox.core.exceptions import (
 )
 from matchbox.core.person import load_person
 from matchbox.core.schema import (
+    VALID_GEOS,
+    VALID_RESPONSE_TYPES,
+    VALID_STATES,
+    VALID_TIERS,
     Application,
     Archetype,
     Candidate,
@@ -47,13 +51,9 @@ from matchbox.core.schema import (
     RequiredSignals,
     Response,
     ScanRun,
-    Skill,
     ScoringWeights,
+    Skill,
     Targets,
-    VALID_GEOS,
-    VALID_RESPONSE_TYPES,
-    VALID_STATES,
-    VALID_TIERS,
     VoiceRules,
     WorkBullet,
     WorkEntry,

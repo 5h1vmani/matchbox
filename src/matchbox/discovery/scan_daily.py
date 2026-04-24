@@ -10,7 +10,7 @@ from matchbox.core import db
 from matchbox.core.person import load_person
 from matchbox.core.schema import Job, Person
 from matchbox.discovery.ats_probe import probe
-from matchbox.discovery.sources import ATSSource, KNOWN_SOURCES
+from matchbox.discovery.sources import KNOWN_SOURCES, ATSSource
 from matchbox.scoring.exclusions import filter_by_exclusions
 from matchbox.scoring.rubric import score_job
 from matchbox.scoring.tier_router import infer_geo, route_job
