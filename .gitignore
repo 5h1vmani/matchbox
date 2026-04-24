@@ -1,8 +1,11 @@
 archive/
-people/*/db.sqlite
-people/*/output/
-people/*/runs/
-people/*/reports/
+
+# People profiles — real profiles are local-only.
+# Only people/demo/ is committed. Any new directory is auto-ignored.
+people/*
+!people/README.md
+!people/demo/
+!people/demo/**
 __pycache__/
 *.pyc
 *.pyo
