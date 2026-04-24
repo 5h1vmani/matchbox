@@ -1,16 +1,16 @@
-# Personal user data
-people/
-
-# App config with credentials/personal paths
-profiles.yml
-
-# Python
+archive/
+people/*/db.sqlite
+people/*/output/
+people/*/runs/
+people/*/reports/
 __pycache__/
 *.pyc
 *.pyo
-
-# macOS
+.env
+.venv/
 .DS_Store
-
-# AI assistant local settings
-.claude/
+dist/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
