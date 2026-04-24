@@ -109,12 +109,14 @@ def score_job(job: Job, person: Person, jd_text: str = "") -> Job:
         + red_flags * weights.location_remote_weight
     )
 
-    return job.model_copy(update={
-        "cv_match_score": round(cv_match, 2),
-        "company_mission_fit_score": round(mission_score, 2),
-        "role_mission_fit_score": round(role_mission, 2),
-        "comp_score": round(comp, 2),
-        "cultural_score": round(cultural, 2),
-        "red_flags_score": round(red_flags, 2),
-        "total_score": round(total, 2),
-    })
+    return job.model_copy(
+        update={
+            "cv_match_score": round(cv_match, 2),
+            "company_mission_fit_score": round(mission_score, 2),
+            "role_mission_fit_score": round(role_mission, 2),
+            "comp_score": round(comp, 2),
+            "cultural_score": round(cultural, 2),
+            "red_flags_score": round(red_flags, 2),
+            "total_score": round(total, 2),
+        }
+    )

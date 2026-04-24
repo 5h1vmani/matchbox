@@ -40,11 +40,11 @@ _CONTENT_TOOL: dict[str, Any] = {
                 "items": {
                     "type": "object",
                     "properties": {
-                        "company":  {"type": "string"},
-                        "role":     {"type": "string"},
-                        "dates":    {"type": "string"},
+                        "company": {"type": "string"},
+                        "role": {"type": "string"},
+                        "dates": {"type": "string"},
                         "location": {"type": "string"},
-                        "bullets":  {
+                        "bullets": {
                             "type": "array",
                             "items": {"type": "string"},
                             "minItems": 2,
@@ -59,9 +59,9 @@ _CONTENT_TOOL: dict[str, Any] = {
                 "items": {
                     "type": "object",
                     "properties": {
-                        "name":        {"type": "string"},
+                        "name": {"type": "string"},
                         "description": {"type": "string"},
-                        "tags":        {"type": "array", "items": {"type": "string"}},
+                        "tags": {"type": "array", "items": {"type": "string"}},
                     },
                     "required": ["name", "description"],
                 },
@@ -179,7 +179,9 @@ def _build_prompt(job: Job, person: Person, tier: str) -> str:
     # Anchor bullets for template tier
     anchor_note = ""
     if tier == "template":
-        role_family = str(list(p.role_family_preference.values())[0]) if p.role_family_preference else None
+        role_family = (
+            str(list(p.role_family_preference.values())[0]) if p.role_family_preference else None
+        )
         anchors = select_bullets(person, role_family, max_per_role=3)
         if anchors:
             anchor_lines = "\n".join(f"  - {b.text}" for b in anchors[:10])
@@ -227,9 +229,9 @@ def _build_prompt(job: Job, person: Person, tier: str) -> str:
 def _estimate_cost(response: anthropic.types.Message, model: str) -> float:
     """Rough cost estimate from token counts. Prices as of 2026-04."""
     prices: dict[str, tuple[float, float]] = {
-        "claude-sonnet-4-6":   (3.0,  15.0),   # per M tokens: input, output
-        "claude-opus-4-7":     (15.0, 75.0),
-        "claude-haiku-4-5":    (0.25,  1.25),
+        "claude-sonnet-4-6": (3.0, 15.0),  # per M tokens: input, output
+        "claude-opus-4-7": (15.0, 75.0),
+        "claude-haiku-4-5": (0.25, 1.25),
     }
     in_price, out_price = prices.get(model, (3.0, 15.0))
     cost = (

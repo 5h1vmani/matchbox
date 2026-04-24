@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # Profile sub-models (what lives in profile.yaml)
 # ──────────────────────────────────────────────
 
+
 class ProfileMeta(BaseModel):
     schema_version: int = 1
     last_updated: str = ""
@@ -149,6 +150,7 @@ class Profile(BaseModel):
 # Voice rules (shared + per-person overlay)
 # ──────────────────────────────────────────────
 
+
 class RequiredSignals(BaseModel):
     min_named_entities_per_150_words: int = 3
     min_numbers_per_150_words: int = 2
@@ -206,6 +208,7 @@ class VoiceRules(BaseModel):
 # Person — the fully loaded candidate object
 # ──────────────────────────────────────────────
 
+
 class Person(BaseModel):
     """Fully loaded candidate. Built by core/person.py — never construct directly."""
 
@@ -219,19 +222,21 @@ class Person(BaseModel):
 # Pipeline models
 # ──────────────────────────────────────────────
 
-VALID_STATES = frozenset({
-    "evaluated",
-    "queued_for_tailor",
-    "tailored",
-    "applied",
-    "responded",
-    "interview",
-    "offer",
-    "rejected",
-    "discarded",
-    "skip",
-    "cooling",
-})
+VALID_STATES = frozenset(
+    {
+        "evaluated",
+        "queued_for_tailor",
+        "tailored",
+        "applied",
+        "responded",
+        "interview",
+        "offer",
+        "rejected",
+        "discarded",
+        "skip",
+        "cooling",
+    }
+)
 
 VALID_TIERS = frozenset({"bespoke", "template", "canonical", "skip"})
 VALID_GEOS = frozenset({"uk", "india", "relocate"})

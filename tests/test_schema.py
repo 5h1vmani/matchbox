@@ -32,6 +32,7 @@ from matchbox.core.schema import (
 # Helpers
 # ──────────────────────────────────────────────
 
+
 def _minimal_profile() -> Profile:
     return Profile(
         candidate=Candidate(
@@ -58,6 +59,7 @@ def _minimal_job(**kwargs) -> Job:
 # TestJob
 # ──────────────────────────────────────────────
 
+
 class TestJob:
     def test_minimal_construction(self) -> None:
         job = _minimal_job()
@@ -72,15 +74,17 @@ class TestJob:
 
     def test_int_columns_coerce_to_bool(self) -> None:
         # SQLite stores booleans as 0/1 integers
-        job = Job.model_validate({
-            "profile_name": "test",
-            "company": "Acme",
-            "role": "Engineer",
-            "url": "https://example.com/job/1",
-            "cv_generated": 1,
-            "cover_generated": 0,
-            "is_starred": 1,
-        })
+        job = Job.model_validate(
+            {
+                "profile_name": "test",
+                "company": "Acme",
+                "role": "Engineer",
+                "url": "https://example.com/job/1",
+                "cv_generated": 1,
+                "cover_generated": 0,
+                "is_starred": 1,
+            }
+        )
         assert job.cv_generated is True
         assert job.cover_generated is False
         assert job.is_starred is True
@@ -114,6 +118,7 @@ class TestJob:
 # TestProfile
 # ──────────────────────────────────────────────
 
+
 class TestProfile:
     def test_minimal_construction(self) -> None:
         p = _minimal_profile()
@@ -136,6 +141,7 @@ class TestProfile:
     def test_date_coercion_in_meta(self) -> None:
         """ruamel.yaml returns datetime.date — must coerce to str."""
         import datetime
+
         meta = ProfileMeta(last_updated=datetime.date(2026, 4, 24))  # type: ignore[arg-type]
         assert meta.last_updated == "2026-04-24"
 
@@ -152,9 +158,7 @@ class TestProfile:
         data = {
             "candidate": {"full_name": "Test User"},
             "targets": {
-                "archetypes": [
-                    {"name": "Solutions Architect", "level": "Senior", "fit": "primary"}
-                ]
+                "archetypes": [{"name": "Solutions Architect", "level": "Senior", "fit": "primary"}]
             },
         }
         p = Profile.model_validate(data)
@@ -164,6 +168,7 @@ class TestProfile:
 # ──────────────────────────────────────────────
 # TestVoiceRules
 # ──────────────────────────────────────────────
+
 
 class TestVoiceRules:
     def test_defaults(self) -> None:
@@ -196,6 +201,7 @@ class TestVoiceRules:
 # ──────────────────────────────────────────────
 # TestPipelineModels
 # ──────────────────────────────────────────────
+
 
 class TestPipelineModels:
     def test_application_construction(self) -> None:
@@ -233,12 +239,21 @@ class TestPipelineModels:
 # TestConstants
 # ──────────────────────────────────────────────
 
+
 class TestConstants:
     def test_valid_states_complete(self) -> None:
         expected = {
-            "evaluated", "queued_for_tailor", "tailored", "applied",
-            "responded", "interview", "offer", "rejected",
-            "discarded", "skip", "cooling",
+            "evaluated",
+            "queued_for_tailor",
+            "tailored",
+            "applied",
+            "responded",
+            "interview",
+            "offer",
+            "rejected",
+            "discarded",
+            "skip",
+            "cooling",
         }
         assert VALID_STATES == expected
 

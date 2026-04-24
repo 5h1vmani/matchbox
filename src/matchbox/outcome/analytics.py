@@ -36,9 +36,7 @@ def get_funnel(profile: str) -> dict[str, Any]:
         "offer_rate": _pct(offer, interview),
         "total_cost_usd": stats.get("total_cost_usd", 0.0),
         "avg_score": stats.get("avg_score", 0.0),
-        "cost_per_application": (
-            round(stats["total_cost_usd"] / applied, 2) if applied else 0.0
-        ),
+        "cost_per_application": (round(stats["total_cost_usd"] / applied, 2) if applied else 0.0),
     }
 
 

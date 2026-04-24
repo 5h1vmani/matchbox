@@ -51,6 +51,7 @@ def migrate_profile(data: dict[str, Any]) -> dict[str, Any]:
 # Migration functions
 # ──────────────────────────────────────────────
 
+
 def _v0_to_v1(data: dict[str, Any]) -> dict[str, Any]:
     """
     v0 → v1: initial Matchbox v0.2 schema.

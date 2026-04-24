@@ -13,8 +13,8 @@ from matchbox.core.schema import Job, Person
 
 # Score thresholds (lower bound inclusive) — matches shared/rubric.yaml
 _TIER_THRESHOLDS = {
-    "bespoke":   0.80,
-    "template":  0.60,
+    "bespoke": 0.80,
+    "template": 0.60,
     "canonical": 0.40,
 }
 

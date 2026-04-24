@@ -66,7 +66,8 @@ def run_daily_scan(
     if dry_run:
         log.info("dry_run — skipping DB writes (run_id=%d)", run_id)
         db.complete_scan_run(
-            profile, run_id,
+            profile,
+            run_id,
             raw_candidates=len(raw_jobs),
             filtered_survivors=len(allowed),
             scored_count=len(scored),
@@ -81,7 +82,8 @@ def run_daily_scan(
     log.info("inserted=%d dupes=%d", inserted, dupes)
 
     db.complete_scan_run(
-        profile, run_id,
+        profile,
+        run_id,
         raw_candidates=len(raw_jobs),
         filtered_survivors=len(allowed),
         scored_count=len(scored),

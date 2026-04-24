@@ -68,11 +68,14 @@ def render_pdf(
 
     try:
         cmd = [
-            typst, "compile",
+            typst,
+            "compile",
             str(template),
             str(output_path),
-            "--input", f"content_path={tmp_path}",
-            "--input", f"geo={geo}",
+            "--input",
+            f"content_path={tmp_path}",
+            "--input",
+            f"geo={geo}",
         ]
         log.info("typst cmd: %s", " ".join(cmd))
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -122,21 +125,25 @@ def _build_canonical_content(person: Any, geo: str) -> dict[str, Any]:
 
     work_history = []
     for we in p.work_history:
-        work_history.append({
-            "company": we.company,
-            "role": we.role,
-            "dates": we.dates,
-            "location": we.location,
-            "bullets": [b.text for b in we.bullets],
-        })
+        work_history.append(
+            {
+                "company": we.company,
+                "role": we.role,
+                "dates": we.dates,
+                "location": we.location,
+                "bullets": [b.text for b in we.bullets],
+            }
+        )
 
     projects = []
     for proj in p.projects:
-        projects.append({
-            "name": proj.name,
-            "description": proj.description,
-            "tags": proj.tags,
-        })
+        projects.append(
+            {
+                "name": proj.name,
+                "description": proj.description,
+                "tags": proj.tags,
+            }
+        )
 
     skills_by_category: dict[str, list[str]] = {}
     for s in p.skills:

@@ -28,20 +28,25 @@ class GateViolation:
 # Individual gate checks
 # ──────────────────────────────────────────────
 
+
 def check_bullet_length(bullet: str, voice: VoiceRules) -> list[GateViolation]:
     words = bullet.split()
     n = len(words)
     violations: list[GateViolation] = []
     if n < voice.quality_gates.min_word_count_cv_bullet:
-        violations.append(GateViolation(
-            "bullet_too_short",
-            f"{n} words (min {voice.quality_gates.min_word_count_cv_bullet}): {bullet[:60]!r}",
-        ))
+        violations.append(
+            GateViolation(
+                "bullet_too_short",
+                f"{n} words (min {voice.quality_gates.min_word_count_cv_bullet}): {bullet[:60]!r}",
+            )
+        )
     if n > voice.quality_gates.max_word_count_cv_bullet:
-        violations.append(GateViolation(
-            "bullet_too_long",
-            f"{n} words (max {voice.quality_gates.max_word_count_cv_bullet}): {bullet[:60]!r}",
-        ))
+        violations.append(
+            GateViolation(
+                "bullet_too_long",
+                f"{n} words (max {voice.quality_gates.max_word_count_cv_bullet}): {bullet[:60]!r}",
+            )
+        )
     return violations
 
 
@@ -76,11 +81,13 @@ def check_required_signals(text: str, voice: VoiceRules) -> list[GateViolation]:
     number_matches = re.findall(r"\b\d[\d,\.]*\s*(?:%|k|M|B|LPA|CCU|ms|s)?\b", text)
     numbers_per_chunk = len(number_matches) / chunks
     if numbers_per_chunk < voice.required_signals.min_numbers_per_150_words:
-        violations.append(GateViolation(
-            "insufficient_numbers",
-            f"{len(number_matches)} numbers found, need "
-            f"{voice.required_signals.min_numbers_per_150_words * chunks:.0f}+",
-        ))
+        violations.append(
+            GateViolation(
+                "insufficient_numbers",
+                f"{len(number_matches)} numbers found, need "
+                f"{voice.required_signals.min_numbers_per_150_words * chunks:.0f}+",
+            )
+        )
     return violations
 
 
@@ -103,6 +110,7 @@ def check_no_contractions(text: str, voice: VoiceRules) -> list[GateViolation]:
 # ──────────────────────────────────────────────
 # Aggregated runners
 # ──────────────────────────────────────────────
+
 
 def run_bullet_gates(bullet: str, voice: VoiceRules) -> list[GateViolation]:
     """All gates applicable to a single CV bullet."""

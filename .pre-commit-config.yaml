@@ -1,0 +1,63 @@
+# Pre-commit hooks — security + auto-fix tier.
+# Strictness hooks (mypy --strict, pytest, conventional-commits) are
+# deferred until after Phase 3.1 ships the first real tailored application.
+#
+# Install:  pre-commit install --install-hooks
+# Run all:  pre-commit run --all-files
+
+repos:
+
+  # ──────────────────────────────────────────────
+  # Auto-fix (silent, never blocks)
+  # ──────────────────────────────────────────────
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+        args: [--unsafe]   # ruamel-style multi-document support
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff-format
+
+  # ──────────────────────────────────────────────
+  # Security (blocks disasters)
+  # ──────────────────────────────────────────────
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: package.lock.json|^\.secrets\.baseline$
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # ──────────────────────────────────────────────
+  # Custom local hooks
+  # ──────────────────────────────────────────────
+
+  - repo: local
+    hooks:
+      - id: pii-scan
+        name: Block PII patterns
+        entry: .githooks/pii-scan.sh
+        language: script
+        types: [text]
+
+      - id: people-guard
+        name: Block people/{name}/ commits except demo
+        entry: .githooks/people-guard.sh
+        language: script

@@ -23,6 +23,7 @@ from matchbox.core.schema import VALID_STATES, Application, Job, ScanRun
 # Path resolution
 # ──────────────────────────────────────────────
 
+
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]  # src/matchbox/core/db.py → repo root
 
@@ -34,6 +35,7 @@ def db_path(profile: str) -> Path:
 # ──────────────────────────────────────────────
 # Connection
 # ──────────────────────────────────────────────
+
 
 @contextmanager
 def _connect(profile: str) -> Iterator[sqlite3.Connection]:
@@ -153,12 +155,12 @@ CREATE TABLE IF NOT EXISTS responses (
 
 # Columns to add if missing (forward-migration for existing DBs).
 _JOBS_MIGRATIONS: list[tuple[str, str]] = [
-    ("jd_text",                "TEXT"),
-    ("tier",                   "TEXT"),
-    ("tailor_cost_usd",        "REAL"),
-    ("response_date",          "TEXT"),
-    ("response_type",          "TEXT"),
-    ("response_note",          "TEXT"),
+    ("jd_text", "TEXT"),
+    ("tier", "TEXT"),
+    ("tailor_cost_usd", "REAL"),
+    ("response_date", "TEXT"),
+    ("response_type", "TEXT"),
+    ("response_note", "TEXT"),
 ]
 
 
@@ -179,6 +181,7 @@ def init_db(profile: str) -> None:
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
+
 
 def _assert_state(state: str) -> None:
     if state not in VALID_STATES:
@@ -206,6 +209,7 @@ def _scan_run_from_row(row: sqlite3.Row) -> ScanRun:
 # ──────────────────────────────────────────────
 # Scan runs
 # ──────────────────────────────────────────────
+
 
 def create_scan_run(
     profile: str,
@@ -242,8 +246,18 @@ def complete_scan_run(
             "UPDATE scan_runs SET completed_at=datetime('now'), raw_candidates=?, "
             "filtered_survivors=?, scored_count=?, apply_count=?, review_count=?, "
             "skip_count=?, cost_usd=?, status=?, notes=? WHERE id=?",
-            (raw_candidates, filtered_survivors, scored_count, apply_count,
-             review_count, skip_count, cost_usd, status, notes, run_id),
+            (
+                raw_candidates,
+                filtered_survivors,
+                scored_count,
+                apply_count,
+                review_count,
+                skip_count,
+                cost_usd,
+                status,
+                notes,
+                run_id,
+            ),
         )
 
 
@@ -260,6 +274,7 @@ def get_scan_history(profile: str, limit: int = 20) -> list[ScanRun]:
 # ──────────────────────────────────────────────
 # Jobs — write
 # ──────────────────────────────────────────────
+
 
 def insert_job(
     profile_name: str,
@@ -305,13 +320,37 @@ def insert_job(
             "  comp_score, cultural_score, red_flags_score, total_score,"
             "  recommendation, report_path, state, role_family, dream_tier, exclusion_triggered"
             ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (profile_name, run_id, company, role, url,
-             discovered_date or _today(),
-             location, country, mode, ats_source, posting_date,
-             jd_summary, jd_text, comp_stated, visa_sponsorship, legitimacy,
-             cv_match_score, company_mission_fit_score, role_mission_fit_score,
-             comp_score, cultural_score, red_flags_score, total_score,
-             recommendation, report_path, state, role_family, dream_tier, exclusion_triggered),
+            (
+                profile_name,
+                run_id,
+                company,
+                role,
+                url,
+                discovered_date or _today(),
+                location,
+                country,
+                mode,
+                ats_source,
+                posting_date,
+                jd_summary,
+                jd_text,
+                comp_stated,
+                visa_sponsorship,
+                legitimacy,
+                cv_match_score,
+                company_mission_fit_score,
+                role_mission_fit_score,
+                comp_score,
+                cultural_score,
+                red_flags_score,
+                total_score,
+                recommendation,
+                report_path,
+                state,
+                role_family,
+                dream_tier,
+                exclusion_triggered,
+            ),
         )
         return cursor.lastrowid or 0
 
@@ -337,12 +376,25 @@ def bulk_insert_jobs(
                     "  location, country, mode, ats_source, jd_summary, jd_text,"
                     "  total_score, state, role_family, dream_tier, exclusion_triggered"
                     ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (profile_name, run_id, j["company"], j["role"], j["url"],
-                     j.get("discovered_date") or _today(),
-                     j.get("location"), j.get("country"), j.get("mode"),
-                     j.get("ats_source"), j.get("jd_summary"), j.get("jd_text"),
-                     j.get("total_score"), state,
-                     j.get("role_family"), j.get("dream_tier"), j.get("exclusion_triggered")),
+                    (
+                        profile_name,
+                        run_id,
+                        j["company"],
+                        j["role"],
+                        j["url"],
+                        j.get("discovered_date") or _today(),
+                        j.get("location"),
+                        j.get("country"),
+                        j.get("mode"),
+                        j.get("ats_source"),
+                        j.get("jd_summary"),
+                        j.get("jd_text"),
+                        j.get("total_score"),
+                        state,
+                        j.get("role_family"),
+                        j.get("dream_tier"),
+                        j.get("exclusion_triggered"),
+                    ),
                 )
                 inserted += 1
             except sqlite3.IntegrityError:
@@ -396,7 +448,8 @@ def mark_tailored(
     cost_usd: float = 0.0,
 ) -> None:
     update_job(
-        profile, job_id,
+        profile,
+        job_id,
         state="tailored",
         cv_generated=1,
         cv_path=cv_path,
@@ -423,6 +476,7 @@ def toggle_star(profile: str, job_id: int) -> bool:
 # ──────────────────────────────────────────────
 # Jobs — read
 # ──────────────────────────────────────────────
+
 
 def get_job(profile: str, job_id: int) -> Job | None:
     init_db(profile)
@@ -566,6 +620,7 @@ def get_distinct_values(profile: str, column: str) -> list[tuple[str, int]]:
 # Responses (outcome tracking)
 # ──────────────────────────────────────────────
 
+
 def log_response(
     profile: str,
     job_id: int,
@@ -575,6 +630,7 @@ def log_response(
     note: str | None = None,
 ) -> int:
     from matchbox.core.schema import VALID_RESPONSE_TYPES
+
     if response_type not in VALID_RESPONSE_TYPES:
         raise ValueError(f"Invalid response_type '{response_type}'")
     init_db(profile)

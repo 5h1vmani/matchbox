@@ -41,7 +41,9 @@ def get_followup_candidates(
         resp_date = job.response_date or ""
         if resp_date and resp_date <= cutoff_responded:
             row = job.model_dump()
-            row["followup_reason"] = f"Responded {resp_date}, no interview after {days_since_response}d"
+            row["followup_reason"] = (
+                f"Responded {resp_date}, no interview after {days_since_response}d"
+            )
             candidates.append(row)
 
     return candidates

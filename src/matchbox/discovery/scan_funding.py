@@ -74,7 +74,8 @@ def probe_funded_companies(
         run_id = db.create_scan_run(profile, mode="funding", is_trial=False)
         db.bulk_insert_jobs(profile, run_id, all_jobs)
         db.complete_scan_run(
-            profile, run_id,
+            profile,
+            run_id,
             raw_candidates=len(raw_jobs),
             filtered_survivors=len(allowed),
             scored_count=len(scored),

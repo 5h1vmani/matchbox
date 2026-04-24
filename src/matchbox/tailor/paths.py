@@ -66,7 +66,9 @@ def tailor_job(
 def _canonical_path(job: Job, person: Person, geo: str) -> Application:
     """Copy pre-rendered canonical PDF into the job output directory."""
     canonical_cv = _repo_root() / "people" / person.name / "output" / f"canonical-{geo}.pdf"
-    canonical_cover = _repo_root() / "people" / person.name / "output" / f"canonical-cover-{geo}.pdf"
+    canonical_cover = (
+        _repo_root() / "people" / person.name / "output" / f"canonical-cover-{geo}.pdf"
+    )
 
     # Rebuild canonical if not present
     if not canonical_cv.exists():
@@ -96,7 +98,8 @@ def _canonical_path(job: Job, person: Person, geo: str) -> Application:
 
     if job.id:
         db.mark_tailored(
-            person.name, job.id,
+            person.name,
+            job.id,
             cv_path=str(cv_dest),
             cover_path=str(cover_dest) if canonical_cover.exists() else None,
             tier="canonical",
@@ -122,31 +125,36 @@ def _llm_path(
 
     # Extract bullets and cover for gate check
     all_bullets: list[str] = [
-        b
-        for entry in content.get("selected_work_history", [])
-        for b in entry.get("bullets", [])
+        b for entry in content.get("selected_work_history", []) for b in entry.get("bullets", [])
     ]
-    cover_text = " ".join([
-        content.get("cover_opening", ""),
-        *content.get("cover_body", []),
-        content.get("cover_closing", ""),
-    ])
+    cover_text = " ".join(
+        [
+            content.get("cover_opening", ""),
+            *content.get("cover_body", []),
+            content.get("cover_closing", ""),
+        ]
+    )
 
     violations: list[GateViolation] = run_all_gates(all_bullets, cover_text, person.voice)
     if violations:
         violation_str = "\n".join(str(v) for v in violations)
         if gate_mode == "raise":
             from matchbox.core.exceptions import GateFailureError
+
             raise GateFailureError(f"{len(violations)} gate violation(s):\n{violation_str}")
         elif gate_mode == "skip":
-            log.warning("gate_mode=skip, abandoning tailor for job_id=%s\n%s", job.id, violation_str)
+            log.warning(
+                "gate_mode=skip, abandoning tailor for job_id=%s\n%s", job.id, violation_str
+            )
             return None
         else:
             log.warning("gate violations (continuing):\n%s", violation_str)
 
     out_dir = _output_dir(person.name, job.id)
     cv_path = render_pdf("cv-canonical", content, out_dir / f"cv-{tier}-{geo}.pdf", geo=geo)
-    cover_path = render_pdf("cover-canonical", content, out_dir / f"cover-{tier}-{geo}.pdf", geo=geo)
+    cover_path = render_pdf(
+        "cover-canonical", content, out_dir / f"cover-{tier}-{geo}.pdf", geo=geo
+    )
 
     app = Application(
         job_id=job.id or 0,
@@ -161,7 +169,8 @@ def _llm_path(
 
     if job.id:
         db.mark_tailored(
-            person.name, job.id,
+            person.name,
+            job.id,
             cv_path=str(cv_path),
             cover_path=str(cover_path),
             tier=tier,
@@ -175,6 +184,7 @@ def _llm_path(
 def rebuild_canonicals(person_name: str) -> dict[str, Path]:
     """Regenerate all 3 geo variants of the canonical PDF. Called via CLI."""
     from matchbox.core.schema import VALID_GEOS
+
     results: dict[str, Path] = {}
     for geo in sorted(VALID_GEOS):
         path = render_canonical(person_name, geo)

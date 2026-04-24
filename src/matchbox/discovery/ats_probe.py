@@ -31,16 +31,18 @@ def probe_greenhouse(source: ATSSource) -> list[dict[str, Any]]:
     jobs = []
     for j in data.get("jobs", []):
         location = (j.get("location") or {}).get("name", "")
-        jobs.append({
-            "company": source.company,
-            "role": j.get("title", ""),
-            "url": j.get("absolute_url", ""),
-            "ats_source": "greenhouse",
-            "location": location,
-            "country": source.country,
-            "sector": source.sector,
-            "jd_text": _strip_html(j.get("content", "")),
-        })
+        jobs.append(
+            {
+                "company": source.company,
+                "role": j.get("title", ""),
+                "url": j.get("absolute_url", ""),
+                "ats_source": "greenhouse",
+                "location": location,
+                "country": source.country,
+                "sector": source.sector,
+                "jd_text": _strip_html(j.get("content", "")),
+            }
+        )
     return jobs
 
 
@@ -53,16 +55,18 @@ def probe_ashby(source: ATSSource) -> list[dict[str, Any]]:
         return []
     jobs = []
     for j in data.get("jobs", []):
-        jobs.append({
-            "company": source.company,
-            "role": j.get("title", ""),
-            "url": j.get("jobUrl", ""),
-            "ats_source": "ashby",
-            "location": j.get("locationName", ""),
-            "country": source.country,
-            "sector": source.sector,
-            "jd_text": j.get("descriptionHtml", ""),
-        })
+        jobs.append(
+            {
+                "company": source.company,
+                "role": j.get("title", ""),
+                "url": j.get("jobUrl", ""),
+                "ats_source": "ashby",
+                "location": j.get("locationName", ""),
+                "country": source.country,
+                "sector": source.sector,
+                "jd_text": j.get("descriptionHtml", ""),
+            }
+        )
     return jobs
 
 
@@ -75,16 +79,18 @@ def probe_lever(source: ATSSource) -> list[dict[str, Any]]:
         return []
     jobs = []
     for j in data:
-        jobs.append({
-            "company": source.company,
-            "role": j.get("text", ""),
-            "url": j.get("hostedUrl", ""),
-            "ats_source": "lever",
-            "location": (j.get("categories") or {}).get("location", ""),
-            "country": source.country,
-            "sector": source.sector,
-            "jd_text": (j.get("descriptionPlain") or ""),
-        })
+        jobs.append(
+            {
+                "company": source.company,
+                "role": j.get("text", ""),
+                "url": j.get("hostedUrl", ""),
+                "ats_source": "lever",
+                "location": (j.get("categories") or {}).get("location", ""),
+                "country": source.country,
+                "sector": source.sector,
+                "jd_text": (j.get("descriptionPlain") or ""),
+            }
+        )
     return jobs
 
 
@@ -105,4 +111,5 @@ def probe(source: ATSSource) -> list[dict[str, Any]]:
 def _strip_html(html: str) -> str:
     """Very simple HTML tag stripper (no dependency on BeautifulSoup)."""
     import re
+
     return re.sub(r"<[^>]+>", " ", html).strip()

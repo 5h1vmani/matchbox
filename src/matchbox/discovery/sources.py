@@ -7,12 +7,12 @@ from dataclasses import dataclass, field
 
 @dataclass
 class ATSSource:
-    name: str             # "greenhouse" | "ashby" | "lever" | "generic"
-    slug: str             # company slug used in the ATS URL
-    base_url: str         # jobs listing API endpoint template
-    company: str          # display name for the company
-    country: str = ""     # "uk" | "india" | "us" | etc.
-    sector: str = ""      # for exclusion checks
+    name: str  # "greenhouse" | "ashby" | "lever" | "generic"
+    slug: str  # company slug used in the ATS URL
+    base_url: str  # jobs listing API endpoint template
+    company: str  # display name for the company
+    country: str = ""  # "uk" | "india" | "us" | etc.
+    sector: str = ""  # for exclusion checks
     extra: dict[str, str] = field(default_factory=dict)
 
 

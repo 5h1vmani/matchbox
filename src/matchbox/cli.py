@@ -36,10 +36,13 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 # scan
 # ──────────────────────────────────────────────
 
+
 @app.command()
 def scan(
     profile: str = typer.Argument(..., help="Person name (e.g. shiva)"),
-    country: Optional[str] = typer.Option(None, "--country", "-c", help="Filter by country (uk/india/us)"),
+    country: Optional[str] = typer.Option(
+        None, "--country", "-c", help="Filter by country (uk/india/us)"
+    ),
     trial: bool = typer.Option(False, "--trial", help="Mark scan run as trial"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Probe only, skip DB writes"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
@@ -62,6 +65,7 @@ def scan(
 # ──────────────────────────────────────────────
 # tailor
 # ──────────────────────────────────────────────
+
 
 @app.command()
 def tailor(
@@ -101,6 +105,7 @@ def tailor(
 # apply
 # ──────────────────────────────────────────────
 
+
 @app.command()
 def apply(
     profile: str = typer.Argument(...),
@@ -117,6 +122,7 @@ def apply(
 # ──────────────────────────────────────────────
 # score-job
 # ──────────────────────────────────────────────
+
 
 @app.command()
 def score_job(
@@ -139,19 +145,20 @@ def score_job(
     table = Table(title=f"Score — {scored.company} | {scored.role}")
     table.add_column("Dimension")
     table.add_column("Score", justify="right")
-    table.add_row("cv_match",          f"{scored.cv_match_score:.2f}")
-    table.add_row("company_mission",   f"{scored.company_mission_fit_score:.2f}")
-    table.add_row("role_mission",      f"{scored.role_mission_fit_score:.2f}")
-    table.add_row("comp",              f"{scored.comp_score:.2f}")
-    table.add_row("cultural",          f"{scored.cultural_score:.2f}")
-    table.add_row("red_flags",         f"{scored.red_flags_score:.2f}")
+    table.add_row("cv_match", f"{scored.cv_match_score:.2f}")
+    table.add_row("company_mission", f"{scored.company_mission_fit_score:.2f}")
+    table.add_row("role_mission", f"{scored.role_mission_fit_score:.2f}")
+    table.add_row("comp", f"{scored.comp_score:.2f}")
+    table.add_row("cultural", f"{scored.cultural_score:.2f}")
+    table.add_row("red_flags", f"{scored.red_flags_score:.2f}")
     table.add_row("[bold]total[/bold]", f"[bold]{scored.total_score:.2f}[/bold]")
     rprint(table)
     rprint(f"tier={scored.tier or 'unset'}  dream_tier={scored.dream_tier or 'none'}")
 
     # Persist updated scores
     db.update_job(
-        profile, job_id,
+        profile,
+        job_id,
         cv_match_score=scored.cv_match_score,
         company_mission_fit_score=scored.company_mission_fit_score,
         role_mission_fit_score=scored.role_mission_fit_score,
@@ -167,12 +174,17 @@ def score_job(
 # log-response
 # ──────────────────────────────────────────────
 
+
 @app.command()
 def log_response(
     profile: str = typer.Argument(...),
     job_id: int = typer.Argument(...),
-    response_type: str = typer.Argument(..., help="interview | rejection | offer | ghosted | other"),
-    response_date: Optional[str] = typer.Option(None, "--date", "-d", help="ISO date (default: today)"),
+    response_type: str = typer.Argument(
+        ..., help="interview | rejection | offer | ghosted | other"
+    ),
+    response_date: Optional[str] = typer.Option(
+        None, "--date", "-d", help="ISO date (default: today)"
+    ),
     note: Optional[str] = typer.Option(None, "--note", "-n"),
 ) -> None:
     """Record an outcome response (interview invite, rejection, offer, etc.)."""
@@ -185,6 +197,7 @@ def log_response(
 # ──────────────────────────────────────────────
 # analytics
 # ──────────────────────────────────────────────
+
 
 @app.command()
 def analytics(
@@ -201,11 +214,11 @@ def analytics(
     table.add_column("Stage")
     table.add_column("Count", justify="right")
     table.add_column("Rate", justify="right")
-    table.add_row("Evaluated",  str(funnel["evaluated"]),  "—")
-    table.add_row("Applied",    str(funnel["applied"]),    f"{funnel['applied_rate']}%")
-    table.add_row("Responded",  str(funnel["responded"]),  f"{funnel['response_rate']}%")
-    table.add_row("Interview",  str(funnel["interview"]),  f"{funnel['interview_rate']}%")
-    table.add_row("Offer",      str(funnel["offer"]),      f"{funnel['offer_rate']}%")
+    table.add_row("Evaluated", str(funnel["evaluated"]), "—")
+    table.add_row("Applied", str(funnel["applied"]), f"{funnel['applied_rate']}%")
+    table.add_row("Responded", str(funnel["responded"]), f"{funnel['response_rate']}%")
+    table.add_row("Interview", str(funnel["interview"]), f"{funnel['interview_rate']}%")
+    table.add_row("Offer", str(funnel["offer"]), f"{funnel['offer_rate']}%")
     rprint(table)
 
     rprint(
@@ -235,6 +248,7 @@ def analytics(
 # rebuild-canonicals
 # ──────────────────────────────────────────────
 
+
 @app.command()
 def rebuild_canonicals(
     profile: str = typer.Argument(...),
@@ -252,6 +266,7 @@ def rebuild_canonicals(
 # ──────────────────────────────────────────────
 # init-profile
 # ──────────────────────────────────────────────
+
 
 @app.command()
 def init_profile(
@@ -331,8 +346,13 @@ opener_patterns: []
 
     (person_dir / "profile.yaml").write_text(profile_stub, encoding="utf-8")
     (person_dir / "voice.yaml").write_text(voice_stub, encoding="utf-8")
-    (person_dir / "stories.md").write_text(f"# {name.title()} Stories\n\n<!-- STAR+R format -->\n", encoding="utf-8")
-    (person_dir / "log.md").write_text(f"# {name.title()} Application Log\n\n<!-- auto-updated by matchbox log-response -->\n", encoding="utf-8")
+    (person_dir / "stories.md").write_text(
+        f"# {name.title()} Stories\n\n<!-- STAR+R format -->\n", encoding="utf-8"
+    )
+    (person_dir / "log.md").write_text(
+        f"# {name.title()} Application Log\n\n<!-- auto-updated by matchbox log-response -->\n",
+        encoding="utf-8",
+    )
 
     rprint(f"[green]Created[/green] {person_dir}")
     rprint("  Edit profile.yaml and stories.md, then run: matchbox scan {name}")
@@ -340,6 +360,7 @@ opener_patterns: []
 
 def _today() -> str:
     from datetime import date
+
     return date.today().isoformat()
 
 

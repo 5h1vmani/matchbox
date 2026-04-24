@@ -44,15 +44,13 @@ st.markdown(_STYLE, unsafe_allow_html=True)
 # Sidebar — profile selector + navigation
 # ──────────────────────────────────────────────
 
+
 def _available_profiles() -> list[str]:
     root = Path(__file__).resolve().parents[4]
     people = root / "people"
     if not people.exists():
         return []
-    return sorted(
-        d.name for d in people.iterdir()
-        if d.is_dir() and (d / "profile.yaml").exists()
-    )
+    return sorted(d.name for d in people.iterdir() if d.is_dir() and (d / "profile.yaml").exists())
 
 
 with st.sidebar:
@@ -77,24 +75,24 @@ with st.sidebar:
 # ──────────────────────────────────────────────
 
 _STATE_COLORS = {
-    "evaluated":        "#888",
-    "queued_for_tailor":"#9C27B0",
-    "tailored":         "#2196F3",
-    "applied":          "#FF9800",
-    "responded":        "#03A9F4",
-    "interview":        "#8BC34A",
-    "offer":            "#4CAF50",
-    "rejected":         "#F44336",
-    "discarded":        "#9E9E9E",
-    "skip":             "#616161",
-    "cooling":          "#795548",
+    "evaluated": "#888",
+    "queued_for_tailor": "#9C27B0",
+    "tailored": "#2196F3",
+    "applied": "#FF9800",
+    "responded": "#03A9F4",
+    "interview": "#8BC34A",
+    "offer": "#4CAF50",
+    "rejected": "#F44336",
+    "discarded": "#9E9E9E",
+    "skip": "#616161",
+    "cooling": "#795548",
 }
 
 _TIER_COLORS = {
-    "bespoke":   "🔴",
-    "template":  "🟡",
+    "bespoke": "🔴",
+    "template": "🟡",
     "canonical": "🟢",
-    "skip":      "⚫",
+    "skip": "⚫",
 }
 
 
@@ -113,6 +111,7 @@ def _badge(state: str) -> str:
 # ──────────────────────────────────────────────
 # Page: Pipeline
 # ──────────────────────────────────────────────
+
 
 def page_pipeline(profile: str) -> None:
     st.header("Pipeline")
@@ -213,11 +212,18 @@ def _render_job_row(profile: str, job: Job) -> None:
         with btn_cols[3]:
             if job.cv_path and Path(job.cv_path).exists():
                 with open(job.cv_path, "rb") as f:
-                    st.download_button("Download CV", f, file_name=Path(job.cv_path).name, key=f"cv_{job.id}")
+                    st.download_button(
+                        "Download CV", f, file_name=Path(job.cv_path).name, key=f"cv_{job.id}"
+                    )
         with btn_cols[4]:
             if job.cover_path and Path(job.cover_path).exists():
                 with open(job.cover_path, "rb") as f:
-                    st.download_button("Download Cover", f, file_name=Path(job.cover_path).name, key=f"cov_{job.id}")
+                    st.download_button(
+                        "Download Cover",
+                        f,
+                        file_name=Path(job.cover_path).name,
+                        key=f"cov_{job.id}",
+                    )
 
         if job.user_notes:
             st.caption(f"Notes: {job.user_notes}")
@@ -226,6 +232,7 @@ def _render_job_row(profile: str, job: Job) -> None:
 # ──────────────────────────────────────────────
 # Page: Analytics
 # ──────────────────────────────────────────────
+
 
 def page_analytics(profile: str) -> None:
     from matchbox.outcome.analytics import get_funnel, get_tier_cost_summary
@@ -236,24 +243,25 @@ def page_analytics(profile: str) -> None:
 
     # Funnel metrics
     m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Evaluated",   funnel["evaluated"])
-    m2.metric("Applied",     funnel["applied"],    f"{funnel['applied_rate']}%")
-    m3.metric("Responded",   funnel["responded"],  f"{funnel['response_rate']}%")
-    m4.metric("Interview",   funnel["interview"],  f"{funnel['interview_rate']}%")
-    m5.metric("Offer",       funnel["offer"],      f"{funnel['offer_rate']}%")
+    m1.metric("Evaluated", funnel["evaluated"])
+    m2.metric("Applied", funnel["applied"], f"{funnel['applied_rate']}%")
+    m3.metric("Responded", funnel["responded"], f"{funnel['response_rate']}%")
+    m4.metric("Interview", funnel["interview"], f"{funnel['interview_rate']}%")
+    m5.metric("Offer", funnel["offer"], f"{funnel['offer_rate']}%")
 
     st.divider()
 
     # Cost summary
     c1, c2, c3 = st.columns(3)
-    c1.metric("Total cost",        f"${funnel['total_cost_usd']:.2f}")
+    c1.metric("Total cost", f"${funnel['total_cost_usd']:.2f}")
     c2.metric("Cost / application", f"${funnel['cost_per_application']:.2f}")
-    c3.metric("Avg score",          f"{funnel['avg_score']:.2f} / 5.00")
+    c3.metric("Avg score", f"{funnel['avg_score']:.2f} / 5.00")
 
     # Tier breakdown
     if tier_costs:
         st.subheader("Cost by tier")
         import pandas as pd
+
         rows = [
             {"Tier": t, "Jobs": v["count"], "Total $": v["total_usd"], "Avg $": v["avg_usd"]}
             for t, v in sorted(tier_costs.items())
@@ -266,6 +274,7 @@ def page_analytics(profile: str) -> None:
     scored = [j.total_score for j in jobs if j.total_score is not None]
     if scored:
         import pandas as pd
+
         st.bar_chart(pd.Series(scored).value_counts(bins=10).sort_index())
     else:
         st.info("No scored jobs yet.")
@@ -274,18 +283,18 @@ def page_analytics(profile: str) -> None:
     st.subheader("Jobs by state")
     stats = db.get_stats(profile)
     state_data = {
-        k.replace("count_", ""): v
-        for k, v in stats.items()
-        if k.startswith("count_") and v > 0
+        k.replace("count_", ""): v for k, v in stats.items() if k.startswith("count_") and v > 0
     }
     if state_data:
         import pandas as pd
+
         st.bar_chart(pd.Series(state_data).sort_values(ascending=False))
 
 
 # ──────────────────────────────────────────────
 # Page: Follow-ups
 # ──────────────────────────────────────────────
+
 
 def page_followups(profile: str) -> None:
     from matchbox.outcome.followup import get_followup_candidates
@@ -318,6 +327,7 @@ def page_followups(profile: str) -> None:
 # Page: Scan history
 # ──────────────────────────────────────────────
 
+
 def page_scan_history(profile: str) -> None:
     st.header("Scan history")
     runs = db.get_scan_history(profile, limit=50)
@@ -327,21 +337,24 @@ def page_scan_history(profile: str) -> None:
         return
 
     import pandas as pd
+
     rows = []
     for r in runs:
-        rows.append({
-            "ID":         r.id,
-            "Started":    r.started_at[:16] if r.started_at else "",
-            "Mode":       r.mode or "—",
-            "Country":    r.country or "all",
-            "Status":     r.status,
-            "Raw":        r.raw_candidates,
-            "Survivors":  r.filtered_survivors,
-            "Scored":     r.scored_count,
-            "Skip":       r.skip_count,
-            "Trial":      "✓" if r.is_trial else "",
-            "Cost $":     f"{r.cost_usd:.4f}",
-        })
+        rows.append(
+            {
+                "ID": r.id,
+                "Started": r.started_at[:16] if r.started_at else "",
+                "Mode": r.mode or "—",
+                "Country": r.country or "all",
+                "Status": r.status,
+                "Raw": r.raw_candidates,
+                "Survivors": r.filtered_survivors,
+                "Scored": r.scored_count,
+                "Skip": r.skip_count,
+                "Trial": "✓" if r.is_trial else "",
+                "Cost $": f"{r.cost_usd:.4f}",
+            }
+        )
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
