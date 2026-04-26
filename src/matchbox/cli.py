@@ -59,6 +59,11 @@ def scan(
         f"raw={result.raw} inserted={result.inserted} "
         f"dupes={result.skipped_dupe} excluded={result.excluded}"
     )
+    if result.inserted and not dry_run:
+        rprint(
+            f"\n[dim]Next:[/dim] [bold]matchbox web[/bold] "
+            f"(or open the inbox at /p/{profile}/inbox)"
+        )
 
 
 # ──────────────────────────────────────────────
