@@ -181,6 +181,47 @@ class TestJobActions:
 # ──────────────────────────────────────────────
 
 
+class TestAccessibility:
+    """Lightweight a11y smoke checks. Catches regressions in markup that
+    the focus-trap and screen-reader story depend on."""
+
+    def test_skip_link_present(self, client: TestClient) -> None:
+        r = client.get("/p/demo/inbox")
+        assert r.status_code == 200
+        assert "#main-content" in r.text
+        assert "Skip to main content" in r.text
+
+    def test_main_landmark_present(self, client: TestClient) -> None:
+        r = client.get("/p/demo/inbox")
+        assert 'id="main-content"' in r.text
+        assert 'role="main"' in r.text
+
+    def test_palette_has_focus_trap(self, client: TestClient) -> None:
+        r = client.get("/p/demo/inbox")
+        assert "data-focus-trap" in r.text  # at least the palette + help modals
+        assert 'role="dialog"' in r.text
+        assert 'aria-modal="true"' in r.text
+
+    def test_bulk_tailor_progress_has_focus_trap(self, client: TestClient) -> None:
+        from matchbox.core import db
+        from matchbox.web import tasks
+
+        # Render the progress modal directly via an in-memory task so we
+        # don't need to actually run the LLM.
+        ids = [j.id for j in db.list_jobs("demo", limit=1)]
+        if not ids:
+            pytest.skip("no jobs seeded")
+        # Manually construct a Task and request the polling endpoint.
+        t = tasks.create("bulk_tailor", [tasks.TaskItem(label="X — Y")])
+        try:
+            r = client.get(f"/p/demo/bulk/tailor/{t.id}")
+            assert r.status_code == 200
+            assert "data-focus-trap" in r.text
+            assert 'role="dialog"' in r.text
+        finally:
+            tasks._TASKS.pop(t.id, None)
+
+
 class TestSecurity:
     def test_invalid_profile_name_blocked_by_pattern(self, client: TestClient) -> None:
         # Path traversal attempt at the profile slug.

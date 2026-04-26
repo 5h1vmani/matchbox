@@ -82,6 +82,73 @@ function paletteNav() {
 }
 window.paletteNav = paletteNav;
 
+// ─────────────────────────────────────────────────────────
+// Focus trap for modals (WCAG AA / ALERT 1).
+// Any element with [data-focus-trap] that is currently visible (offsetParent
+// non-null) wins; Tab + Shift+Tab cycle within it. The topmost such element
+// in DOM order takes precedence so nested modals nest cleanly.
+// ─────────────────────────────────────────────────────────
+const _FOCUSABLE_SEL = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled]):not([type=hidden])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+function _visibleModals() {
+    return Array.from(document.querySelectorAll('[data-focus-trap]'))
+                .filter(el => el.offsetParent !== null);
+}
+
+function _focusableIn(container) {
+    return Array.from(container.querySelectorAll(_FOCUSABLE_SEL))
+                .filter(el => el.offsetParent !== null);
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const modals = _visibleModals();
+    if (modals.length === 0) return;
+    const trap = modals[modals.length - 1];
+
+    // If focus is outside the modal, pull it back in.
+    if (!trap.contains(document.activeElement)) {
+        e.preventDefault();
+        const focusables = _focusableIn(trap);
+        focusables[0]?.focus();
+        return;
+    }
+
+    const focusables = _focusableIn(trap);
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+
+    if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+    }
+}, true);  // capture so we beat default tab behaviour even inside HTMX-swapped content
+
+// When a modal becomes visible (added or x-show flips), move focus into it.
+// Uses MutationObserver to catch dynamic modals (bulk tailor inserts via fetch).
+new MutationObserver((mutations) => {
+    for (const m of mutations) {
+        for (const node of m.addedNodes) {
+            if (node.nodeType !== 1) continue;
+            const trap = node.matches?.('[data-focus-trap]') ? node : node.querySelector?.('[data-focus-trap]');
+            if (trap && trap.offsetParent !== null) {
+                _focusableIn(trap)[0]?.focus();
+            }
+        }
+    }
+}).observe(document.body, { childList: true, subtree: true });
+
 // Re-fetch the open detail panel (used after undo, bulk actions, etc.).
 function refreshOpenDetail() {
     const panel = document.querySelector('#detail-panel [data-job-id]');

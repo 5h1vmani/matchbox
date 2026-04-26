@@ -98,17 +98,20 @@
 
     <!-- Keyboard help overlay -->
     <div x-show="help" x-cloak
+         data-focus-trap
          role="dialog"
          aria-modal="true"
          aria-labelledby="kbd-help-title"
          class="fixed inset-0 z-40 bg-slate-900/60 flex items-center justify-center p-4"
-         @click="help = false">
+         @click="help = false"
+         x-init="$watch('help', open => { if (open) $nextTick(() => $el.querySelector('button')?.focus()); })">
         {% include "components/keyboard_help.html" %}
     </div>
 
     <!-- Cmd+K command palette -->
     {% if active_profile %}
     <div x-show="palette" x-cloak
+         data-focus-trap
          role="dialog"
          aria-modal="true"
          aria-label="Command palette"
