@@ -1,0 +1,25 @@
+{# Gate violation card — surfaces hidden quality issues for visual review. #}
+{% if violations %}
+<div class="bg-rose-50 border border-rose-200 rounded-lg p-4">
+    <div class="flex items-center justify-between mb-2">
+        <h3 class="font-medium text-rose-900">
+            <span class="text-base">⚠</span> {{ violations|length }} quality gate violation(s)
+        </h3>
+    </div>
+    <p class="text-xs text-rose-800 mb-2">
+        These bullets/cover paragraphs failed deterministic checks. The PDF was still generated;
+        re-tailor or edit the YAML to address them.
+    </p>
+    <ul class="space-y-1.5 text-xs">
+        {% for v in violations[:10] %}
+        <li class="flex items-start gap-2">
+            <code class="bg-rose-100 text-rose-900 px-1.5 py-0.5 rounded shrink-0">{{ v.gate }}</code>
+            <span class="text-rose-900">{{ v.detail }}</span>
+        </li>
+        {% endfor %}
+        {% if violations|length > 10 %}
+        <li class="text-rose-700 italic">… and {{ violations|length - 10 }} more.</li>
+        {% endif %}
+    </ul>
+</div>
+{% endif %}

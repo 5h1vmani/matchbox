@@ -2,36 +2,135 @@
 {% block title %}Profile · {{ active_profile }} · {{ app_name }}{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-6 py-6">
-    <h1 class="text-xl font-semibold text-slate-900">{{ person.profile.candidate.full_name or active_profile }}</h1>
-    <p class="text-sm text-slate-600 mt-1">{{ person.profile.candidate.location or '—' }}</p>
+<div class="max-w-3xl mx-auto px-6 py-6 space-y-6">
 
-    <div class="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
-        Live profile editor (sliders for scoring weights with re-score preview) ships in the next phase.
-        For now, edit
-        <code class="text-xs bg-amber-100 px-1.5 py-0.5 rounded">people/{{ active_profile }}/profile.yaml</code>
-        directly and reload.
-    </div>
+    <header>
+        <h1 class="text-xl font-semibold text-slate-900">{{ person.profile.candidate.full_name or active_profile }}</h1>
+        <p class="text-sm text-slate-600 mt-1">{{ person.profile.candidate.location or '—' }}</p>
+    </header>
 
-    <section class="mt-6 bg-white border border-slate-200 rounded-xl p-5">
-        <h2 class="font-medium text-slate-900 mb-3">Current scoring weights</h2>
-        <dl class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-            {% set w = person.profile.scoring %}
-            {% set weights = [
-                ('CV match',           w.cv_match_weight),
-                ('Company mission',    w.company_mission_fit_weight),
-                ('Role mission',       w.role_mission_fit_weight),
-                ('Tech stack',         w.tech_stack_weight),
-                ('Seniority',          w.seniority_weight),
-                ('Location / remote',  w.location_remote_weight),
+    <!-- Scoring weights — live-tunable -->
+    <section class="bg-white border border-slate-200 rounded-xl p-5"
+             x-data="weightsForm({{ {
+                 'cv_match_weight': person.profile.scoring.cv_match_weight,
+                 'company_mission_fit_weight': person.profile.scoring.company_mission_fit_weight,
+                 'role_mission_fit_weight': person.profile.scoring.role_mission_fit_weight,
+                 'tech_stack_weight': person.profile.scoring.tech_stack_weight,
+                 'seniority_weight': person.profile.scoring.seniority_weight,
+                 'location_remote_weight': person.profile.scoring.location_remote_weight,
+             } | tojson }})">
+
+        <div class="flex items-baseline justify-between mb-4">
+            <h2 class="font-medium text-slate-900">Scoring weights</h2>
+            <span class="text-xs text-slate-500">
+                Sum:
+                <strong class="tabular-nums"
+                        :class="Math.abs(total - 1) < 0.001 ? 'text-emerald-600' : 'text-amber-600'"
+                        x-text="total.toFixed(3)"></strong>
+                <span class="text-slate-400" x-show="Math.abs(total - 1) >= 0.001" x-cloak>
+                    (should sum to 1.000)
+                </span>
+            </span>
+        </div>
+
+        <form hx-post="/p/{{ active_profile }}/profile/save"
+              hx-target="#weights-result"
+              hx-swap="innerHTML"
+              class="space-y-3">
+
+            {% set labels = [
+                ('cv_match_weight',           'CV match',
+                 'How much keyword overlap with the JD matters.'),
+                ('company_mission_fit_weight','Company mission fit',
+                 'Dream-tier list match boosts this.'),
+                ('role_mission_fit_weight',   'Role mission fit',
+                 'How well the role fits target archetypes.'),
+                ('tech_stack_weight',         'Tech stack',
+                 'Skills overlap between profile and JD.'),
+                ('seniority_weight',          'Seniority',
+                 'Title-level match (junior / senior / staff).'),
+                ('location_remote_weight',    'Location / remote',
+                 'Remote preference and country fit.'),
             ] %}
-            {% for label, val in weights %}
-            <div class="flex justify-between">
-                <dt class="text-slate-600">{{ label }}</dt>
-                <dd class="text-slate-900 tabular-nums">{{ val }}</dd>
+
+            {% for field, label, hint in labels %}
+            <div>
+                <div class="flex items-center justify-between text-sm">
+                    <label for="{{ field }}" class="text-slate-700 font-medium">{{ label }}</label>
+                    <span class="text-xs text-slate-500 tabular-nums" x-text="weights['{{ field }}'].toFixed(3)"></span>
+                </div>
+                <input type="range" name="{{ field }}" id="{{ field }}"
+                       min="0" max="1" step="0.01"
+                       x-model.number="weights['{{ field }}']"
+                       @input="recompute()"
+                       class="w-full mt-1 accent-indigo-600">
+                <p class="text-xs text-slate-400 mt-0.5">{{ hint }}</p>
             </div>
             {% endfor %}
+
+            <div class="flex items-center gap-2 pt-3 border-t border-slate-100">
+                <button type="button" @click="normalize()"
+                        class="text-xs px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">
+                    Normalize to 1.0
+                </button>
+                <button type="button" @click="reset()"
+                        class="text-xs px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">
+                    Reset to last saved
+                </button>
+                <button type="submit"
+                        class="ml-auto text-sm px-3 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-white">
+                    Save
+                </button>
+            </div>
+        </form>
+
+        <div id="weights-result" class="mt-3"></div>
+
+        <p class="mt-4 text-xs text-slate-500">
+            Changing weights does not re-score existing jobs. Re-run
+            <code class="bg-slate-100 px-1 rounded">matchbox score-job {{ active_profile }} &lt;id&gt;</code>
+            for any job you want updated.
+        </p>
+    </section>
+
+    <!-- Read-only profile sections — link out to YAML for structural edits -->
+    <section class="bg-white border border-slate-200 rounded-xl p-5">
+        <h2 class="font-medium text-slate-900 mb-3">Structural profile</h2>
+        <p class="text-sm text-slate-600 mb-3">
+            Work history, voice rules, and exclusions stay in YAML for reviewability.
+            Edit
+            <code class="text-xs bg-slate-100 px-1.5 py-0.5 rounded">people/{{ active_profile }}/profile.yaml</code>
+            and reload.
+        </p>
+        <dl class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+            <div class="flex justify-between"><dt class="text-slate-600">Work entries</dt><dd>{{ person.profile.work_history|length }}</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-600">Skills</dt><dd>{{ person.profile.skills|length }}</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-600">Archetypes</dt><dd>{{ person.profile.targets.archetypes|length }}</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-600">Dream tier 1</dt><dd>{{ person.profile.targets.dream_tiers.tier_1_dream|length }}</dd></div>
         </dl>
     </section>
 </div>
+
+<script>
+function weightsForm(initial) {
+    return {
+        weights: { ...initial },
+        original: { ...initial },
+        total: 0,
+        init() { this.recompute(); },
+        recompute() {
+            this.total = Object.values(this.weights).reduce((a, b) => a + b, 0);
+        },
+        normalize() {
+            if (this.total === 0) return;
+            for (const k in this.weights) this.weights[k] = this.weights[k] / this.total;
+            this.recompute();
+        },
+        reset() {
+            this.weights = { ...this.original };
+            this.recompute();
+        },
+    }
+}
+</script>
 {% endblock %}

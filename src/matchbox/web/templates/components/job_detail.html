@@ -132,16 +132,50 @@
             </div>
         </section>
 
-        <!-- Tailor preview / PDF -->
+        <!-- Tailor section: button → preview → execute → PDF + violations -->
+        <section id="tailor-section">
+            <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Tailor</h3>
+            <button type="button"
+                    hx-get="/p/{{ active_profile }}/jobs/{{ job.id }}/tailor/preview"
+                    hx-target="#tailor-section"
+                    hx-swap="beforeend"
+                    class="text-sm px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white">
+                Tailor now
+            </button>
+            <span class="ml-2 text-xs text-slate-500">
+                Routes to {{ job.tier or '—' }} tier based on score.
+            </span>
+        </section>
+
+        {% if tailor_outcome %}
+        {% if tailor_outcome.error %}
+        <div class="bg-rose-50 border border-rose-200 rounded-lg p-3 text-sm text-rose-900">
+            <strong>Tailor failed:</strong> {{ tailor_outcome.error }}
+        </div>
+        {% endif %}
+        {% set violations = tailor_outcome.violations %}
+        {% include "components/_violations.html" %}
+        {% endif %}
+
+        <!-- Generated CV preview -->
         {% if job.cv_path %}
         <section>
             <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Generated CV</h3>
             <iframe src="/p/{{ active_profile }}/files/{{ job.id }}/{{ job.cv_path.split('/')[-1] }}"
-                    class="w-full h-96 rounded-lg border border-slate-200 bg-white"></iframe>
+                    class="w-full h-96 rounded-lg border border-slate-200 bg-white"
+                    title="Tailored CV preview"></iframe>
             {% if job.tailor_cost_usd %}
             <p class="mt-1 text-xs text-slate-500">
                 Tailored as <strong>{{ job.tier }}</strong>, cost {{ job.tailor_cost_usd | usd(precision=4) }}
             </p>
+            {% endif %}
+            {% if job.cover_path %}
+            <details class="mt-2">
+                <summary class="text-xs text-slate-600 cursor-pointer">Cover letter</summary>
+                <iframe src="/p/{{ active_profile }}/files/{{ job.id }}/{{ job.cover_path.split('/')[-1] }}"
+                        class="mt-2 w-full h-80 rounded-lg border border-slate-200 bg-white"
+                        title="Tailored cover letter preview"></iframe>
+            </details>
             {% endif %}
         </section>
         {% endif %}

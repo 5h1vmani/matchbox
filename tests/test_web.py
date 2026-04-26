@@ -9,10 +9,13 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from matchbox.core.schema import Job
 from matchbox.web.app import create_app
 from matchbox.web.config import Settings
 from matchbox.web.demo import seed_demo_profile
+from matchbox.web.profile_view import update_weights
 from matchbox.web.routes.jobs import parse_filters
+from matchbox.web.tailor_view import alternative_tier, estimate
 
 
 @pytest.fixture(scope="module")
@@ -197,8 +200,143 @@ class TestParseFilters:
 
 
 # ──────────────────────────────────────────────
+# Tailor — cost estimate + preview routes (no LLM call)
+# ──────────────────────────────────────────────
+
+
+def _job_with_tier(tier: str) -> Job:
+    return Job(
+        profile_name="demo",
+        company="X",
+        role="Y",
+        url="https://example.com/x",
+        tier=tier,
+    )
+
+
+class TestTailorEstimate:
+    def test_bespoke_requires_llm_and_confirmation(self) -> None:
+        e = estimate(_job_with_tier("bespoke"))
+        assert e.requires_llm is True
+        assert e.high_usd >= 10.0
+        assert e.needs_confirmation(threshold_usd=1.0) is True
+
+    def test_template_under_threshold(self) -> None:
+        e = estimate(_job_with_tier("template"))
+        assert e.requires_llm is True
+        assert e.high_usd < 1.0
+        assert e.needs_confirmation(threshold_usd=1.0) is False
+
+    def test_canonical_is_free(self) -> None:
+        e = estimate(_job_with_tier("canonical"))
+        assert e.requires_llm is False
+        assert e.midpoint_usd == 0.0
+
+    def test_alternative_tier_chain(self) -> None:
+        assert alternative_tier("bespoke") == "template"
+        assert alternative_tier("template") == "canonical"
+        assert alternative_tier("canonical") == "skip"
+        assert alternative_tier("skip") is None
+        assert alternative_tier("invalid") is None
+
+    def test_tailor_preview_renders(self, client: TestClient) -> None:
+        jid = _first_job_id(client)
+        r = client.get(f"/p/demo/jobs/{jid}/tailor/preview")
+        assert r.status_code == 200
+        assert "tailor" in r.text.lower()
+
+    def test_expensive_tailor_requires_confirmation(self, client: TestClient) -> None:
+        from matchbox.core import db
+
+        bespoke = next(
+            (j for j in db.list_jobs("demo", limit=500) if j.tier == "bespoke"),
+            None,
+        )
+        if bespoke is None:
+            pytest.skip("no bespoke-tier job in seed")
+        # POST without confirmed=1 must be rejected with 412 Precondition Failed.
+        r = client.post(f"/p/demo/jobs/{bespoke.id}/tailor")
+        assert r.status_code == 412
+
+
+# ──────────────────────────────────────────────
 # Demo seed idempotency
 # ──────────────────────────────────────────────
+
+
+class TestProfileEditor:
+    @pytest.fixture()
+    def demo_yaml_backup(self, settings: Settings) -> str:
+        """Snapshot demo profile.yaml so write tests can roll back."""
+        path = settings.profile_dir("demo") / "profile.yaml"
+        original = path.read_text(encoding="utf-8")
+        yield original
+        path.write_text(original, encoding="utf-8")
+
+    def test_update_weights_writes_atomically(
+        self, settings: Settings, demo_yaml_backup: str
+    ) -> None:
+        result = update_weights(
+            settings,
+            "demo",
+            {"cv_match_weight": 0.42, "tech_stack_weight": 0.13},
+        )
+        assert result["cv_match_weight"] == 0.42
+        assert result["tech_stack_weight"] == 0.13
+        # Other fields preserved.
+        assert "company_mission_fit_weight" in result
+        # File was actually rewritten.
+        text = (settings.profile_dir("demo") / "profile.yaml").read_text(encoding="utf-8")
+        assert "0.42" in text
+
+    def test_update_weights_rejects_unknown_field(
+        self, settings: Settings, demo_yaml_backup: str
+    ) -> None:
+        with pytest.raises(ValueError, match="unknown weight field"):
+            update_weights(settings, "demo", {"evil_weight": 0.5})
+
+    def test_update_weights_rejects_out_of_range(
+        self, settings: Settings, demo_yaml_backup: str
+    ) -> None:
+        with pytest.raises(ValueError, match="out of range"):
+            update_weights(settings, "demo", {"cv_match_weight": 1.5})
+        with pytest.raises(ValueError, match="out of range"):
+            update_weights(settings, "demo", {"cv_match_weight": -0.1})
+
+    def test_save_endpoint_persists(
+        self, client: TestClient, settings: Settings, demo_yaml_backup: str
+    ) -> None:
+        r = client.post(
+            "/p/demo/profile/save",
+            data={
+                "cv_match_weight": 0.30,
+                "company_mission_fit_weight": 0.20,
+                "role_mission_fit_weight": 0.10,
+                "tech_stack_weight": 0.20,
+                "seniority_weight": 0.10,
+                "location_remote_weight": 0.10,
+            },
+        )
+        assert r.status_code == 200
+        assert "Saved" in r.text
+        text = (settings.profile_dir("demo") / "profile.yaml").read_text(encoding="utf-8")
+        assert "0.3" in text  # cv_match_weight written
+
+    def test_save_endpoint_rejects_out_of_range(
+        self, client: TestClient, demo_yaml_backup: str
+    ) -> None:
+        r = client.post(
+            "/p/demo/profile/save",
+            data={
+                "cv_match_weight": 5.0,  # invalid
+                "company_mission_fit_weight": 0.15,
+                "role_mission_fit_weight": 0.15,
+                "tech_stack_weight": 0.20,
+                "seniority_weight": 0.15,
+                "location_remote_weight": 0.10,
+            },
+        )
+        assert r.status_code == 400
 
 
 class TestDemoSeed:

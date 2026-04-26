@@ -213,4 +213,76 @@ async def log_response(
     )
 
 
-# Tailor endpoints intentionally deferred to phase 4.
+# ──────────────────────────────────────────────
+# Tailor flow — preview → confirm → execute
+# ──────────────────────────────────────────────
+
+
+@router.get("/{job_id}/tailor/preview", response_class=HTMLResponse)
+async def tailor_preview(request: Request, profile: ProfileDep, job_id: int) -> HTMLResponse:
+    from matchbox.web.deps import get_settings
+    from matchbox.web.tailor_view import alternative_tier, estimate
+
+    job = db.get_job(profile, job_id)
+    if job is None:
+        raise HTTPException(404, "Job not found")
+
+    est = estimate(job)
+    settings = get_settings()
+    return render(
+        request,
+        "components/_tailor_preview.html",
+        {
+            "job": job,
+            "active_profile": profile,
+            "estimate": est,
+            "alt_tier": alternative_tier(est.tier),
+            "needs_confirm": est.needs_confirmation(settings.cost_confirm_threshold_usd),
+            "threshold": settings.cost_confirm_threshold_usd,
+        },
+    )
+
+
+@router.post("/{job_id}/tailor", response_class=HTMLResponse)
+async def tailor_execute(
+    request: Request,
+    profile: ProfileDep,
+    job_id: int,
+    tier_override: Annotated[str | None, Form()] = None,
+    confirmed: Annotated[str | None, Form()] = None,
+) -> HTMLResponse:
+    from matchbox.core.person import load_person
+    from matchbox.web.deps import get_settings
+    from matchbox.web.tailor_view import estimate, run
+
+    job = db.get_job(profile, job_id)
+    if job is None:
+        raise HTTPException(404, "Job not found")
+
+    settings = get_settings()
+    est = estimate(job.model_copy(update={"tier": tier_override}) if tier_override else job)
+    if est.needs_confirmation(settings.cost_confirm_threshold_usd) and confirmed != "1":
+        # Defence in depth: user must POST `confirmed=1` for expensive tailor.
+        raise HTTPException(412, "Cost confirmation required")
+
+    person = load_person(profile)
+    outcome = run(job, person, tier_override=tier_override)
+
+    job_after = db.get_job(profile, job_id)
+    return render(
+        request,
+        "components/job_detail.html",
+        {
+            "job": job_after,
+            "active_profile": profile,
+            "valid_response_types": sorted(VALID_RESPONSE_TYPES),
+            "tailor_outcome": outcome,
+            "toast": (
+                f"Tailor failed: {outcome.error}"
+                if outcome.error
+                else f"Tailored as {outcome.application.tier}"
+                if outcome.application
+                else "Skipped (skip tier)"
+            ),
+        },
+    )
