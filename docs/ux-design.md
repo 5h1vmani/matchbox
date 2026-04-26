@@ -198,7 +198,23 @@ options because it requires the smaller commitment.
 
 ## Future moves (numbered for tracking)
 
-1. Live re-score preview on weight change (delta table of top 10 jobs).
+1. ~~Live re-score preview on weight change.~~ Shipped — see `web/profile_view.preview_rescore` and the `_rescore_preview.html` partial.
 2. Tailor "regenerate just this bullet" for surgical edits.
 3. Saved filter presets per profile.
 4. Email digest of follow-ups.
+5. Background-task bulk tailor (currently sync, capped at 5 — see `web/routes/bulk.MAX_BULK_TAILOR`).
+
+## Security posture
+
+This is a single-user local tool. Threat model is **"my own machine, my own
+network"** — not "untrusted users on the internet". Specifically:
+
+- **No auth.** Anyone who can reach the port can do everything.
+- **No CSRF.** A malicious page in the same browser could trigger form POSTs.
+- **No rate limiting.** A bug or runaway script could spam state changes.
+- **Binds to 127.0.0.1 by default.** The CLI prints a red warning if you
+  change `--host`.
+
+If you need to share Matchbox between machines, put it behind a reverse
+proxy with auth (Tailscale + a basic-auth Caddy config is the lowest-effort
+path).

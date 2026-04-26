@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from matchbox.web.deps import SettingsDep, list_profiles
+from matchbox.web.deps import SettingsDep, shell_context
 from matchbox.web.render import render
 
 router = APIRouter()
@@ -17,12 +17,7 @@ router = APIRouter()
 
 @router.get("/welcome", response_class=HTMLResponse, include_in_schema=False)
 async def welcome(request: Request, settings: SettingsDep) -> HTMLResponse:
-    profiles = list_profiles(settings)
-    return render(
-        request,
-        "pages/welcome.html",
-        {"profiles": profiles, "active_profile": None, "active_page": "welcome"},
-    )
+    return render(request, "pages/welcome.html", shell_context(settings, None, "welcome"))
 
 
 @router.post("/seed-demo", include_in_schema=False)

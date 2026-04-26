@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException
 from fastapi import Path as PathParam
@@ -19,6 +19,21 @@ from matchbox.web.config import Settings
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings.load()
+
+
+def shell_context(
+    settings: Settings, active_profile: str | None, active_page: str
+) -> dict[str, Any]:
+    """Common context for full-page templates: profile list, active selectors.
+
+    SSOT — both pages and the welcome route must call this so the nav header
+    looks consistent. Don't construct this dict by hand anywhere else.
+    """
+    return {
+        "profiles": list_profiles(settings),
+        "active_profile": active_profile,
+        "active_page": active_page,
+    }
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]

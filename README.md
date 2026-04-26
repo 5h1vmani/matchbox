@@ -80,6 +80,14 @@ matchbox init-profile alice
 matchbox scan alice --dry-run
 ```
 
+## Security note
+
+Matchbox is a single-user local tool with **no auth, no CSRF protection, and
+no rate limiting.** The dashboard binds to `127.0.0.1` by default. Do not
+expose it to the network. If you need remote access, put it behind a reverse
+proxy with auth — anyone who can reach the port can read your jobs and spend
+your Anthropic API budget.
+
 ## License
 
 MIT

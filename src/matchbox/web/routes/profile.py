@@ -1,6 +1,6 @@
 """Profile editor endpoints — live-tunable scoring weights.
 
-GET  /p/{profile}/profile/preview  -> normalisation + summary partial
+POST /p/{profile}/profile/preview  -> live re-score preview (no DB writes)
 POST /p/{profile}/profile/save     -> persist weights to profile.yaml
 """
 
@@ -11,18 +11,61 @@ from typing import Annotated
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
+from matchbox.core.schema import ScoringWeights
 from matchbox.web.deps import ProfileDep, SettingsDep
-from matchbox.web.profile_view import WEIGHT_FIELDS, update_weights
+from matchbox.web.profile_view import WEIGHT_FIELDS, preview_rescore, update_weights
 from matchbox.web.render import render
 
 router = APIRouter()
 
 
-@router.get("/preview", response_class=HTMLResponse)
-async def preview(request: Request, profile: ProfileDep) -> HTMLResponse:
-    # Reserved for live re-score preview (next phase).
-    return HTMLResponse(
-        "<div class='text-xs text-slate-400'>Live re-score preview lands in a follow-up.</div>"
+def _form_to_weights(
+    cv_match_weight: float,
+    company_mission_fit_weight: float,
+    role_mission_fit_weight: float,
+    comp_weight: float,
+    cultural_weight: float,
+    red_flags_weight: float,
+) -> ScoringWeights:
+    return ScoringWeights(
+        cv_match_weight=cv_match_weight,
+        company_mission_fit_weight=company_mission_fit_weight,
+        role_mission_fit_weight=role_mission_fit_weight,
+        comp_weight=comp_weight,
+        cultural_weight=cultural_weight,
+        red_flags_weight=red_flags_weight,
+    )
+
+
+@router.post("/preview", response_class=HTMLResponse)
+async def preview(
+    request: Request,
+    profile: ProfileDep,
+    cv_match_weight: Annotated[float, Form()],
+    company_mission_fit_weight: Annotated[float, Form()],
+    role_mission_fit_weight: Annotated[float, Form()],
+    comp_weight: Annotated[float, Form()],
+    cultural_weight: Annotated[float, Form()],
+    red_flags_weight: Annotated[float, Form()],
+) -> HTMLResponse:
+    """Render a live re-score preview for the slider values.
+
+    Pure read — no DB writes, no LLM call. weighted_total() recomputes from
+    cached dimension scores in milliseconds even for hundreds of jobs.
+    """
+    weights = _form_to_weights(
+        cv_match_weight,
+        company_mission_fit_weight,
+        role_mission_fit_weight,
+        comp_weight,
+        cultural_weight,
+        red_flags_weight,
+    )
+    preview_data = preview_rescore(profile, weights, top_n=10)
+    return render(
+        request,
+        "components/_rescore_preview.html",
+        {"preview": preview_data, "active_profile": profile},
     )
 
 

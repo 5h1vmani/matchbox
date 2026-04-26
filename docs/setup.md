@@ -52,6 +52,11 @@ The dashboard is FastAPI + HTMX + Tailwind — no build step.
 Use `matchbox seed-demo` to populate the demo profile with 30 synthetic jobs
 so you can see the UI in action before connecting an API key.
 
+> **Security:** the dashboard has no auth, no CSRF protection, and no rate
+> limiting. It binds to `127.0.0.1` by default. **Do not** expose to the
+> network. The CLI prints a warning if you set `--host` to anything else;
+> heed it.
+
 ## Typst (for PDF generation)
 
 Typst is only needed for `matchbox tailor` and `matchbox rebuild-canonicals`.

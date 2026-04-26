@@ -33,7 +33,8 @@
             </span>
         </div>
 
-        <form hx-post="/p/{{ active_profile }}/profile/save"
+        <form id="weights-form"
+              hx-post="/p/{{ active_profile }}/profile/save"
               hx-target="#weights-result"
               hx-swap="innerHTML"
               @htmx:after-request="if ($event.detail.successful) original = { ...weights }"
@@ -63,7 +64,7 @@
                 <input type="range" name="{{ field }}" id="{{ field }}"
                        min="0" max="1" step="0.01"
                        x-model.number="weights['{{ field }}']"
-                       @input="recompute()"
+                       @input="recompute(); requestPreview()"
                        class="w-full mt-1 accent-indigo-600">
                 <p class="text-xs text-slate-400 mt-0.5">{{ hint }}</p>
             </div>
@@ -87,11 +88,20 @@
 
         <div id="weights-result" class="mt-3"></div>
 
-        <p class="mt-4 text-xs text-slate-500">
-            Changing weights does not re-score existing jobs. Re-run
-            <code class="bg-slate-100 px-1 rounded">matchbox score-job {{ active_profile }} &lt;id&gt;</code>
-            for any job you want updated.
-        </p>
+        <!-- Live re-score preview (item #2) -->
+        <div class="mt-5 pt-5 border-t border-slate-100">
+            <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Live preview</h3>
+            <div id="preview-pane"
+                 hx-post="/p/{{ active_profile }}/profile/preview"
+                 hx-trigger="preview-changed from:body delay:300ms, load"
+                 hx-include="#weights-form"
+                 hx-target="this"
+                 hx-swap="innerHTML"
+                 hx-indicator="#preview-spinner">
+                <p class="text-xs text-slate-400">Loading preview…</p>
+            </div>
+            <span id="preview-spinner" class="htmx-indicator text-xs text-slate-400">Updating…</span>
+        </div>
     </section>
 
     <!-- Read-only profile sections — link out to YAML for structural edits -->
@@ -122,14 +132,20 @@ function weightsForm(initial) {
         recompute() {
             this.total = Object.values(this.weights).reduce((a, b) => a + b, 0);
         },
+        requestPreview() {
+            // HTMX listens for `preview-changed` on body and re-fetches.
+            document.body.dispatchEvent(new CustomEvent('preview-changed'));
+        },
         normalize() {
             if (this.total === 0) return;
             for (const k in this.weights) this.weights[k] = this.weights[k] / this.total;
             this.recompute();
+            this.requestPreview();
         },
         reset() {
             this.weights = { ...this.original };
             this.recompute();
+            this.requestPreview();
         },
     }
 }

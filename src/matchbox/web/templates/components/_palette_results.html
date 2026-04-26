@@ -1,0 +1,25 @@
+{% if items %}
+<ul class="divide-y divide-slate-100">
+    {% for it in items %}
+    <li>
+        <a href="{{ it.url }}"
+           class="flex items-center justify-between gap-3 px-4 py-2 hover:bg-indigo-50 cursor-pointer">
+            <div class="flex items-center gap-3 min-w-0">
+                <span class="text-xs uppercase tracking-wide text-slate-400 w-12 shrink-0">
+                    {{ it.kind }}
+                </span>
+                <div class="min-w-0">
+                    <div class="text-sm text-slate-900 truncate">{{ it.label }}</div>
+                    {% if it.hint %}<div class="text-xs text-slate-500 truncate">{{ it.hint }}</div>{% endif %}
+                </div>
+            </div>
+            <span class="text-slate-300 text-xs">↩</span>
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div class="px-4 py-6 text-center text-sm text-slate-400">
+    {% if q %}No matches for “{{ q }}”.{% else %}Type to search.{% endif %}
+</div>
+{% endif %}

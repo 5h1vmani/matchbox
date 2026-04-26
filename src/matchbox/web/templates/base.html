@@ -24,9 +24,11 @@
     <script defer src="/static/app.js"></script>
 </head>
 <body class="h-full bg-slate-50 text-slate-900 antialiased"
-      x-data="{ panel: false, help: false }"
-      @keydown.window.escape="panel = false; help = false"
-      @keydown.window.shift.slash.prevent="help = !help">
+      x-data="{ panel: false, help: false, palette: false }"
+      @keydown.window.escape="panel = false; help = false; palette = false"
+      @keydown.window.shift.slash.prevent="help = !help"
+      @keydown.window.meta.k.prevent="palette = !palette"
+      @keydown.window.ctrl.k.prevent="palette = !palette">
 
     <!-- Top nav -->
     <header class="sticky top-0 z-30 bg-white border-b border-slate-200">
@@ -71,11 +73,9 @@
         </div>
     </header>
 
-    <!-- Toast (HTMX-driven) -->
+    <!-- Toast host — populated client-side by app.js on `matchbox:toast` events. -->
     <div id="toast-host"
-         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-        {% if toast %}{% include "components/toast.html" %}{% endif %}
-    </div>
+         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col gap-2 items-center"></div>
 
     <!-- Keyboard help overlay -->
     <div x-show="help" x-cloak
@@ -83,6 +83,35 @@
          @click="help = false">
         {% include "components/keyboard_help.html" %}
     </div>
+
+    <!-- Cmd+K command palette -->
+    {% if active_profile %}
+    <div x-show="palette" x-cloak
+         class="fixed inset-0 z-50 bg-slate-900/40 flex items-start justify-center pt-24 px-4"
+         @click="palette = false">
+        <div @click.stop
+             class="bg-white rounded-xl shadow-2xl w-full max-w-xl overflow-hidden"
+             x-init="$watch('palette', open => { if (open) setTimeout(() => $refs.paletteInput.focus(), 0); })">
+            <input x-ref="paletteInput"
+                   type="search"
+                   name="q"
+                   placeholder="Jump to page, profile, or job…"
+                   autocomplete="off"
+                   hx-get="/p/{{ active_profile }}/palette"
+                   hx-trigger="input changed delay:120ms, load"
+                   hx-target="#palette-results"
+                   hx-swap="innerHTML"
+                   class="w-full text-base px-4 py-3 border-0 border-b border-slate-200 focus:ring-0 focus:outline-none">
+            <div id="palette-results" class="max-h-96 overflow-auto">
+                <div class="px-4 py-6 text-center text-xs text-slate-400">Loading…</div>
+            </div>
+            <div class="px-4 py-2 text-xs text-slate-400 border-t border-slate-100 flex items-center justify-between">
+                <span><kbd>↑↓</kbd> navigate · <kbd>↩</kbd> open · <kbd>Esc</kbd> close</span>
+                <span class="text-slate-300">Cmd+K</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <main class="relative">
         {% block content %}{% endblock %}

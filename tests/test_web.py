@@ -13,7 +13,7 @@ from matchbox.core.schema import Job
 from matchbox.web.app import create_app
 from matchbox.web.config import Settings
 from matchbox.web.demo import seed_demo_profile
-from matchbox.web.profile_view import update_weights
+from matchbox.web.profile_view import preview_rescore, update_weights
 from matchbox.web.routes.jobs import parse_filters
 from matchbox.web.tailor_view import alternative_tier, estimate
 
@@ -142,6 +142,39 @@ class TestJobActions:
         r = client.get("/p/demo/jobs/99999999/detail")
         assert r.status_code == 404
 
+    def test_state_change_emits_toast_header(self, client: TestClient) -> None:
+        jid = _first_job_id(client)
+        r = client.post(f"/p/demo/jobs/{jid}/state", data={"new_state": "applied"})
+        assert r.status_code == 200
+        trigger = r.headers.get("HX-Trigger")
+        assert trigger and "matchbox:toast" in trigger
+        assert "log when you hear back" in trigger.lower()
+
+    def test_destructive_state_offers_undo(self, client: TestClient) -> None:
+        jid = _first_job_id(client)
+        r = client.post(
+            f"/p/demo/jobs/{jid}/state",
+            data={"new_state": "discarded", "prev_state": "evaluated"},
+        )
+        assert r.status_code == 200
+        trigger = r.headers.get("HX-Trigger") or ""
+        assert "undo" in trigger.lower()
+        assert "/state" in trigger
+        assert "evaluated" in trigger
+
+    def test_jd_full_partial(self, client: TestClient) -> None:
+        jid = _first_job_id(client)
+        r = client.get(f"/p/demo/jobs/{jid}/jd")
+        assert r.status_code == 200
+        # No <html> shell — pure partial.
+        assert "<html" not in r.text.lower()
+
+    def test_responses_partial(self, client: TestClient) -> None:
+        jid = _first_job_id(client)
+        r = client.get(f"/p/demo/jobs/{jid}/responses")
+        assert r.status_code == 200
+        assert "<html" not in r.text.lower()
+
 
 # ──────────────────────────────────────────────
 # Security
@@ -177,26 +210,26 @@ class TestSecurity:
 class TestParseFilters:
     def test_empty_qs(self) -> None:
         f = parse_filters("")
-        assert f["_states"] is None
-        assert f["_min_score"] is None
-        assert f["_order_key"] == "score"
+        assert f["states"] is None
+        assert f["min_score"] is None
+        assert f["order_key"] == "score"
 
     def test_dict_qs(self) -> None:
         f = parse_filters("state=applied&min_score=3.5&q=engineer&order=newest&starred=1")
-        assert f["_states"] == ["applied"]
-        assert f["_min_score"] == 3.5
-        assert f["_role_search"] == "engineer"
-        assert f["_starred"] is True
-        assert f["_order_by"] == "discovered_date DESC"
+        assert f["states"] == ["applied"]
+        assert f["min_score"] == 3.5
+        assert f["role_search"] == "engineer"
+        assert f["starred"] is True
+        assert f["order_by"] == "discovered_date DESC"
 
     def test_invalid_state_dropped(self) -> None:
         f = parse_filters("state=applied&state=not_a_state")
-        assert f["_states"] == ["applied"]
+        assert f["states"] == ["applied"]
 
     def test_invalid_order_falls_back(self) -> None:
         f = parse_filters("order=evil")
-        assert f["_order_key"] == "evil"  # echoed for UI
-        assert f["_order_by"] == "total_score DESC"  # but routed to safe default
+        assert f["order_key"] == "evil"  # echoed for UI
+        assert f["order_by"] == "total_score DESC"  # but routed to safe default
 
 
 # ──────────────────────────────────────────────
@@ -361,6 +394,107 @@ class TestProfileEditor:
             },
         )
         assert r.status_code == 400
+
+
+class TestBulkTailor:
+    def test_preview_requires_selection(self, client: TestClient) -> None:
+        r = client.post("/p/demo/bulk/tailor/preview", data={})
+        assert r.status_code == 400
+
+    def test_preview_returns_modal(self, client: TestClient) -> None:
+        from matchbox.core import db
+
+        ids = [j.id for j in db.list_jobs("demo", limit=2)]
+        r = client.post(
+            "/p/demo/bulk/tailor/preview",
+            data={"id": [str(i) for i in ids]},
+        )
+        assert r.status_code == 200
+        assert "Bulk tailor" in r.text
+
+    def test_execute_blocks_above_cap(self, client: TestClient) -> None:
+        from matchbox.core import db
+
+        ids = [j.id for j in db.list_jobs("demo", limit=6)]
+        if len(ids) < 6:
+            pytest.skip("seed has < 6 jobs")
+        r = client.post(
+            "/p/demo/bulk/tailor",
+            data={"id": [str(i) for i in ids], "confirmed": "1"},
+        )
+        assert r.status_code == 400
+
+    def test_execute_requires_confirmation_when_expensive(self, client: TestClient) -> None:
+        from matchbox.core import db
+
+        bespoke = [j for j in db.list_jobs("demo", limit=500) if j.tier == "bespoke"][:2]
+        if len(bespoke) < 2:
+            pytest.skip("seed has < 2 bespoke jobs")
+        r = client.post(
+            "/p/demo/bulk/tailor",
+            data={"id": [str(j.id) for j in bespoke]},  # no confirmed=1
+        )
+        assert r.status_code == 412
+
+
+class TestPalette:
+    def test_empty_query_returns_pages(self, client: TestClient) -> None:
+        r = client.get("/p/demo/palette?q=")
+        assert r.status_code == 200
+        # Should at least show no-query message OR pages.
+        assert "<html" not in r.text.lower()
+
+    def test_query_returns_results(self, client: TestClient) -> None:
+        r = client.get("/p/demo/palette?q=ins")
+        assert r.status_code == 200
+        # "ins" should match Insights page.
+        assert "Insights" in r.text or "/insights" in r.text
+
+    def test_job_search(self, client: TestClient) -> None:
+        # Demo seed includes Stripe; query should surface it as a job result.
+        r = client.get("/p/demo/palette?q=stripe")
+        assert r.status_code == 200
+
+
+class TestRescorePreview:
+    def test_preview_returns_top_n_with_deltas(self, settings: Settings, seeded: int) -> None:
+        from matchbox.core.schema import ScoringWeights
+
+        # Use very different weights to force re-ordering.
+        weights = ScoringWeights(
+            cv_match_weight=1.0,
+            company_mission_fit_weight=0.0,
+            role_mission_fit_weight=0.0,
+            comp_weight=0.0,
+            cultural_weight=0.0,
+            red_flags_weight=0.0,
+        )
+        result = preview_rescore("demo", weights, top_n=5)
+        assert result.total_jobs > 0
+        assert len(result.top) == 5
+        # Each delta has consistent fields.
+        for d in result.top:
+            assert 0.0 <= d.new_total <= 5.0
+            assert d.old_rank > 0
+            assert d.new_rank > 0
+            assert d.old_tier in {"bespoke", "template", "canonical", "skip"}
+
+    def test_preview_endpoint_renders(self, client: TestClient) -> None:
+        r = client.post(
+            "/p/demo/profile/preview",
+            data={
+                "cv_match_weight": 0.30,
+                "company_mission_fit_weight": 0.20,
+                "role_mission_fit_weight": 0.10,
+                "comp_weight": 0.20,
+                "cultural_weight": 0.10,
+                "red_flags_weight": 0.10,
+            },
+        )
+        assert r.status_code == 200
+        # Returns the preview partial (no html shell).
+        assert "<html" not in r.text.lower()
+        assert "Re-scoring" in r.text or "scored jobs" in r.text
 
 
 class TestDemoSeed:

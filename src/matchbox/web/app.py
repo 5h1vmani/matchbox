@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 from matchbox.web.config import Settings
 from matchbox.web.deps import get_settings, list_profiles
 from matchbox.web.filters import register as register_filters
-from matchbox.web.routes import bulk, files, jobs, pages, profile, system
+from matchbox.web.routes import bulk, files, jobs, pages, palette, profile, system
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router, prefix="/p/{profile}/jobs", tags=["jobs"])
     app.include_router(bulk.router, prefix="/p/{profile}/bulk", tags=["bulk"])
     app.include_router(profile.router, prefix="/p/{profile}/profile", tags=["profile"])
+    app.include_router(palette.router, prefix="/p/{profile}/palette", tags=["palette"])
     app.include_router(files.router, prefix="/p/{profile}/files", tags=["files"])
     app.include_router(system.router, prefix="/system", tags=["system"])
 
@@ -77,6 +78,10 @@ def run() -> None:
     import uvicorn
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    log.warning(
+        "Matchbox web has no auth and no CSRF protection — bind to 127.0.0.1 only. "
+        "If you need remote access, put it behind a reverse proxy with auth."
+    )
     uvicorn.run(
         "matchbox.web.app:create_app",
         factory=True,

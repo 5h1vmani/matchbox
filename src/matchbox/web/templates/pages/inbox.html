@@ -6,22 +6,39 @@
 
     {% include "components/_filters.html" %}
 
+    <!-- Active filter chips (item #17) — recognition over recall -->
+    {% if active_filters %}
+    <div class="px-4 py-2 flex flex-wrap items-center gap-2 bg-indigo-50/40 border-b border-indigo-100">
+        <span class="text-xs uppercase tracking-wide text-indigo-700">Filters</span>
+        {% for chip in active_filters %}
+        <span class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-white ring-1 ring-indigo-200 text-indigo-800">
+            {{ chip.label }}
+        </span>
+        {% endfor %}
+        <a href="/p/{{ active_profile }}/inbox"
+           class="ml-auto text-xs text-indigo-700 hover:text-indigo-900 underline">Clear all</a>
+    </div>
+    {% endif %}
+
     <!-- Stats strip — small, secondary, never noisy -->
     <div class="px-4 py-2 text-xs text-slate-500 flex items-center gap-4 bg-white border-b border-slate-100">
-        <span><strong class="text-slate-900">{{ jobs|length }}</strong> shown</span>
+        <span>
+            <strong class="text-slate-900">{{ jobs|length }}</strong> shown
+            {% if truncated %}
+            <span class="text-amber-700">(of more — limit {{ row_limit }} reached, narrow filters)</span>
+            {% endif %}
+        </span>
         <span class="text-slate-300">·</span>
         <span>{{ stats.get('count_evaluated', 0) }} evaluated</span>
         <span>· {{ stats.get('count_applied', 0) }} applied</span>
         <span>· {{ stats.get('count_interview', 0) }} interview</span>
         <span class="text-slate-300">·</span>
         <span>spent {{ stats.get('total_cost_usd', 0) | usd }}</span>
-        <span class="ml-auto text-slate-400">Press <kbd>?</kbd> for shortcuts</span>
+        <span class="ml-auto text-slate-400">Press <kbd>?</kbd> for shortcuts · <kbd>⌘K</kbd> palette</span>
     </div>
 
     <!-- Two-pane layout: table + slide-out detail -->
     <div class="flex h-[calc(100vh-7rem)]">
-
-        <!-- Table -->
         <div class="flex-1 overflow-auto" :class="panel ? 'mr-[36rem]' : ''">
             <table class="w-full text-sm">
                 <thead class="sticky top-0 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
@@ -47,23 +64,18 @@
             </table>
         </div>
 
-        <!-- Detail panel (HTMX swap target) -->
         <aside x-show="panel" x-cloak
                x-transition:enter="transition ease-out duration-200"
                x-transition:enter-start="opacity-0 translate-x-4"
                x-transition:enter-end="opacity-100 translate-x-0"
                class="fixed right-0 top-14 bottom-0 w-[36rem] bg-white border-l border-slate-200 overflow-auto shadow-xl z-10">
             <div id="detail-panel">
-                <div class="p-8 text-center text-sm text-slate-400">
-                    Loading…
-                </div>
+                <div class="p-8 text-center text-sm text-slate-400">Loading…</div>
             </div>
         </aside>
-
     </div>
 
     {% include "components/_selection_bar.html" %}
-
 </div>
 
 <script>
@@ -74,22 +86,27 @@ function inbox() {
         cursor: -1,
 
         init() {
-            // Sync checkbox state on partial reloads
             document.body.addEventListener('htmx:afterSwap', (e) => {
-                if (e.detail.target && e.detail.target.id === 'job-rows') {
-                    this.syncSelection();
+                if (e.detail.target?.id === 'job-rows') this.syncSelection();
+                if (e.detail.target?.id === 'detail-panel') {
+                    // Sync cursor to the opened job so prev/next works.
+                    const id = parseInt(e.detail.target.querySelector('[data-job-id]')?.dataset.jobId || -1, 10);
+                    if (id > 0) this.cursorToId(id);
                 }
             });
-            // j/k navigation
             document.addEventListener('keydown', (e) => this.onKey(e));
         },
 
         rows() { return Array.from(document.querySelectorAll('#job-rows tr.job-row')); },
+        cursorToId(id) {
+            const idx = this.rows().findIndex(r => parseInt(r.dataset.jobId, 10) === id);
+            if (idx >= 0) { this.cursor = idx; this.focusCursor(this.rows()); }
+        },
 
         toggleAll(checked) {
             this.rows().forEach(r => {
                 const cb = r.querySelector('.row-select');
-                if (cb) { cb.checked = checked; }
+                if (cb) cb.checked = checked;
             });
             this.syncSelection();
         },
@@ -109,16 +126,27 @@ function inbox() {
         },
 
         get estimatedCost() {
-            // Heuristic per-row cost by tier (matches README table).
-            const rows = this.rows();
             let total = 0;
-            for (const r of rows) {
+            for (const r of this.rows()) {
                 if (r.dataset.selected !== 'true') continue;
                 const t = (r.querySelector('td:nth-child(4)')?.innerText || '').trim();
                 if (t === 'bespoke') total += 14;
                 else if (t === 'template') total += 0.2;
             }
             return total;
+        },
+
+        async bulkTailor() {
+            if (this.selected.length === 0) return;
+            const fd = new FormData();
+            this.selected.forEach(id => fd.append('id', id));
+            const res = await fetch('/p/{{ active_profile }}/bulk/tailor/preview',
+                                    { method: 'POST', body: fd });
+            const html = await res.text();
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html;
+            document.body.appendChild(wrapper.firstElementChild);
+            htmx.process(document.body);
         },
 
         async bulkAction(url, extra) {
@@ -131,6 +159,25 @@ function inbox() {
             document.getElementById('job-rows').innerHTML = html;
             this.clearSelection();
             htmx.process(document.getElementById('job-rows'));
+            // Toast trigger from server header is automatic via HTMX,
+            // but fetch() bypasses that — show a manual toast.
+            const trigger = res.headers.get('HX-Trigger');
+            if (trigger) {
+                try {
+                    const evts = JSON.parse(trigger);
+                    if (evts['matchbox:toast']) {
+                        document.body.dispatchEvent(new CustomEvent('matchbox:toast', { detail: evts['matchbox:toast'] }));
+                    }
+                } catch {}
+            }
+        },
+
+        navJob(delta) {
+            const rows = this.rows();
+            if (rows.length === 0) return;
+            this.cursor = Math.max(0, Math.min(rows.length - 1, this.cursor + delta));
+            this.focusCursor(rows);
+            rows[this.cursor].click();
         },
 
         onKey(e) {
@@ -146,6 +193,16 @@ function inbox() {
                 case 'k':
                     this.cursor = Math.max(this.cursor - 1, 0);
                     this.focusCursor(rows);
+                    break;
+                case 'ArrowRight':
+                    if (this.panel || document.querySelector('#detail-panel [data-job-id]')) {
+                        e.preventDefault(); this.navJob(1);
+                    }
+                    break;
+                case 'ArrowLeft':
+                    if (this.panel || document.querySelector('#detail-panel [data-job-id]')) {
+                        e.preventDefault(); this.navJob(-1);
+                    }
                     break;
                 case 'Enter':
                     if (this.cursor >= 0) rows[this.cursor].click();

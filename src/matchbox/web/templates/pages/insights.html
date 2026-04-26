@@ -7,27 +7,39 @@
     <!-- Action needed (Zeigarnik effect — unfinished work stays visible) -->
     {% if followups %}
     <section class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between mb-3">
             <h2 class="font-medium text-amber-900">
                 <span class="text-lg">⚠</span> {{ followups|length }} job(s) need follow-up
             </h2>
+            <a href="/p/{{ active_profile }}/inbox?state=applied&state=responded"
+               class="text-xs px-2.5 py-1 rounded-md bg-amber-900 hover:bg-amber-950 text-amber-50">
+                Open all in inbox →
+            </a>
         </div>
-        <ul class="mt-3 space-y-1.5">
-            {% for f in followups[:5] %}
-            <li class="flex items-start justify-between text-sm">
-                <div>
-                    <a href="/p/{{ active_profile }}/inbox?q={{ f.company }}"
-                       class="font-medium text-amber-900 hover:underline">{{ f.company }}</a>
+        <ul class="space-y-1.5">
+            {% for f in followups[:8] %}
+            <li class="flex items-start justify-between text-sm gap-3">
+                <div class="min-w-0 flex-1">
+                    <span class="font-medium text-amber-900">{{ f.company }}</span>
                     <span class="text-amber-800">— {{ f.role }}</span>
                     <p class="text-xs text-amber-700 mt-0.5">{{ f.followup_reason }}</p>
                 </div>
-                {% if f.url %}
-                <a href="{{ f.url }}" target="_blank" rel="noopener"
-                   class="text-xs text-amber-700 hover:text-amber-900">Open ↗</a>
-                {% endif %}
+                <div class="flex items-center gap-2 shrink-0">
+                    {% if f.url %}
+                    <a href="{{ f.url }}" target="_blank" rel="noopener"
+                       class="text-xs text-amber-700 hover:text-amber-900">JD ↗</a>
+                    {% endif %}
+                    {% if f.id %}
+                    <a href="/p/{{ active_profile }}/inbox#row-{{ f.id }}"
+                       class="text-xs text-amber-700 hover:text-amber-900 underline">View</a>
+                    {% endif %}
+                </div>
             </li>
             {% endfor %}
         </ul>
+        {% if followups|length > 8 %}
+        <p class="mt-3 text-xs text-amber-700">… and {{ followups|length - 8 }} more.</p>
+        {% endif %}
     </section>
     {% endif %}
 

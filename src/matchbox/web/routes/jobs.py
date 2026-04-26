@@ -1,19 +1,21 @@
 """Per-job HTMX endpoints — partial swaps for table rows and the detail panel.
 
 Routes (all under /p/{profile}/jobs):
-    GET  /              -> rows partial (filtered table body)
-    GET  /{id}/detail   -> slide-out detail panel
-    POST /{id}/star     -> toggle star, return updated row
-    POST /{id}/state    -> change state, return updated row + panel
-    POST /{id}/response -> log response, return updated panel
-    GET  /{id}/tailor/preview -> cost preview before tailor (phase 4)
-    POST /{id}/tailor   -> run tailor, return updated panel + row (phase 4)
+    GET  /                    -> rows partial (filtered table body)
+    GET  /{id}/detail         -> slide-out detail panel
+    POST /{id}/star           -> toggle star, return updated row
+    POST /{id}/state          -> change state, return updated row + panel
+    POST /{id}/response       -> log response, return updated panel
+    GET  /{id}/jd             -> full JD text partial (lazy load)
+    GET  /{id}/responses      -> response history partial (lazy load)
+    GET  /{id}/tailor/preview -> cost preview before tailor
+    POST /{id}/tailor         -> run tailor, return updated panel + row
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Annotated, Any
+from typing import Annotated, Any, TypedDict
 from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -21,6 +23,7 @@ from fastapi.responses import HTMLResponse
 
 from matchbox.core import db
 from matchbox.core.schema import VALID_RESPONSE_TYPES, VALID_STATES, Job
+from matchbox.outcome.response import log_response as _log_response
 from matchbox.web.deps import ProfileDep
 from matchbox.web.render import render
 
@@ -40,6 +43,25 @@ _VALID_ORDERS: dict[str, str] = {
     "starred": "starred_first",
 }
 
+ROW_LIMIT = 500
+
+
+class ParsedFilters(TypedDict):
+    """Typed payload from `parse_filters` — used by both inbox and rows endpoints.
+
+    Keys are SQL-shaped (states, country, etc.) so they pass straight to
+    db.list_jobs(**); the `_order_key` and `_role_search` mirror UI state.
+    """
+
+    states: list[str] | None
+    tiers: list[str] | None
+    countries: list[str] | None
+    min_score: float | None
+    role_search: str | None
+    starred: bool | None
+    order_by: str
+    order_key: str
+
 
 def _qs_get_list(qs: Any, key: str) -> Sequence[str]:
     """Return all values for `key` (Starlette QueryParams or dict-of-lists)."""
@@ -58,42 +80,42 @@ def _qs_get_one(qs: Any, key: str) -> str | None:
     return values[0] if values else None
 
 
-def parse_filters(qs: Any) -> dict[str, Any]:
+def parse_filters(qs: Any) -> ParsedFilters:
     """Parse query params into list_jobs kwargs. Tolerant of missing/empty."""
     states = [s for s in _qs_get_list(qs, "state") if s in VALID_STATES] or None
     tiers = [t for t in _qs_get_list(qs, "tier") if t] or None
     countries = [c for c in _qs_get_list(qs, "country") if c] or None
-    min_score = _qs_get_one(qs, "min_score") or None
+    min_score_raw = _qs_get_one(qs, "min_score")
     role_search = _qs_get_one(qs, "q") or None
     starred = True if _qs_get_one(qs, "starred") == "1" else None
     order_key = _qs_get_one(qs, "order") or "score"
     order_by = _VALID_ORDERS.get(order_key, _VALID_ORDERS["score"])
 
-    return {
-        "_states": states,
-        "_tiers": tiers,
-        "_countries": countries,
-        "_min_score": float(min_score) if min_score else None,
-        "_role_search": role_search,
-        "_starred": starred,
-        "_order_by": order_by,
-        "_order_key": order_key,
-    }
+    return ParsedFilters(
+        states=states,
+        tiers=tiers,
+        countries=countries,
+        min_score=float(min_score_raw) if min_score_raw else None,
+        role_search=role_search,
+        starred=starred,
+        order_by=order_by,
+        order_key=order_key,
+    )
 
 
-def _query_jobs(profile: str, f: dict[str, Any]) -> list[Job]:
+def _query_jobs(profile: str, f: ParsedFilters) -> list[Job]:
     jobs = db.list_jobs(
         profile,
-        state=f["_states"],
-        country=f["_countries"],
-        min_score=f["_min_score"],
-        is_starred=f["_starred"],
-        role_search=f["_role_search"],
-        limit=500,
-        order_by=f["_order_by"],
+        state=f["states"],
+        country=f["countries"],
+        min_score=f["min_score"],
+        is_starred=f["starred"],
+        role_search=f["role_search"],
+        limit=ROW_LIMIT,
+        order_by=f["order_by"],
     )
-    if f["_tiers"]:
-        jobs = [j for j in jobs if j.tier in f["_tiers"]]
+    if f["tiers"]:
+        jobs = [j for j in jobs if j.tier in f["tiers"]]
     return jobs
 
 
@@ -102,19 +124,41 @@ def build_inbox_context(profile: str, qs: Any) -> dict[str, Any]:
     f = parse_filters(qs)
     jobs = _query_jobs(profile, f)
     stats = db.get_stats(profile)
+    # Surface "showing X of Y" when the limit truncates results, so the
+    # operator never silently misses jobs (item #13 from the audit).
+    truncated = len(jobs) >= ROW_LIMIT
     return {
         "jobs": jobs,
         "stats": stats,
-        "filter_states": f["_states"] or [],
-        "filter_tiers": f["_tiers"] or [],
-        "filter_min_score": f["_min_score"] or 0.0,
-        "filter_q": f["_role_search"] or "",
-        "filter_starred": bool(f["_starred"]),
-        "order_key": f["_order_key"],
+        "filter_states": f["states"] or [],
+        "filter_tiers": f["tiers"] or [],
+        "filter_min_score": f["min_score"] or 0.0,
+        "filter_q": f["role_search"] or "",
+        "filter_starred": bool(f["starred"]),
+        "order_key": f["order_key"],
         "valid_states": sorted(VALID_STATES),
         "valid_tiers": ["bespoke", "template", "canonical", "skip"],
         "valid_response_types": sorted(VALID_RESPONSE_TYPES),
+        "row_limit": ROW_LIMIT,
+        "truncated": truncated,
+        "active_filters": _active_filter_chips(f),
     }
+
+
+def _active_filter_chips(f: ParsedFilters) -> list[dict[str, str]]:
+    """List of {label, remove_param} for visible filter chips. Item #17."""
+    chips: list[dict[str, str]] = []
+    for s in f["states"] or []:
+        chips.append({"label": f"state: {s.replace('_', ' ')}", "param": "state", "value": s})
+    for t in f["tiers"] or []:
+        chips.append({"label": f"tier: {t}", "param": "tier", "value": t})
+    if f["min_score"]:
+        chips.append({"label": f"score ≥ {f['min_score']}", "param": "min_score", "value": ""})
+    if f["role_search"]:
+        chips.append({"label": f"“{f['role_search']}”", "param": "q", "value": ""})
+    if f["starred"]:
+        chips.append({"label": "starred", "param": "starred", "value": ""})
+    return chips
 
 
 # ──────────────────────────────────────────────
@@ -172,23 +216,46 @@ async def change_state(
     job_id: int,
     new_state: Annotated[str, Form()],
     note: Annotated[str | None, Form()] = None,
+    prev_state: Annotated[str | None, Form()] = None,
 ) -> HTMLResponse:
     if new_state not in VALID_STATES:
         raise HTTPException(400, f"Invalid state '{new_state}'")
-    db.update_job_state(profile, job_id, new_state, note=note)
-    job = db.get_job(profile, job_id)
-    if job is None:
+    job_before = db.get_job(profile, job_id)
+    if job_before is None:
         raise HTTPException(404, "Job not found")
+    actual_prev = prev_state or job_before.state
+
+    db.update_job_state(profile, job_id, new_state, note=note)
+    job_after = db.get_job(profile, job_id)
+    assert job_after is not None  # we just verified it exists
+
+    # Item #15: undo for destructive state changes (anything that hides
+    # or rejects the job). The toast offers a one-click revert.
+    destructive = new_state in {"discarded", "rejected", "skip"}
     return render(
         request,
         "components/job_detail.html",
         {
-            "job": job,
+            "job": job_after,
             "active_profile": profile,
             "valid_response_types": sorted(VALID_RESPONSE_TYPES),
-            "toast": f"Marked {new_state}",
         },
+        toast=_state_toast(new_state),
+        toast_level="info",
+        undo_url=(f"/p/{profile}/jobs/{job_id}/state" if destructive and actual_prev else None),
+        undo_payload=({"new_state": actual_prev} if destructive and actual_prev else None),
     )
+
+
+def _state_toast(new_state: str) -> str:
+    nice = new_state.replace("_", " ")
+    next_hints = {
+        "applied": "Applied — log when you hear back.",
+        "queued_for_tailor": "Queued for tailor.",
+        "discarded": "Discarded.",
+        "tailored": "Tailored — review the PDF, then mark applied.",
+    }
+    return next_hints.get(new_state, f"Marked {nice}.")
 
 
 @router.post("/{job_id}/response", response_class=HTMLResponse)
@@ -202,12 +269,18 @@ async def log_response(
 ) -> HTMLResponse:
     if response_type not in VALID_RESPONSE_TYPES:
         raise HTTPException(400, f"Invalid response_type '{response_type}'")
-    from matchbox.outcome.response import log_response as _log
-
-    _log(profile, job_id, response_type=response_type, response_date=response_date, note=note)
+    _log_response(
+        profile, job_id, response_type=response_type, response_date=response_date, note=note
+    )
     job = db.get_job(profile, job_id)
     if job is None:
         raise HTTPException(404, "Job not found")
+    next_hint = {
+        "interview": "Logged — log offer or rejection when you hear back.",
+        "offer": "Offer logged. Congrats.",
+        "rejection": "Rejection logged.",
+        "ghosted": "Ghosted logged.",
+    }.get(response_type, f"Logged {response_type}.")
     return render(
         request,
         "components/job_detail.html",
@@ -215,9 +288,29 @@ async def log_response(
             "job": job,
             "active_profile": profile,
             "valid_response_types": sorted(VALID_RESPONSE_TYPES),
-            "toast": f"Logged {response_type}",
         },
+        toast=next_hint,
+        toast_level="success" if response_type in ("interview", "offer") else "info",
     )
+
+
+@router.get("/{job_id}/jd", response_class=HTMLResponse)
+async def jd_full(request: Request, profile: ProfileDep, job_id: int) -> HTMLResponse:
+    """Full JD text partial — lazy-loaded so the detail panel stays fast."""
+    job = db.get_job(profile, job_id)
+    if job is None:
+        raise HTTPException(404, "Job not found")
+    body = (job.jd_text or job.jd_summary or "").strip()
+    if not body:
+        return HTMLResponse('<div class="text-xs text-slate-400">No JD text on file.</div>')
+    return render(request, "components/_jd_full.html", {"job": job, "body": body})
+
+
+@router.get("/{job_id}/responses", response_class=HTMLResponse)
+async def responses_history(request: Request, profile: ProfileDep, job_id: int) -> HTMLResponse:
+    """Response history (item #20) — lazy-loaded under the panel."""
+    rows = db.get_responses(profile, job_id=job_id)
+    return render(request, "components/_responses.html", {"responses": rows})
 
 
 # ──────────────────────────────────────────────
@@ -269,13 +362,22 @@ async def tailor_execute(
     settings = get_settings()
     est = estimate(job.model_copy(update={"tier": tier_override}) if tier_override else job)
     if est.needs_confirmation(settings.cost_confirm_threshold_usd) and confirmed != "1":
-        # Defence in depth: user must POST `confirmed=1` for expensive tailor.
         raise HTTPException(412, "Cost confirmation required")
 
     person = load_person(profile)
     outcome = run(job, person, tier_override=tier_override)
 
     job_after = db.get_job(profile, job_id)
+    if outcome.error:
+        toast_msg = f"Tailor failed: {outcome.error}"
+        level: Any = "error"
+    elif outcome.application:
+        toast_msg = f"Tailored as {outcome.application.tier}. Review the PDF, then mark applied."
+        level = "success"
+    else:
+        toast_msg = "Skipped (skip tier)."
+        level = "info"
+
     return render(
         request,
         "components/job_detail.html",
@@ -284,12 +386,7 @@ async def tailor_execute(
             "active_profile": profile,
             "valid_response_types": sorted(VALID_RESPONSE_TYPES),
             "tailor_outcome": outcome,
-            "toast": (
-                f"Tailor failed: {outcome.error}"
-                if outcome.error
-                else f"Tailored as {outcome.application.tier}"
-                if outcome.application
-                else "Skipped (skip tier)"
-            ),
         },
+        toast=toast_msg,
+        toast_level=level,
     )

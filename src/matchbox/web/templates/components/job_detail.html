@@ -1,10 +1,12 @@
-{# Slide-out job detail panel — HTMX swap target. #}
-<div class="flex flex-col h-full">
+{# Slide-out job detail panel — HTMX swap target.
+   Toast handling lives in the response header (HX-Trigger), not in this
+   template. See render.py:render(toast=...). #}
+<div class="flex flex-col h-full" data-job-id="{{ job.id }}">
 
     <!-- Header -->
     <div class="px-5 py-4 border-b border-slate-200 sticky top-0 bg-white z-10">
         <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
                 <h2 class="font-semibold text-slate-900 truncate">{{ job.company }}</h2>
                 <p class="text-sm text-slate-600 truncate">{{ job.role }}</p>
                 <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
@@ -21,8 +23,17 @@
                     {% endif %}
                 </div>
             </div>
-            <button @click="panel = false"
-                    class="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
+            <div class="flex items-center gap-1">
+                <button type="button" @click="navJob(-1)"
+                        class="text-slate-400 hover:text-slate-700 px-1 leading-none"
+                        title="Previous job (←)">‹</button>
+                <button type="button" @click="navJob(1)"
+                        class="text-slate-400 hover:text-slate-700 px-1 leading-none"
+                        title="Next job (→)">›</button>
+                <button @click="panel = false"
+                        class="text-slate-400 hover:text-slate-700 text-xl leading-none ml-1"
+                        title="Close (Esc)">×</button>
+            </div>
         </div>
 
         <div class="mt-3 flex items-center gap-2">
@@ -38,7 +49,7 @@
                     hx-swap="outerHTML"
                     class="text-xs px-2.5 py-1 rounded-md
                            {% if job.is_starred %}bg-amber-100 text-amber-800{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}">
-                {% if job.is_starred %}★ Starred{% else %}☆ Star{% endif %}
+                {% if job.is_starred %}★ Starred (s){% else %}☆ Star (s){% endif %}
             </button>
         </div>
     </div>
@@ -46,7 +57,7 @@
     <!-- Body -->
     <div class="flex-1 overflow-auto p-5 space-y-5">
 
-        <!-- Score breakdown — visual, not table -->
+        <!-- Score breakdown -->
         <section>
             <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Score</h3>
             <div class="bg-slate-50 rounded-lg p-3">
@@ -79,7 +90,7 @@
             </div>
         </section>
 
-        <!-- Outcome buttons — primary action zone -->
+        <!-- Outcome buttons -->
         <section>
             <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Log outcome</h3>
             <div class="grid grid-cols-4 gap-1.5">
@@ -102,27 +113,30 @@
                 {% endif %}
                 {% endfor %}
             </div>
-            {% if job.response_type %}
-            <p class="mt-2 text-xs text-slate-500">
-                Last response: <strong class="text-slate-700">{{ job.response_type }}</strong>
-                {% if job.response_date %}on {{ job.response_date | short_date }}{% endif %}
-            </p>
-            {% endif %}
+            <details class="mt-2"
+                     hx-get="/p/{{ active_profile }}/jobs/{{ job.id }}/responses"
+                     hx-trigger="toggle once from:closest details[open]"
+                     hx-target="find .response-history-slot"
+                     hx-swap="innerHTML">
+                <summary class="text-xs text-slate-600 cursor-pointer">Response history</summary>
+                <div class="response-history-slot mt-2 text-xs text-slate-500">Loading…</div>
+            </details>
         </section>
 
-        <!-- State change -->
+        <!-- State change with inline shortcut hint -->
         <section>
-            <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">State</h3>
+            <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">State (a applied · t queue)</h3>
             <div class="flex flex-wrap gap-1.5">
                 {% set primary_states = [
-                    ('queued_for_tailor', 'Queue for tailor'),
-                    ('applied', 'Mark applied'),
+                    ('queued_for_tailor', 'Queue for tailor (t)'),
+                    ('applied', 'Mark applied (a)'),
                     ('discarded', 'Discard'),
                 ] %}
                 {% for s, label in primary_states %}
                 <form hx-post="/p/{{ active_profile }}/jobs/{{ job.id }}/state"
                       hx-target="#detail-panel" hx-swap="innerHTML">
                     <input type="hidden" name="new_state" value="{{ s }}">
+                    <input type="hidden" name="prev_state" value="{{ job.state }}">
                     <button type="submit"
                             class="text-xs px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">
                         {{ label }}
@@ -132,7 +146,7 @@
             </div>
         </section>
 
-        <!-- Tailor section: button → preview → execute → PDF + violations -->
+        <!-- Tailor section -->
         <section id="tailor-section">
             <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Tailor</h3>
             <div id="tailor-action">
@@ -182,11 +196,21 @@
         </section>
         {% endif %}
 
-        <!-- JD summary -->
+        <!-- JD summary + lazy-loaded full text (item #19) -->
         {% if job.jd_summary %}
         <section>
             <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Summary</h3>
             <p class="text-sm text-slate-700 leading-relaxed">{{ job.jd_summary }}</p>
+            {% if job.jd_text %}
+            <details class="mt-2"
+                     hx-get="/p/{{ active_profile }}/jobs/{{ job.id }}/jd"
+                     hx-trigger="toggle once from:closest details[open]"
+                     hx-target="find .jd-full-slot"
+                     hx-swap="innerHTML">
+                <summary class="text-xs text-slate-600 cursor-pointer">Show full JD</summary>
+                <div class="jd-full-slot mt-2 text-xs text-slate-400">Loading…</div>
+            </details>
+            {% endif %}
         </section>
         {% endif %}
 
@@ -208,9 +232,3 @@
         {% endif %}
     </div>
 </div>
-
-{% if toast %}
-<div hx-swap-oob="innerHTML:#toast-host">
-    {% include "components/toast.html" %}
-</div>
-{% endif %}

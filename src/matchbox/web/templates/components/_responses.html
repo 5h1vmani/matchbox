@@ -1,0 +1,13 @@
+{% if responses %}
+<ul class="space-y-1 text-xs">
+    {% for r in responses %}
+    <li class="flex items-start gap-2 py-1 border-b border-slate-100 last:border-0">
+        <span class="font-mono text-slate-500 shrink-0">{{ (r.response_date or '')[:10] }}</span>
+        <span class="capitalize font-medium text-slate-700">{{ r.response_type }}</span>
+        {% if r.note %}<span class="text-slate-500">— {{ r.note }}</span>{% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="text-xs text-slate-400">No responses logged yet.</p>
+{% endif %}

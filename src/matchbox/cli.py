@@ -404,6 +404,14 @@ def web(
     """Start the FastAPI + HTMX dashboard at http://HOST:PORT."""
     import uvicorn
 
+    if host not in ("127.0.0.1", "localhost"):
+        rprint(
+            "[red bold]WARNING[/red bold] Matchbox has no auth and no CSRF protection.\n"
+            f"  You set --host {host}, which exposes the dashboard beyond loopback.\n"
+            "  Anyone who can reach this port can read your jobs and spend your\n"
+            "  Anthropic API budget. Use a reverse proxy with auth, or revert to\n"
+            "  127.0.0.1.\n"
+        )
     rprint(f"[bold]Matchbox[/bold] starting on http://{host}:{port}")
     uvicorn.run(
         "matchbox.web.app:create_app",
