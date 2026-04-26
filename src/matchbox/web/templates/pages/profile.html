@@ -15,9 +15,9 @@
                  'cv_match_weight': person.profile.scoring.cv_match_weight,
                  'company_mission_fit_weight': person.profile.scoring.company_mission_fit_weight,
                  'role_mission_fit_weight': person.profile.scoring.role_mission_fit_weight,
-                 'tech_stack_weight': person.profile.scoring.tech_stack_weight,
-                 'seniority_weight': person.profile.scoring.seniority_weight,
-                 'location_remote_weight': person.profile.scoring.location_remote_weight,
+                 'comp_weight': person.profile.scoring.comp_weight,
+                 'cultural_weight': person.profile.scoring.cultural_weight,
+                 'red_flags_weight': person.profile.scoring.red_flags_weight,
              } | tojson }})">
 
         <div class="flex items-baseline justify-between mb-4">
@@ -36,21 +36,22 @@
         <form hx-post="/p/{{ active_profile }}/profile/save"
               hx-target="#weights-result"
               hx-swap="innerHTML"
+              @htmx:after-request="if ($event.detail.successful) original = { ...weights }"
               class="space-y-3">
 
             {% set labels = [
                 ('cv_match_weight',           'CV match',
-                 'How much keyword overlap with the JD matters.'),
+                 'Keyword overlap between JD text and your skills/tags.'),
                 ('company_mission_fit_weight','Company mission fit',
-                 'Dream-tier list match boosts this.'),
+                 'Dream-tier list match (tier_1_dream → 5.0; exploratory → 2.5).'),
                 ('role_mission_fit_weight',   'Role mission fit',
-                 'How well the role fits target archetypes.'),
-                ('tech_stack_weight',         'Tech stack',
-                 'Skills overlap between profile and JD.'),
-                ('seniority_weight',          'Seniority',
-                 'Title-level match (junior / senior / staff).'),
-                ('location_remote_weight',    'Location / remote',
-                 'Remote preference and country fit.'),
+                 'Title keyword match against your target roles.'),
+                ('comp_weight',               'Compensation',
+                 'How much salary signal influences the score (placeholder 3.0 today).'),
+                ('cultural_weight',           'Cultural fit',
+                 'Soft signals from JD tone & values (placeholder 3.0 today).'),
+                ('red_flags_weight',          'Red flags',
+                 'Penalty for exclusion triggers (visa-blocked, off-list, etc.).'),
             ] %}
 
             {% for field, label, hint in labels %}

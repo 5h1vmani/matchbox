@@ -15,7 +15,8 @@
 
     <button type="button"
             @click="bulkAction('/p/{{ active_profile }}/bulk/state', { new_state: 'queued_for_tailor' })"
-            class="hover:text-indigo-300 transition" title="Tailor (t)">Tailor</button>
+            class="hover:text-indigo-300 transition"
+            title="Queue selected jobs for tailoring (t)">Queue</button>
     <button type="button"
             @click="bulkAction('/p/{{ active_profile }}/bulk/state', { new_state: 'applied' })"
             class="hover:text-indigo-300 transition" title="Mark applied (a)">Applied</button>

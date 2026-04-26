@@ -25,10 +25,19 @@ WEIGHT_FIELDS: tuple[str, ...] = (
     "cv_match_weight",
     "company_mission_fit_weight",
     "role_mission_fit_weight",
-    "tech_stack_weight",
-    "seniority_weight",
-    "location_remote_weight",
+    "comp_weight",
+    "cultural_weight",
+    "red_flags_weight",
 )
+
+# Legacy YAML keys → canonical keys. Older profile.yaml files used names
+# that semantically mismatched the dimensions they applied to (see
+# core/schema.ScoringWeights docstring). On save we silently migrate.
+LEGACY_ALIASES: dict[str, str] = {
+    "tech_stack_weight": "comp_weight",
+    "seniority_weight": "cultural_weight",
+    "location_remote_weight": "red_flags_weight",
+}
 
 
 @dataclass(frozen=True)
@@ -74,6 +83,16 @@ def update_weights(
         data: Any = yaml.load(f)
 
     scoring = data.setdefault("scoring", {})
+
+    # Migrate any legacy aliases to canonical keys before writing new values.
+    # Old YAMLs survive without a manual edit.
+    for old_key, new_key in LEGACY_ALIASES.items():
+        if old_key in scoring and new_key not in scoring:
+            scoring[new_key] = scoring.pop(old_key)
+        elif old_key in scoring:
+            # Both keys present (rare) — drop the legacy one.
+            del scoring[old_key]
+
     for k, v in new_weights.items():
         scoring[k] = float(v)
 

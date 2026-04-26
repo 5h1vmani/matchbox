@@ -3,6 +3,11 @@
 Reads shared/rubric.yaml for dimension weights and tier thresholds.
 Reads profile.yaml:scoring for per-person weight overrides.
 All computation is deterministic Python — zero LLM cost.
+
+Public surface:
+    score_job(job, person, jd_text="") -> Job   # full rubric
+    weighted_total(job, weights)        -> float # pure recombine of cached dim
+                                                  # scores, no rubric work
 """
 
 from __future__ import annotations
@@ -28,6 +33,26 @@ def _shared_rubric() -> dict[str, Any]:
 
 def _weights(person: Person) -> ScoringWeights:
     return person.profile.scoring
+
+
+def weighted_total(job: Job, weights: ScoringWeights) -> float:
+    """Recompute total_score from cached dimension scores + given weights.
+
+    Pure function — does not call the rubric, does not touch the DB. Used by
+    the live re-score preview to answer "what would total_score be if I
+    nudged this slider?" without re-running scoring on every drag.
+
+    Returns 0.0 if all dimensions are None (job hasn't been scored yet).
+    """
+    dims: list[tuple[float | None, float]] = [
+        (job.cv_match_score, weights.cv_match_weight),
+        (job.company_mission_fit_score, weights.company_mission_fit_weight),
+        (job.role_mission_fit_score, weights.role_mission_fit_weight),
+        (job.comp_score, weights.comp_weight),
+        (job.cultural_score, weights.cultural_weight),
+        (job.red_flags_score, weights.red_flags_weight),
+    ]
+    return round(sum((d or 0.0) * w for d, w in dims), 2)
 
 
 def score_job(job: Job, person: Person, jd_text: str = "") -> Job:
@@ -103,9 +128,9 @@ def score_job(job: Job, person: Person, jd_text: str = "") -> Job:
         cv_match * weights.cv_match_weight
         + mission_score * weights.company_mission_fit_weight
         + role_mission * weights.role_mission_fit_weight
-        + comp * getattr(weights, "tech_stack_weight", 0.20)
-        + cultural * getattr(weights, "seniority_weight", 0.10)
-        + red_flags * weights.location_remote_weight
+        + comp * weights.comp_weight
+        + cultural * weights.cultural_weight
+        + red_flags * weights.red_flags_weight
     )
 
     return job.model_copy(

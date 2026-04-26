@@ -124,9 +124,16 @@ def build_inbox_context(profile: str, qs: Any) -> dict[str, Any]:
 
 @router.get("", response_class=HTMLResponse)
 async def rows_partial(request: Request, profile: ProfileDep) -> HTMLResponse:
+    """Filtered table rows. Sends `HX-Push-Url` so the browser address bar
+    reflects the canonical inbox URL with current filters (bookmarkable),
+    even though the response itself is just the rows partial."""
     ctx = build_inbox_context(profile, request.query_params)
     ctx["active_profile"] = profile
-    return render(request, "components/_job_rows.html", ctx)
+    response = render(request, "components/_job_rows.html", ctx)
+    qs = str(request.query_params)
+    inbox_url = f"/p/{profile}/inbox" + (f"?{qs}" if qs else "")
+    response.headers["HX-Push-Url"] = inbox_url
+    return response
 
 
 @router.get("/{job_id}/detail", response_class=HTMLResponse)

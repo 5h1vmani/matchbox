@@ -135,16 +135,18 @@
         <!-- Tailor section: button → preview → execute → PDF + violations -->
         <section id="tailor-section">
             <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Tailor</h3>
-            <button type="button"
-                    hx-get="/p/{{ active_profile }}/jobs/{{ job.id }}/tailor/preview"
-                    hx-target="#tailor-section"
-                    hx-swap="beforeend"
-                    class="text-sm px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white">
-                Tailor now
-            </button>
-            <span class="ml-2 text-xs text-slate-500">
-                Routes to {{ job.tier or '—' }} tier based on score.
-            </span>
+            <div id="tailor-action">
+                <button type="button"
+                        hx-get="/p/{{ active_profile }}/jobs/{{ job.id }}/tailor/preview"
+                        hx-target="#tailor-action"
+                        hx-swap="innerHTML"
+                        class="text-sm px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white">
+                    Tailor now
+                </button>
+                <span class="ml-2 text-xs text-slate-500">
+                    Routes to {{ job.tier or '—' }} tier based on score.
+                </span>
+            </div>
         </section>
 
         {% if tailor_outcome %}

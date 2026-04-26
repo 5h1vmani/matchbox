@@ -279,15 +279,39 @@ class TestProfileEditor:
         result = update_weights(
             settings,
             "demo",
-            {"cv_match_weight": 0.42, "tech_stack_weight": 0.13},
+            {"cv_match_weight": 0.42, "comp_weight": 0.13},
         )
         assert result["cv_match_weight"] == 0.42
-        assert result["tech_stack_weight"] == 0.13
+        assert result["comp_weight"] == 0.13
         # Other fields preserved.
         assert "company_mission_fit_weight" in result
         # File was actually rewritten.
         text = (settings.profile_dir("demo") / "profile.yaml").read_text(encoding="utf-8")
         assert "0.42" in text
+
+    def test_update_weights_migrates_legacy_aliases(
+        self, settings: Settings, demo_yaml_backup: str
+    ) -> None:
+        # Hand-write a profile.yaml with the OLD weight names to simulate
+        # an existing real-user profile, then save canonical values and
+        # confirm the legacy keys are gone.
+        path = settings.profile_dir("demo") / "profile.yaml"
+        legacy_text = (
+            path.read_text(encoding="utf-8")
+            .replace("comp_weight: 0.20", "tech_stack_weight: 0.20")
+            .replace("cultural_weight: 0.10", "seniority_weight: 0.10")
+            .replace("red_flags_weight: 0.15", "location_remote_weight: 0.15")
+        )
+        path.write_text(legacy_text, encoding="utf-8")
+
+        update_weights(settings, "demo", {"comp_weight": 0.30})
+        text = path.read_text(encoding="utf-8")
+        assert "tech_stack_weight" not in text
+        assert "seniority_weight" not in text
+        assert "location_remote_weight" not in text
+        assert "comp_weight: 0.3" in text
+        assert "cultural_weight" in text  # migrated
+        assert "red_flags_weight" in text  # migrated
 
     def test_update_weights_rejects_unknown_field(
         self, settings: Settings, demo_yaml_backup: str
@@ -312,9 +336,9 @@ class TestProfileEditor:
                 "cv_match_weight": 0.30,
                 "company_mission_fit_weight": 0.20,
                 "role_mission_fit_weight": 0.10,
-                "tech_stack_weight": 0.20,
-                "seniority_weight": 0.10,
-                "location_remote_weight": 0.10,
+                "comp_weight": 0.20,
+                "cultural_weight": 0.10,
+                "red_flags_weight": 0.10,
             },
         )
         assert r.status_code == 200
@@ -331,9 +355,9 @@ class TestProfileEditor:
                 "cv_match_weight": 5.0,  # invalid
                 "company_mission_fit_weight": 0.15,
                 "role_mission_fit_weight": 0.15,
-                "tech_stack_weight": 0.20,
-                "seniority_weight": 0.15,
-                "location_remote_weight": 0.10,
+                "comp_weight": 0.20,
+                "cultural_weight": 0.15,
+                "red_flags_weight": 0.10,
             },
         )
         assert r.status_code == 400

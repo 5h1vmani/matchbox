@@ -34,17 +34,17 @@ async def save(
     cv_match_weight: Annotated[float, Form()],
     company_mission_fit_weight: Annotated[float, Form()],
     role_mission_fit_weight: Annotated[float, Form()],
-    tech_stack_weight: Annotated[float, Form()],
-    seniority_weight: Annotated[float, Form()],
-    location_remote_weight: Annotated[float, Form()],
+    comp_weight: Annotated[float, Form()],
+    cultural_weight: Annotated[float, Form()],
+    red_flags_weight: Annotated[float, Form()],
 ) -> HTMLResponse:
     new_weights = {
         "cv_match_weight": cv_match_weight,
         "company_mission_fit_weight": company_mission_fit_weight,
         "role_mission_fit_weight": role_mission_fit_weight,
-        "tech_stack_weight": tech_stack_weight,
-        "seniority_weight": seniority_weight,
-        "location_remote_weight": location_remote_weight,
+        "comp_weight": comp_weight,
+        "cultural_weight": cultural_weight,
+        "red_flags_weight": red_flags_weight,
     }
     try:
         saved = update_weights(settings, profile, new_weights)

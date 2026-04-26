@@ -119,12 +119,28 @@ class Project(BaseModel):
 
 
 class ScoringWeights(BaseModel):
+    """Per-dimension weights used to compute Job.total_score.
+
+    Field names align 1:1 with the six Job dimension scores
+    (cv_match_score, company_mission_fit_score, role_mission_fit_score,
+    comp_score, cultural_score, red_flags_score).
+
+    Older profile.yaml files used different names for the last three
+    weights (tech_stack_weight, seniority_weight, location_remote_weight)
+    that did NOT match the dimensions they were applied to. We accept
+    those names via validation_alias for backward compatibility, so old
+    YAMLs continue to load — but new profiles should use the canonical
+    names because the legacy names are misleading.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
     cv_match_weight: float = 0.25
     company_mission_fit_weight: float = 0.15
     role_mission_fit_weight: float = 0.15
-    tech_stack_weight: float = 0.20
-    seniority_weight: float = 0.15
-    location_remote_weight: float = 0.10
+    comp_weight: float = Field(default=0.20, validation_alias="tech_stack_weight")
+    cultural_weight: float = Field(default=0.10, validation_alias="seniority_weight")
+    red_flags_weight: float = Field(default=0.10, validation_alias="location_remote_weight")
 
 
 class Profile(BaseModel):

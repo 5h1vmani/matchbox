@@ -327,9 +327,9 @@ scoring:
   cv_match_weight: 0.25
   company_mission_fit_weight: 0.15
   role_mission_fit_weight: 0.15
-  tech_stack_weight: 0.20
-  seniority_weight: 0.15
-  location_remote_weight: 0.10
+  comp_weight: 0.20
+  cultural_weight: 0.10
+  red_flags_weight: 0.15
 
 work_history: []
 skills: []
