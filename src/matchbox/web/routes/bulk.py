@@ -2,27 +2,32 @@
 
 Selected job IDs are POSTed as repeated `id` form fields.
 
-Bulk Tailor (item #1): synchronous execution capped at MAX_BULK_TAILOR jobs
-to bound cost and request time. For larger batches use the CLI:
+Bulk Tailor (item #1, M4 fix): runs in a FastAPI BackgroundTask so the
+HTTP request returns immediately and the UI polls /bulk/tailor/{task_id}
+for progress. Capped at MAX_BULK_TAILOR jobs so total cost is bounded.
+For larger batches use the CLI:
     matchbox tailor <profile> <id> [<id> ...]
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from matchbox.core import db
 from matchbox.core.person import load_person
-from matchbox.core.schema import VALID_STATES
+from matchbox.core.schema import VALID_STATES, Person
+from matchbox.web import tasks
 from matchbox.web.deps import ProfileDep, SettingsDep
 from matchbox.web.render import render
 from matchbox.web.routes.jobs import build_inbox_context
 from matchbox.web.tailor_view import estimate, run
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 MAX_BULK_TAILOR = 5
 
@@ -56,20 +61,23 @@ async def bulk_star(
     id: Annotated[list[int] | None, Form()] = None,
 ) -> HTMLResponse:
     ids = id or []
+    starred_after = 0
     for jid in ids:
-        db.toggle_star(profile, jid)
+        if db.toggle_star(profile, jid):
+            starred_after += 1
     ctx = build_inbox_context(profile, request.query_params)
     ctx["active_profile"] = profile
-    return render(
-        request,
-        "components/_job_rows.html",
-        ctx,
-        toast=f"{len(ids)} job(s) toggled",
-    )
+    if starred_after == len(ids):
+        msg = f"{len(ids)} job(s) starred"
+    elif starred_after == 0:
+        msg = f"{len(ids)} job(s) unstarred"
+    else:
+        msg = f"{starred_after} starred · {len(ids) - starred_after} unstarred"
+    return render(request, "components/_job_rows.html", ctx, toast=msg)
 
 
 # ──────────────────────────────────────────────
-# Bulk tailor (item #1)
+# Bulk tailor (background task + polling)
 # ──────────────────────────────────────────────
 
 
@@ -80,8 +88,7 @@ async def bulk_tailor_preview(
     profile: ProfileDep,
     id: Annotated[list[int] | None, Form()] = None,
 ) -> HTMLResponse:
-    """Cumulative cost preview before bulk tailor execution. Returns a
-    confirmation modal partial that the operator must POST to /tailor."""
+    """Cumulative cost preview before bulk tailor execution."""
     ids = id or []
     if not ids:
         raise HTTPException(400, "Select at least one job to tailor.")
@@ -111,11 +118,61 @@ async def bulk_tailor_preview(
     )
 
 
+def _run_bulk_tailor(profile: str, person: Person, task_id: str, ids: list[int]) -> None:
+    """Background worker — runs in a thread via FastAPI BackgroundTasks."""
+    tasks.set_status(task_id, "running")
+    total_cost = 0.0
+    failures = 0
+    for idx, jid in enumerate(ids):
+        tasks.update_item(task_id, idx, status="running")
+        job = db.get_job(profile, jid)
+        if job is None:
+            tasks.update_item(task_id, idx, status="failed", detail="job not found")
+            failures += 1
+            continue
+        try:
+            outcome = run(job, person)
+        except Exception as e:  # noqa: BLE001
+            log.exception("bulk tailor failed for job_id=%s", jid)
+            tasks.update_item(task_id, idx, status="failed", detail=str(e))
+            failures += 1
+            continue
+
+        if outcome.error:
+            tasks.update_item(task_id, idx, status="failed", detail=outcome.error)
+            failures += 1
+        elif outcome.application:
+            cost = outcome.application.cost_usd
+            total_cost += cost
+            tasks.update_item(
+                task_id,
+                idx,
+                status="ok",
+                detail=f"{outcome.application.tier} · ${cost:.4f}"
+                + (f" · {len(outcome.violations)} gate" if outcome.violations else ""),
+                extra={
+                    "tier": outcome.application.tier,
+                    "cost": cost,
+                    "violations": len(outcome.violations),
+                },
+            )
+        else:
+            tasks.update_item(task_id, idx, status="skipped", detail="skip tier")
+
+    final: tasks.TaskStatus = "failed" if failures == len(ids) else "done"
+    tasks.set_status(
+        task_id,
+        final,
+        summary={"total_cost": total_cost, "failures": failures, "total": len(ids)},
+    )
+
+
 @router.post("/tailor", response_class=HTMLResponse)
 async def bulk_tailor_execute(
     request: Request,
     settings: SettingsDep,
     profile: ProfileDep,
+    background: BackgroundTasks,
     id: Annotated[list[int] | None, Form()] = None,
     confirmed: Annotated[str | None, Form()] = None,
 ) -> HTMLResponse:
@@ -128,40 +185,32 @@ async def bulk_tailor_execute(
             f"Bulk tailor capped at {MAX_BULK_TAILOR}. Use the CLI for larger batches.",
         )
 
-    # Cumulative cost confirmation.
     jobs = [j for j in (db.get_job(profile, jid) for jid in ids) if j is not None]
     high = sum(estimate(j).high_usd for j in jobs)
     if high >= settings.cost_confirm_threshold_usd and confirmed != "1":
         raise HTTPException(412, "Cost confirmation required for bulk tailor.")
 
     person = load_person(profile)
-    results: list[dict[str, object]] = []
-    total_cost = 0.0
-    failures = 0
-    for j in jobs:
-        outcome = run(j, person)
-        if outcome.error:
-            failures += 1
-            results.append({"job": j, "status": "failed", "detail": outcome.error})
-        elif outcome.application:
-            total_cost += outcome.application.cost_usd
-            results.append(
-                {
-                    "job": j,
-                    "status": "ok",
-                    "tier": outcome.application.tier,
-                    "cost": outcome.application.cost_usd,
-                    "violations": len(outcome.violations),
-                }
-            )
-        else:
-            results.append({"job": j, "status": "skipped"})
+    items = [tasks.TaskItem(label=f"{j.company} — {j.role}") for j in jobs]
+    task = tasks.create("bulk_tailor", items)
+    background.add_task(_run_bulk_tailor, profile, person, task.id, [j.id or 0 for j in jobs])
 
-    toast = f"Tailored {len(jobs) - failures}/{len(jobs)} · spent ${total_cost:.2f}"
     return render(
         request,
-        "components/_bulk_tailor_result.html",
-        {"active_profile": profile, "results": results, "total_cost": total_cost},
-        toast=toast,
-        toast_level="error" if failures else "success",
+        "components/_bulk_tailor_progress.html",
+        {"active_profile": profile, "task": task},
+    )
+
+
+@router.get("/tailor/{task_id}", response_class=HTMLResponse)
+async def bulk_tailor_status(request: Request, profile: ProfileDep, task_id: str) -> HTMLResponse:
+    """Polling endpoint — returns the same template; HTMX refreshes itself
+    every 1.5s until the task is terminal."""
+    task = tasks.get(task_id)
+    if task is None:
+        raise HTTPException(404, "Task not found (may have been cleaned up).")
+    return render(
+        request,
+        "components/_bulk_tailor_progress.html",
+        {"active_profile": profile, "task": task},
     )

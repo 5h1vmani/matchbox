@@ -30,19 +30,34 @@
       @keydown.window.meta.k.prevent="palette = !palette"
       @keydown.window.ctrl.k.prevent="palette = !palette">
 
+    <!-- Skip link (a11y: keyboard users should be able to bypass nav) -->
+    <a href="#main-content"
+       class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50
+              focus:bg-slate-900 focus:text-white focus:px-3 focus:py-1.5 focus:rounded">
+        Skip to main content
+    </a>
+
+    <!-- Top progress bar — visible whenever ANY HTMX request is in flight. -->
+    <div id="global-progress"
+         class="fixed top-0 left-0 right-0 h-0.5 bg-indigo-500 z-[60] origin-left scale-x-0 transition-transform duration-300"
+         aria-hidden="true"></div>
+
     <!-- Top nav -->
-    <header class="sticky top-0 z-30 bg-white border-b border-slate-200">
+    <header class="sticky top-0 z-30 bg-white border-b border-slate-200" role="banner">
         <div class="flex items-center gap-4 px-4 h-14">
-            <a href="/" class="font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+            <a href="/"
+               aria-label="Matchbox — home"
+               class="font-semibold tracking-tight text-slate-900 flex items-center gap-2">
+                <span aria-hidden="true" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
                 {{ app_name }}
             </a>
 
             {% if active_profile %}
-            <nav class="flex items-center gap-1 text-sm">
+            <nav class="flex items-center gap-1 text-sm" aria-label="Primary">
                 {% set tabs = [('inbox','Inbox'),('insights','Insights'),('profile','Profile'),('settings','Settings')] %}
                 {% for slug, label in tabs %}
                 <a href="/p/{{ active_profile }}/{{ slug }}"
+                   {% if active_page == slug %}aria-current="page"{% endif %}
                    class="px-3 py-1.5 rounded-md transition
                           {% if active_page == slug %}bg-slate-100 text-slate-900 font-medium{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-50{% endif %}">
                     {{ label }}
@@ -73,12 +88,19 @@
         </div>
     </header>
 
-    <!-- Toast host — populated client-side by app.js on `matchbox:toast` events. -->
+    <!-- Toast host — populated client-side by app.js on `matchbox:toast` events.
+         aria-live region announces toasts to screen readers. -->
     <div id="toast-host"
+         role="status"
+         aria-live="polite"
+         aria-atomic="false"
          class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col gap-2 items-center"></div>
 
     <!-- Keyboard help overlay -->
     <div x-show="help" x-cloak
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="kbd-help-title"
          class="fixed inset-0 z-40 bg-slate-900/60 flex items-center justify-center p-4"
          @click="help = false">
         {% include "components/keyboard_help.html" %}
@@ -87,22 +109,34 @@
     <!-- Cmd+K command palette -->
     {% if active_profile %}
     <div x-show="palette" x-cloak
+         role="dialog"
+         aria-modal="true"
+         aria-label="Command palette"
+         x-data="paletteNav()"
          class="fixed inset-0 z-50 bg-slate-900/40 flex items-start justify-center pt-24 px-4"
          @click="palette = false">
         <div @click.stop
              class="bg-white rounded-xl shadow-2xl w-full max-w-xl overflow-hidden"
-             x-init="$watch('palette', open => { if (open) setTimeout(() => $refs.paletteInput.focus(), 0); })">
+             x-init="$watch('palette', open => { if (open) setTimeout(() => $refs.paletteInput.focus(), 0); else cursor = -1; })">
             <input x-ref="paletteInput"
                    type="search"
                    name="q"
                    placeholder="Jump to page, profile, or job…"
                    autocomplete="off"
+                   aria-label="Search pages, profiles, and jobs"
+                   aria-controls="palette-results"
                    hx-get="/p/{{ active_profile }}/palette"
                    hx-trigger="input changed delay:120ms, load"
                    hx-target="#palette-results"
                    hx-swap="innerHTML"
+                   @keydown.arrow-down.prevent="moveCursor(1)"
+                   @keydown.arrow-up.prevent="moveCursor(-1)"
+                   @keydown.enter.prevent="openCursor()"
                    class="w-full text-base px-4 py-3 border-0 border-b border-slate-200 focus:ring-0 focus:outline-none">
-            <div id="palette-results" class="max-h-96 overflow-auto">
+            <div id="palette-results"
+                 role="listbox"
+                 aria-label="Search results"
+                 class="max-h-96 overflow-auto">
                 <div class="px-4 py-6 text-center text-xs text-slate-400">Loading…</div>
             </div>
             <div class="px-4 py-2 text-xs text-slate-400 border-t border-slate-100 flex items-center justify-between">
@@ -113,7 +147,7 @@
     </div>
     {% endif %}
 
-    <main class="relative">
+    <main id="main-content" class="relative" role="main">
         {% block content %}{% endblock %}
     </main>
 

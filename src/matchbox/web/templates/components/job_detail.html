@@ -23,15 +23,22 @@
                     {% endif %}
                 </div>
             </div>
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-1" role="toolbar" aria-label="Job navigation">
                 <button type="button" @click="navJob(-1)"
-                        class="text-slate-400 hover:text-slate-700 px-1 leading-none"
+                        :disabled="!canNavPrev()"
+                        :class="canNavPrev() ? 'text-slate-500 hover:text-slate-900' : 'text-slate-300 cursor-not-allowed'"
+                        class="px-1 leading-none"
+                        aria-label="Previous job"
                         title="Previous job (←)">‹</button>
                 <button type="button" @click="navJob(1)"
-                        class="text-slate-400 hover:text-slate-700 px-1 leading-none"
+                        :disabled="!canNavNext()"
+                        :class="canNavNext() ? 'text-slate-500 hover:text-slate-900' : 'text-slate-300 cursor-not-allowed'"
+                        class="px-1 leading-none"
+                        aria-label="Next job"
                         title="Next job (→)">›</button>
                 <button @click="panel = false"
                         class="text-slate-400 hover:text-slate-700 text-xl leading-none ml-1"
+                        aria-label="Close panel"
                         title="Close (Esc)">×</button>
             </div>
         </div>
@@ -115,7 +122,7 @@
             </div>
             <details class="mt-2"
                      hx-get="/p/{{ active_profile }}/jobs/{{ job.id }}/responses"
-                     hx-trigger="toggle once from:closest details[open]"
+                     hx-trigger="toggle[target.open] once"
                      hx-target="find .response-history-slot"
                      hx-swap="innerHTML">
                 <summary class="text-xs text-slate-600 cursor-pointer">Response history</summary>
@@ -204,7 +211,7 @@
             {% if job.jd_text %}
             <details class="mt-2"
                      hx-get="/p/{{ active_profile }}/jobs/{{ job.id }}/jd"
-                     hx-trigger="toggle once from:closest details[open]"
+                     hx-trigger="toggle[target.open] once"
                      hx-target="find .jd-full-slot"
                      hx-swap="innerHTML">
                 <summary class="text-xs text-slate-600 cursor-pointer">Show full JD</summary>

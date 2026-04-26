@@ -17,11 +17,17 @@ from pathlib import Path
 from typing import Any
 
 from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 
 from matchbox.core import db
 from matchbox.core.schema import Job, ScoringWeights
 from matchbox.scoring.rubric import weighted_total
 from matchbox.web.config import Settings
+
+
+class ProfileYamlError(ValueError):
+    """Raised when profile.yaml is missing or malformed."""
+
 
 log = logging.getLogger(__name__)
 
@@ -80,11 +86,18 @@ def update_weights(
 
     path = profile_path(settings, profile)
     if not path.exists():
-        raise FileNotFoundError(path)
+        raise ProfileYamlError(f"profile.yaml not found at {path}")
 
     yaml = _yaml()
-    with path.open("r", encoding="utf-8") as f:
-        data: Any = yaml.load(f)
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data: Any = yaml.load(f)
+    except YAMLError as e:
+        raise ProfileYamlError(
+            f"profile.yaml is malformed; fix the file in your editor and reload: {e}"
+        ) from e
+    if not isinstance(data, dict):
+        raise ProfileYamlError("profile.yaml must be a YAML mapping at the top level")
 
     scoring = data.setdefault("scoring", {})
 

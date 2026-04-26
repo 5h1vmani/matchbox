@@ -436,6 +436,48 @@ class TestBulkTailor:
         )
         assert r.status_code == 412
 
+    def test_status_404_for_unknown_task(self, client: TestClient) -> None:
+        # The actual execute path requires LLM credentials; we only test the
+        # status endpoint shape here.
+        r = client.get("/p/demo/bulk/tailor/no_such_task")
+        assert r.status_code == 404
+
+
+class TestTaskTracker:
+    """Pure-function tests for the in-process task tracker."""
+
+    def test_create_and_get(self) -> None:
+        from matchbox.web import tasks
+
+        t = tasks.create("bulk_tailor", [tasks.TaskItem(label="x")])
+        assert tasks.get(t.id) is t
+        assert t.status == "pending"
+        assert t.total == 1
+        assert t.done_count == 0
+
+    def test_update_item_and_set_status(self) -> None:
+        from matchbox.web import tasks
+
+        t = tasks.create("bulk_tailor", [tasks.TaskItem(label="a"), tasks.TaskItem(label="b")])
+        tasks.update_item(t.id, 0, status="ok", detail="great")
+        tasks.update_item(t.id, 1, status="failed", detail="boom")
+        tasks.set_status(t.id, "done", summary={"total_cost": 0.5})
+        assert t.done_count == 2
+        assert t.is_terminal
+        assert t.summary["total_cost"] == 0.5
+
+    def test_cleanup_old_drops_terminal(self) -> None:
+        from matchbox.web import tasks
+
+        t = tasks.create("bulk_tailor", [])
+        tasks.set_status(t.id, "done")
+        # Force-age the task by rewinding completed_at.
+        assert t.completed_at is not None
+        t.completed_at -= 7200
+        dropped = tasks.cleanup_old(max_age_seconds=3600)
+        assert dropped >= 1
+        assert tasks.get(t.id) is None
+
 
 class TestPalette:
     def test_empty_query_returns_pages(self, client: TestClient) -> None:

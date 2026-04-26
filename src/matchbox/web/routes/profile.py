@@ -13,7 +13,12 @@ from fastapi.responses import HTMLResponse
 
 from matchbox.core.schema import ScoringWeights
 from matchbox.web.deps import ProfileDep, SettingsDep
-from matchbox.web.profile_view import WEIGHT_FIELDS, preview_rescore, update_weights
+from matchbox.web.profile_view import (
+    WEIGHT_FIELDS,
+    ProfileYamlError,
+    preview_rescore,
+    update_weights,
+)
 from matchbox.web.render import render
 
 router = APIRouter()
@@ -91,7 +96,9 @@ async def save(
     }
     try:
         saved = update_weights(settings, profile, new_weights)
-    except (ValueError, FileNotFoundError) as e:
+    except ProfileYamlError as e:
+        raise HTTPException(400, str(e)) from e
+    except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
     total = sum(saved.values())

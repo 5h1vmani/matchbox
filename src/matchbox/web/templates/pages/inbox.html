@@ -6,14 +6,17 @@
 
     {% include "components/_filters.html" %}
 
-    <!-- Active filter chips (item #17) — recognition over recall -->
+    <!-- Active filter chips (item #17) — recognition over recall + per-chip remove -->
     {% if active_filters %}
     <div class="px-4 py-2 flex flex-wrap items-center gap-2 bg-indigo-50/40 border-b border-indigo-100">
         <span class="text-xs uppercase tracking-wide text-indigo-700">Filters</span>
         {% for chip in active_filters %}
-        <span class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-white ring-1 ring-indigo-200 text-indigo-800">
+        <a href="/p/{{ active_profile }}/inbox{{ remove_qs_param(request.url.query, chip.param, chip.value) }}"
+           title="Remove this filter"
+           class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-white ring-1 ring-indigo-200 text-indigo-800 hover:bg-indigo-100">
             {{ chip.label }}
-        </span>
+            <span aria-hidden="true" class="text-indigo-500">×</span>
+        </a>
         {% endfor %}
         <a href="/p/{{ active_profile }}/inbox"
            class="ml-auto text-xs text-indigo-700 hover:text-indigo-900 underline">Clear all</a>
@@ -172,10 +175,15 @@ function inbox() {
             }
         },
 
+        canNavPrev() { return this.cursor > 0; },
+        canNavNext() { return this.cursor >= 0 && this.cursor < this.rows().length - 1; },
+
         navJob(delta) {
             const rows = this.rows();
             if (rows.length === 0) return;
-            this.cursor = Math.max(0, Math.min(rows.length - 1, this.cursor + delta));
+            const next = Math.max(0, Math.min(rows.length - 1, this.cursor + delta));
+            if (next === this.cursor) return;  // at boundary
+            this.cursor = next;
             this.focusCursor(rows);
             rows[this.cursor].click();
         },

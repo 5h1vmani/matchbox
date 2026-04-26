@@ -9,14 +9,16 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from matchbox.web.config import Settings
-from matchbox.web.deps import get_settings, list_profiles
+from matchbox.web.deps import get_settings, list_profiles, shell_context
 from matchbox.web.filters import register as register_filters
+from matchbox.web.render import render
 from matchbox.web.routes import bulk, files, jobs, pages, palette, profile, system
 
 log = logging.getLogger(__name__)
@@ -69,6 +71,33 @@ def create_app() -> FastAPI:
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.exception_handler(HTTPException)
+    async def http_exception(request: Request, exc: HTTPException) -> Response:
+        # HTMX requests: return the detail as a small HTML fragment so the
+        # client error handler can surface a toast. Browser navigations to a
+        # full page get a styled error page.
+        is_htmx = request.headers.get("HX-Request") == "true"
+        accept = request.headers.get("accept") or ""
+        if is_htmx or "text/html" not in accept:
+            return Response(
+                content=str(exc.detail),
+                status_code=exc.status_code,
+                media_type="text/plain",
+            )
+        return _render_error(request, exc.status_code, str(exc.detail))
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError) -> Response:
+        msg = "Invalid request."
+        if request.headers.get("HX-Request") == "true":
+            return Response(content=msg, status_code=422, media_type="text/plain")
+        return _render_error(request, 422, msg)
+
+    def _render_error(request: Request, status: int, message: str) -> HTMLResponse:
+        ctx = shell_context(get_settings(), None, "")
+        ctx.update(status=status, message=message)
+        return render(request, "pages/error.html", ctx, status_code=status)
 
     return app
 

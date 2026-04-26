@@ -146,7 +146,11 @@ def build_inbox_context(profile: str, qs: Any) -> dict[str, Any]:
 
 
 def _active_filter_chips(f: ParsedFilters) -> list[dict[str, str]]:
-    """List of {label, remove_param} for visible filter chips. Item #17."""
+    """List of {label, param, value} for visible filter chips.
+
+    The template builds a remove URL by stripping (param, value) from the
+    current query string. If `value` is empty the whole param is removed.
+    """
     chips: list[dict[str, str]] = []
     for s in f["states"] or []:
         chips.append({"label": f"state: {s.replace('_', ' ')}", "param": "state", "value": s})
@@ -368,9 +372,12 @@ async def tailor_execute(
     outcome = run(job, person, tier_override=tier_override)
 
     job_after = db.get_job(profile, job_id)
+    from matchbox.web.render import ToastLevel
+
+    level: ToastLevel
     if outcome.error:
         toast_msg = f"Tailor failed: {outcome.error}"
-        level: Any = "error"
+        level = "error"
     elif outcome.application:
         toast_msg = f"Tailored as {outcome.application.tier}. Review the PDF, then mark applied."
         level = "success"

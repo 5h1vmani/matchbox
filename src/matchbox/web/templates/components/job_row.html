@@ -17,7 +17,10 @@
                 hx-post="/p/{{ active_profile }}/jobs/{{ job.id }}/star"
                 hx-target="#row-{{ job.id }}"
                 hx-swap="outerHTML"
-                class="text-lg leading-none {% if job.is_starred %}text-amber-400{% else %}text-slate-300 hover:text-amber-400{% endif %}"
+                onclick="this.classList.toggle('text-amber-400'); this.classList.toggle('text-slate-300')"
+                aria-pressed="{{ 'true' if job.is_starred else 'false' }}"
+                aria-label="{% if job.is_starred %}Starred — click to unstar{% else %}Star this job{% endif %}"
+                class="text-lg leading-none transition-colors {% if job.is_starred %}text-amber-400{% else %}text-slate-300 hover:text-amber-400{% endif %}"
                 title="{% if job.is_starred %}Starred{% else %}Star{% endif %}">★</button>
     </td>
 

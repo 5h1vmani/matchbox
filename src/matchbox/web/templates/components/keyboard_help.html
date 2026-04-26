@@ -1,20 +1,24 @@
 <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
      @click.stop>
     <div class="flex items-center justify-between mb-4">
-        <h2 class="text-base font-semibold text-slate-900">Keyboard shortcuts</h2>
-        <button @click="help = false" class="text-slate-400 hover:text-slate-700">×</button>
+        <h2 id="kbd-help-title" class="text-base font-semibold text-slate-900">Keyboard shortcuts</h2>
+        <button @click="help = false"
+                aria-label="Close shortcut help"
+                class="text-slate-400 hover:text-slate-700">×</button>
     </div>
     <dl class="space-y-2 text-sm">
         {% set shortcuts = [
-            ('j / k',  'Next / previous job'),
-            ('Enter',  'Open detail panel'),
-            ('Space',  'Toggle row selection'),
-            ('s',      'Star / unstar'),
-            ('a',      'Mark applied'),
-            ('t',      'Tailor selected'),
-            ('/',      'Focus search'),
-            ('Esc',    'Close panel'),
-            ('?',      'This menu'),
+            ('⌘K / Ctrl+K', 'Command palette (jump anywhere)'),
+            ('j / k',       'Next / previous job'),
+            ('Enter',       'Open detail panel'),
+            ('Space',       'Toggle row selection'),
+            ('← / →',       'Prev / next job in panel'),
+            ('s',           'Star / unstar'),
+            ('a',           'Mark applied'),
+            ('t',           'Queue for tailor'),
+            ('/',           'Focus search'),
+            ('Esc',         'Close panel / modal'),
+            ('?',           'This menu'),
         ] %}
         {% for keys, label in shortcuts %}
         <div class="flex items-center justify-between">

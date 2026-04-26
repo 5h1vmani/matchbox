@@ -117,3 +117,20 @@ def register(env: Environment) -> None:
     env.filters["tier_class"] = tier_class
     env.filters["state_class"] = state_class
     env.filters["score_color"] = score_color
+    env.globals["remove_qs_param"] = remove_qs_param
+
+
+def remove_qs_param(qs: str, param: str, value: str = "") -> str:
+    """Build a query string with (param, value) removed.
+
+    If value is empty, all values for `param` are stripped.
+    Used by the inbox filter chips to make each chip individually removable.
+    """
+    from urllib.parse import parse_qsl, urlencode
+
+    pairs = parse_qsl(qs.lstrip("?"), keep_blank_values=False)
+    if value:
+        pairs = [(k, v) for k, v in pairs if not (k == param and v == value)]
+    else:
+        pairs = [(k, v) for k, v in pairs if k != param]
+    return ("?" + urlencode(pairs)) if pairs else ""

@@ -10,12 +10,21 @@ poking at `request.app.state.templates` directly. Keeps:
 from __future__ import annotations
 
 import json
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, get_args
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 
 ToastLevel = Literal["info", "success", "error"]
+_VALID_LEVELS: frozenset[str] = frozenset(get_args(ToastLevel))
+
+
+def _coerce_level(value: object) -> ToastLevel:
+    """Defence-in-depth: reject unknown levels so the JS handler always gets
+    one of three known classes. Anything else falls back to 'info'."""
+    if isinstance(value, str) and value in _VALID_LEVELS:
+        return cast(ToastLevel, value)
+    return "info"
 
 
 def render(
@@ -45,7 +54,7 @@ def render(
         trigger: dict[str, Any] = {
             "matchbox:toast": {
                 "message": toast,
-                "level": toast_level,
+                "level": _coerce_level(toast_level),
             }
         }
         if undo_url:
