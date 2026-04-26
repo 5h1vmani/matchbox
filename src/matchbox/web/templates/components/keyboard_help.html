@@ -1,0 +1,27 @@
+<div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
+     @click.stop>
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-semibold text-slate-900">Keyboard shortcuts</h2>
+        <button @click="help = false" class="text-slate-400 hover:text-slate-700">×</button>
+    </div>
+    <dl class="space-y-2 text-sm">
+        {% set shortcuts = [
+            ('j / k',  'Next / previous job'),
+            ('Enter',  'Open detail panel'),
+            ('Space',  'Toggle row selection'),
+            ('s',      'Star / unstar'),
+            ('a',      'Mark applied'),
+            ('t',      'Tailor selected'),
+            ('/',      'Focus search'),
+            ('Esc',    'Close panel'),
+            ('?',      'This menu'),
+        ] %}
+        {% for keys, label in shortcuts %}
+        <div class="flex items-center justify-between">
+            <span class="text-slate-600">{{ label }}</span>
+            <kbd>{{ keys }}</kbd>
+        </div>
+        {% endfor %}
+    </dl>
+    <p class="mt-4 text-xs text-slate-400">Shortcuts work everywhere unless a text input is focused.</p>
+</div>

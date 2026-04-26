@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Profile · {{ active_profile }} · {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-6 py-6">
+    <h1 class="text-xl font-semibold text-slate-900">{{ person.profile.candidate.full_name or active_profile }}</h1>
+    <p class="text-sm text-slate-600 mt-1">{{ person.profile.candidate.location or '—' }}</p>
+
+    <div class="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+        Live profile editor (sliders for scoring weights with re-score preview) ships in the next phase.
+        For now, edit
+        <code class="text-xs bg-amber-100 px-1.5 py-0.5 rounded">people/{{ active_profile }}/profile.yaml</code>
+        directly and reload.
+    </div>
+
+    <section class="mt-6 bg-white border border-slate-200 rounded-xl p-5">
+        <h2 class="font-medium text-slate-900 mb-3">Current scoring weights</h2>
+        <dl class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+            {% set w = person.profile.scoring %}
+            {% set weights = [
+                ('CV match',           w.cv_match_weight),
+                ('Company mission',    w.company_mission_fit_weight),
+                ('Role mission',       w.role_mission_fit_weight),
+                ('Tech stack',         w.tech_stack_weight),
+                ('Seniority',          w.seniority_weight),
+                ('Location / remote',  w.location_remote_weight),
+            ] %}
+            {% for label, val in weights %}
+            <div class="flex justify-between">
+                <dt class="text-slate-600">{{ label }}</dt>
+                <dd class="text-slate-900 tabular-nums">{{ val }}</dd>
+            </div>
+            {% endfor %}
+        </dl>
+    </section>
+</div>
+{% endblock %}

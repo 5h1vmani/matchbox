@@ -9,6 +9,8 @@ Commands:
   analytics         Show conversion funnel and cost breakdown
   rebuild-canonicals Regenerate all canonical PDFs
   init-profile      Create a new person directory with starter files
+  seed-demo         Populate demo profile with synthetic jobs
+  web               Start the web dashboard (FastAPI + HTMX)
 """
 
 from __future__ import annotations
@@ -359,6 +361,52 @@ def _today() -> str:
     from datetime import date
 
     return date.today().isoformat()
+
+
+# ──────────────────────────────────────────────
+# seed-demo
+# ──────────────────────────────────────────────
+
+
+@app.command("seed-demo")
+def seed_demo(
+    count: int = typer.Option(30, "--count", "-n", help="Number of synthetic jobs"),
+    force: bool = typer.Option(False, "--force", help="Re-seed even if demo already populated"),
+) -> None:
+    """Populate people/demo/db.sqlite with synthetic jobs for trying the UI."""
+    from matchbox.web.config import Settings
+    from matchbox.web.demo import seed_demo_profile
+
+    inserted = seed_demo_profile(Settings.load(), count=count, force=force)
+    if inserted:
+        rprint(f"[green]Seeded[/green] {inserted} demo jobs into people/demo/db.sqlite")
+    else:
+        rprint("[yellow]Demo already populated[/yellow] (use --force to re-seed)")
+    rprint("Start the dashboard:  [bold]matchbox web[/bold]")
+
+
+# ──────────────────────────────────────────────
+# web
+# ──────────────────────────────────────────────
+
+
+@app.command()
+def web(
+    host: str = typer.Option("127.0.0.1", "--host", "-h"),
+    port: int = typer.Option(8765, "--port", "-p"),
+    reload: bool = typer.Option(False, "--reload", help="Auto-reload on code changes"),
+) -> None:
+    """Start the FastAPI + HTMX dashboard at http://HOST:PORT."""
+    import uvicorn
+
+    rprint(f"[bold]Matchbox[/bold] starting on http://{host}:{port}")
+    uvicorn.run(
+        "matchbox.web.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        reload=reload,
+    )
 
 
 if __name__ == "__main__":

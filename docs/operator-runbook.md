@@ -19,7 +19,7 @@ matchbox scan shiva --dry-run --verbose
 
 ```bash
 # Open dashboard
-streamlit run src/matchbox/ui/ui.py
+matchbox web
 
 # CLI: list top-scored evaluated jobs
 sqlite3 people/shiva/db.sqlite \

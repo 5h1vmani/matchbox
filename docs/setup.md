@@ -40,12 +40,17 @@ matchbox --help
 matchbox scan shiva --dry-run
 ```
 
-## Streamlit dashboard
+## Web dashboard
 
 ```bash
-streamlit run src/matchbox/ui/ui.py
-# Opens at http://localhost:8501
+matchbox web                 # http://127.0.0.1:8765
+matchbox web --port 9000     # custom port
+matchbox web --reload        # auto-reload on code changes (dev)
 ```
+
+The dashboard is FastAPI + HTMX + Tailwind — no build step.
+Use `matchbox seed-demo` to populate the demo profile with 30 synthetic jobs
+so you can see the UI in action before connecting an API key.
 
 ## Typst (for PDF generation)
 

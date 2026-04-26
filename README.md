@@ -19,11 +19,13 @@ Precision job application pipeline. Scan ATS boards → score by fit → tailor 
 # Install (requires Python 3.12+, uv recommended)
 pip install -e ".[dev]"
 
-# Run your first scan (dry-run — no DB writes)
-matchbox scan shiva --dry-run
+# Try the dashboard with synthetic demo data (no API key needed)
+matchbox seed-demo
+matchbox web                 # opens at http://127.0.0.1:8765
 
-# View the Streamlit dashboard
-streamlit run src/matchbox/ui/ui.py
+# Or use a real profile
+matchbox init-profile alice
+matchbox scan alice --dry-run
 
 # Full help
 matchbox --help

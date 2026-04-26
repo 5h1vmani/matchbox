@@ -1,0 +1,180 @@
+{# Slide-out job detail panel — HTMX swap target. #}
+<div class="flex flex-col h-full">
+
+    <!-- Header -->
+    <div class="px-5 py-4 border-b border-slate-200 sticky top-0 bg-white z-10">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="font-semibold text-slate-900 truncate">{{ job.company }}</h2>
+                <p class="text-sm text-slate-600 truncate">{{ job.role }}</p>
+                <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                    {% if job.tier %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full ring-1 ring-inset {{ job.tier | tier_class }}">
+                        {{ job.tier }}
+                    </span>
+                    {% endif %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full ring-1 ring-inset {{ job.state | state_class }}">
+                        {{ job.state.replace('_', ' ') }}
+                    </span>
+                    {% if job.location %}
+                    <span class="text-slate-500">· {{ job.location }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <button @click="panel = false"
+                    class="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
+        </div>
+
+        <div class="mt-3 flex items-center gap-2">
+            {% if job.url %}
+            <a href="{{ job.url }}" target="_blank" rel="noopener"
+               class="text-xs px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">
+                Open JD ↗
+            </a>
+            {% endif %}
+            <button type="button"
+                    hx-post="/p/{{ active_profile }}/jobs/{{ job.id }}/star"
+                    hx-target="#row-{{ job.id }}"
+                    hx-swap="outerHTML"
+                    class="text-xs px-2.5 py-1 rounded-md
+                           {% if job.is_starred %}bg-amber-100 text-amber-800{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}">
+                {% if job.is_starred %}★ Starred{% else %}☆ Star{% endif %}
+            </button>
+        </div>
+    </div>
+
+    <!-- Body -->
+    <div class="flex-1 overflow-auto p-5 space-y-5">
+
+        <!-- Score breakdown — visual, not table -->
+        <section>
+            <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Score</h3>
+            <div class="bg-slate-50 rounded-lg p-3">
+                <div class="flex items-baseline justify-between mb-2">
+                    <span class="text-2xl font-semibold {{ job.total_score | score_color }}">
+                        {{ job.total_score | score }}
+                    </span>
+                    <span class="text-xs text-slate-500">of 5.00</span>
+                </div>
+                <div class="space-y-1.5">
+                    {% set dims = [
+                        ('CV match',    job.cv_match_score),
+                        ('Mission fit', job.company_mission_fit_score),
+                        ('Role fit',    job.role_mission_fit_score),
+                        ('Comp',        job.comp_score),
+                        ('Cultural',    job.cultural_score),
+                        ('Red flags',   job.red_flags_score),
+                    ] %}
+                    {% for label, val in dims %}
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="w-20 text-slate-600">{{ label }}</span>
+                        <div class="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-slate-700"
+                                 style="width: {{ ((val or 0) / 5 * 100) | round(0) }}%"></div>
+                        </div>
+                        <span class="w-8 text-right tabular-nums text-slate-600">{{ val | score }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <!-- Outcome buttons — primary action zone -->
+        <section>
+            <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Log outcome</h3>
+            <div class="grid grid-cols-4 gap-1.5">
+                {% set outcome_styles = {
+                    'interview': 'bg-lime-100 hover:bg-lime-200 text-lime-900',
+                    'offer':     'bg-emerald-100 hover:bg-emerald-200 text-emerald-900',
+                    'rejection': 'bg-rose-100 hover:bg-rose-200 text-rose-900',
+                    'ghosted':   'bg-slate-100 hover:bg-slate-200 text-slate-700',
+                } %}
+                {% for r in valid_response_types %}
+                {% if r != 'other' %}
+                <form hx-post="/p/{{ active_profile }}/jobs/{{ job.id }}/response"
+                      hx-target="#detail-panel" hx-swap="innerHTML">
+                    <input type="hidden" name="response_type" value="{{ r }}">
+                    <button type="submit"
+                            class="w-full text-xs py-1.5 rounded-md font-medium {{ outcome_styles.get(r, 'bg-slate-100 hover:bg-slate-200 text-slate-700') }}">
+                        {{ r.title() }}
+                    </button>
+                </form>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% if job.response_type %}
+            <p class="mt-2 text-xs text-slate-500">
+                Last response: <strong class="text-slate-700">{{ job.response_type }}</strong>
+                {% if job.response_date %}on {{ job.response_date | short_date }}{% endif %}
+            </p>
+            {% endif %}
+        </section>
+
+        <!-- State change -->
+        <section>
+            <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">State</h3>
+            <div class="flex flex-wrap gap-1.5">
+                {% set primary_states = [
+                    ('queued_for_tailor', 'Queue for tailor'),
+                    ('applied', 'Mark applied'),
+                    ('discarded', 'Discard'),
+                ] %}
+                {% for s, label in primary_states %}
+                <form hx-post="/p/{{ active_profile }}/jobs/{{ job.id }}/state"
+                      hx-target="#detail-panel" hx-swap="innerHTML">
+                    <input type="hidden" name="new_state" value="{{ s }}">
+                    <button type="submit"
+                            class="text-xs px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">
+                        {{ label }}
+                    </button>
+                </form>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Tailor preview / PDF -->
+        {% if job.cv_path %}
+        <section>
+            <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Generated CV</h3>
+            <iframe src="/p/{{ active_profile }}/files/{{ job.id }}/{{ job.cv_path.split('/')[-1] }}"
+                    class="w-full h-96 rounded-lg border border-slate-200 bg-white"></iframe>
+            {% if job.tailor_cost_usd %}
+            <p class="mt-1 text-xs text-slate-500">
+                Tailored as <strong>{{ job.tier }}</strong>, cost {{ job.tailor_cost_usd | usd(precision=4) }}
+            </p>
+            {% endif %}
+        </section>
+        {% endif %}
+
+        <!-- JD summary -->
+        {% if job.jd_summary %}
+        <section>
+            <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Summary</h3>
+            <p class="text-sm text-slate-700 leading-relaxed">{{ job.jd_summary }}</p>
+        </section>
+        {% endif %}
+
+        <!-- Metadata -->
+        <section class="text-xs text-slate-500 grid grid-cols-2 gap-x-4 gap-y-1.5 pt-2 border-t border-slate-100">
+            <div>ID: <span class="text-slate-700">{{ job.id }}</span></div>
+            <div>ATS: <span class="text-slate-700">{{ job.ats_source or '—' }}</span></div>
+            <div>Country: <span class="text-slate-700">{{ job.country or '—' }}</span></div>
+            <div>Mode: <span class="text-slate-700">{{ job.mode or '—' }}</span></div>
+            {% if job.applied_date %}<div>Applied: <span class="text-slate-700">{{ job.applied_date | short_date }}</span></div>{% endif %}
+            {% if job.dream_tier %}<div>Dream: <span class="text-slate-700">{{ job.dream_tier }}</span></div>{% endif %}
+        </section>
+
+        {% if job.user_notes %}
+        <section>
+            <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Notes</h3>
+            <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ job.user_notes }}</p>
+        </section>
+        {% endif %}
+    </div>
+</div>
+
+{% if toast %}
+<div hx-swap-oob="innerHTML:#toast-host">
+    {% include "components/toast.html" %}
+</div>
+{% endif %}

@@ -6,6 +6,10 @@ people/*
 !people/README.md
 !people/demo/
 !people/demo/**
+# But never commit generated artifacts even for demo:
+people/demo/db.sqlite
+people/demo/output/*
+!people/demo/output/.gitkeep
 __pycache__/
 *.pyc
 *.pyo

@@ -1,0 +1,35 @@
+<div id="selection-bar"
+     x-show="selected.length > 0"
+     x-cloak
+     x-transition:enter="transition ease-out duration-150"
+     x-transition:enter-start="opacity-0 translate-y-2"
+     x-transition:enter-end="opacity-100 translate-y-0"
+     class="fixed bottom-4 left-1/2 -translate-x-1/2 z-30
+            bg-slate-900 text-white shadow-xl rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm">
+
+    <span><strong x-text="selected.length"></strong> selected</span>
+    <span class="text-slate-400 text-xs"
+          x-text="estimatedCost > 0 ? '· est. $' + estimatedCost.toFixed(2) : ''"></span>
+
+    <span class="w-px h-5 bg-slate-700"></span>
+
+    <button type="button"
+            @click="bulkAction('/p/{{ active_profile }}/bulk/state', { new_state: 'queued_for_tailor' })"
+            class="hover:text-indigo-300 transition" title="Tailor (t)">Tailor</button>
+    <button type="button"
+            @click="bulkAction('/p/{{ active_profile }}/bulk/state', { new_state: 'applied' })"
+            class="hover:text-indigo-300 transition" title="Mark applied (a)">Applied</button>
+    <button type="button"
+            @click="bulkAction('/p/{{ active_profile }}/bulk/star', {})"
+            class="hover:text-amber-300 transition" title="Star (s)">★ Star</button>
+    <button type="button"
+            @click="bulkAction('/p/{{ active_profile }}/bulk/state', { new_state: 'discarded' })"
+            class="hover:text-rose-300 transition" title="Discard">Discard</button>
+
+    <span class="w-px h-5 bg-slate-700"></span>
+
+    <button type="button" @click="clearSelection()"
+            class="text-slate-400 hover:text-white text-xs">Clear</button>
+</div>
+
+<form id="bulk-form" class="hidden" hx-target="#job-rows"></form>

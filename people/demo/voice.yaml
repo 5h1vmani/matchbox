@@ -1,0 +1,8 @@
+_meta:
+  schema_version: 1
+
+# Demo profile voice overrides. Lists append to shared/voice-rules.yaml.
+banned_words: []
+banned_openers: []
+costly_signal_patterns: []
+opener_patterns: []
