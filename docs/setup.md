@@ -37,8 +37,12 @@ Scan, score, and tracking are all free.
 
 ```bash
 matchbox --help
-matchbox scan shiva --dry-run
+matchbox seed-demo            # populates people/demo/db.sqlite
+matchbox web                  # opens http://127.0.0.1:8765
 ```
+
+The `demo` profile is the only one committed; real profiles
+(`people/{name}/`) are gitignored automatically.
 
 ## Web dashboard
 

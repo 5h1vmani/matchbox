@@ -1,93 +1,115 @@
-# Matchbox v0.2
+# Matchbox
 
-Precision job application pipeline. Scan ATS boards → score by fit → tailor at the right cost tier → track outcomes.
+[![CI](https://github.com/5h1vmani/matchbox/actions/workflows/ci.yml/badge.svg)](https://github.com/5h1vmani/matchbox/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python: 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](pyproject.toml)
+[![Type checked: mypy strict](https://img.shields.io/badge/type%20checked-mypy%20strict-2bbc8a.svg)](pyproject.toml)
+[![Code style: ruff](https://img.shields.io/badge/lint%20%2B%20format-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+[![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196.svg)](https://www.conventionalcommits.org)
+
+> Precision job-application pipeline. Scan ATS boards → score by fit → tailor at the right cost tier → track outcomes.
+
+Single-machine CLI + web dashboard. Your data stays on your laptop. The only network call is the optional Anthropic API for tailoring high-scoring jobs.
 
 ## What it does
 
 | Step | Command | Cost |
 |------|---------|------|
-| Scan KNOWN_SOURCES (20+ ATS boards) | `matchbox scan shiva` | $0 |
-| Score on 6 dimensions (heuristic) | automatic | $0 |
-| Route: bespoke / template / canonical / skip | automatic | $0 |
-| Generate tailored CV + cover | `matchbox tailor shiva 42` | $0.05–$20 |
-| Track outcomes | `matchbox log-response shiva 42 interview` | $0 |
-| Analytics + funnel | `matchbox analytics shiva` | $0 |
+| Scan 20+ ATS boards (Greenhouse / Lever / Ashby / Workable) | `matchbox scan alice` | $0 |
+| Score each job on 6 dimensions (deterministic, no LLM) | automatic | $0 |
+| Route to bespoke / template / canonical / skip | automatic | $0 |
+| Generate tailored CV + cover letter | `matchbox tailor alice 42` | $0–$20 |
+| Track outcomes (interview / offer / rejection) | one click in the web UI | $0 |
+| Conversion funnel + cost-per-stage analytics | `matchbox analytics alice` or **Insights** page | $0 |
 
-## Quick start
+## 60-second demo (no API key, no profile setup)
 
 ```bash
-# Install (requires Python 3.12+, uv recommended)
+git clone https://github.com/5h1vmani/matchbox.git
+cd matchbox
 pip install -e ".[dev]"
 
-# Try the dashboard with synthetic demo data (no API key needed)
-matchbox seed-demo
-matchbox web                 # opens at http://127.0.0.1:8765
-
-# Or use a real profile
-matchbox init-profile alice
-matchbox scan alice --dry-run
-
-# Full help
-matchbox --help
+matchbox seed-demo            # 30 synthetic jobs in people/demo/
+matchbox web                  # http://127.0.0.1:8765
 ```
 
-See [docs/setup.md](docs/setup.md) for full setup including Typst and API keys.
+Click around. Press `?` for shortcuts, `⌘K` for the command palette. **Zero spend.**
 
-## Repository layout
+## Real usage
 
+```bash
+matchbox init-profile alice                 # creates people/alice/ with starter YAML
+$EDITOR people/alice/profile.yaml           # candidate, target roles, weights, ...
+$EDITOR people/alice/stories.md             # 3-5 STAR+R career stories
+
+export ANTHROPIC_API_KEY=sk-ant-...         # only needed for `tailor`
+matchbox scan alice                         # populate people/alice/db.sqlite
+matchbox web                                # triage in the browser
 ```
-matchbox/
-├── src/matchbox/
-│   ├── core/          # Schema, DB, person loader, exceptions
-│   ├── scoring/       # Exclusions, rubric, tier router
-│   ├── discovery/     # ATS probers, daily scan, funding scan
-│   ├── tailor/        # Gates, content gen, Typst render, dispatch
-│   ├── outcome/       # Response logging, follow-ups, analytics
-│   ├── ui/            # Streamlit dashboard
-│   └── cli.py         # Typer entry point
-├── people/
-│   └── shiva/
-│       ├── profile.yaml        # Structured profile (SSOT)
-│       ├── voice.yaml          # LLM voice rules
-│       ├── stories.md          # STAR+R narratives
-│       ├── anchor-packs.yaml   # Pre-approved bullets by role family
-│       ├── log.md              # Application log
-│       └── output/             # Generated PDFs (gitignored)
-├── shared/
-│   ├── rubric.yaml             # 6-dimension scoring weights
-│   ├── voice-rules.yaml        # Universal voice constraints
-│   └── templates/              # Typst CV + cover templates
-├── tests/
-└── docs/
-```
+
+Full install (Typst, uv, env vars): see **[docs/setup.md](docs/setup.md)**.
 
 ## Tier routing
 
-| Score (0–5) | Normalised | Tier | Estimated cost |
-|-------------|-----------|------|----------------|
-| ≥ 4.0 | ≥ 0.80 | bespoke | $10–20 (full Sonnet rewrite) |
-| ≥ 3.0 | ≥ 0.60 | template | $0.05–0.30 (anchor pack + Sonnet) |
-| ≥ 2.0 | ≥ 0.40 | canonical | $0 (pre-rendered PDF copy) |
-| < 2.0 | < 0.40 | skip | $0 |
+| Score (0–5) | Tier | Action | Estimated cost |
+|---|---|---|---|
+| ≥ 4.0 | `bespoke` | Full Sonnet rewrite from anchor packs | $10–20 |
+| ≥ 3.0 | `template` | Lighter Sonnet prompt + anchor pack | $0.05–0.30 |
+| ≥ 2.0 | `canonical` | Copy a pre-rendered PDF | $0 |
+| < 2.0 | `skip` | No output | $0 |
 
-## Profiles
+The UI **never spends money silently.** Above the configurable `MATCHBOX_COST_CONFIRM_USD` threshold (default $1) you must explicitly confirm. Bulk tailor is capped at 5 jobs in the UI; for batches use the CLI.
 
-Each person has their own directory under `people/`. To add a new profile:
+## Repository layout
 
-```bash
-matchbox init-profile alice
-# Edit people/alice/profile.yaml
-matchbox scan alice --dry-run
+```text
+matchbox/
+├── src/matchbox/
+│   ├── core/          # Pydantic schema, SQLite layer, person loader
+│   ├── scoring/       # Exclusions, 6-dim rubric, tier router
+│   ├── discovery/     # ATS probers, daily scan, funding scan
+│   ├── tailor/        # Quality gates, content gen, Typst render, dispatch
+│   ├── outcome/       # Response logging, follow-ups, analytics
+│   ├── web/           # FastAPI + HTMX + Jinja + Tailwind dashboard
+│   └── cli.py         # Typer entry point
+├── people/
+│   ├── demo/          # Demo profile (committed, gets you running in 30s)
+│   └── {your_name}/   # Your real profile (gitignored automatically)
+├── shared/
+│   ├── rubric.yaml             # 6-dimension scoring weights
+│   ├── voice-rules.yaml        # Universal voice constraints
+│   └── templates/              # Typst CV + cover letter templates
+├── tests/                       # 109 tests; ruff + mypy strict + pytest in CI
+└── docs/                        # See docs/index.md
 ```
 
-## Security note
+## Documentation
 
-Matchbox is a single-user local tool with **no auth, no CSRF protection, and
-no rate limiting.** The dashboard binds to `127.0.0.1` by default. Do not
-expose it to the network. If you need remote access, put it behind a reverse
-proxy with auth — anyone who can reach the port can read your jobs and spend
-your Anthropic API budget.
+* **[Setup](docs/setup.md)** — install, prerequisites, verifying
+* **[Operator runbook](docs/operator-runbook.md)** — daily commands
+* **[Architecture](docs/architecture.md)** — module map, data flow, gates
+* **[UX design rationale](docs/ux-design.md)** — *why* the dashboard looks the way it does
+* **[CLI reference](docs/cli-reference.md)** — every command + flags
+* **[Troubleshooting](docs/troubleshooting.md)** — common errors
+* **[Decision records (ADRs)](docs/decisions/)** — durable architectural choices
+* **[Contributing](CONTRIBUTING.md)** — code standards, PR flow
+* **[Development guide](docs/development.md)** — local dev workflow
+* **[Changelog](CHANGELOG.md)** — release history
+* **[Security policy](SECURITY.md)** — how to report vulnerabilities
+* **[Code of conduct](CODE_OF_CONDUCT.md)** — community standards
+
+Full index at **[docs/index.md](docs/index.md)**.
+
+## Security
+
+Matchbox is a **single-user local tool**: no auth, no CSRF protection, no rate limiting. The web dashboard binds to `127.0.0.1` only by default. **Do not** expose it to the network without a reverse proxy + auth — anyone who can reach the port can read your jobs and spend your Anthropic API budget.
+
+To report a security issue, see [SECURITY.md](SECURITY.md). Please do not open a public issue.
+
+## Contributing
+
+PRs welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) — short version: ruff + mypy strict + pytest must pass, conventional commits, no PII in commits.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

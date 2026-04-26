@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/5h1vmani/matchbox/security/advisories/new
+    about: Please report security issues privately, not as public issues.
+  - name: Question or discussion
+    url: https://github.com/5h1vmani/matchbox/discussions
+    about: For usage questions, design discussions, or "is this a bug?" — start a discussion.

@@ -35,18 +35,20 @@ per "what's the state of my pipeline" check.
 ## Inbox — the heart of the app
 
 ### Layout
-- **Sticky filter bar** (top) — search, sort, state, tier, min score, starred.
-- **Stats strip** (under filters) — N shown · counts by state · total spent.
+
+* **Sticky filter bar** (top) — search, sort, state, tier, min score, starred.
+* **Stats strip** (under filters) — N shown · counts by state · total spent.
   Always tells you what's on the table.
-- **Table** (left, fills viewport) — virtualised by the browser, sortable header.
-- **Slide-out detail panel** (right, ~580px) — opens on row click; doesn't
+* **Table** (left, fills viewport) — virtualised by the browser, sortable header.
+* **Slide-out detail panel** (right, ~580px) — opens on row click; doesn't
   navigate away from the list (Zeigarnik: keeps the list visible so you don't
   lose your scroll position or selection).
-- **Bulk action bar** (fixed bottom-centre) — appears only when ≥1 row
+* **Bulk action bar** (fixed bottom-centre) — appears only when ≥1 row
   selected. Fitts's law: bottom-centre is the easiest place to hit with a
   mouse no matter where you scrolled.
 
 ### Keyboard model
+
 Triage at scale is keyboard work. Every primary action has a single key:
 
 | Key | Action | Why |
@@ -66,12 +68,13 @@ doesn't navigate rows). The `?` overlay reduces recall load — recognition
 beats memorisation (Nielsen #6).
 
 ### Score visualisation
+
 A horizontal coloured bar plus a number. Colour band:
 
-- ≥ 4.0 emerald (bespoke threshold)
-- ≥ 3.0 sky (template)
-- ≥ 2.0 amber (canonical)
-- < 2.0 slate (skip)
+* ≥ 4.0 emerald (bespoke threshold)
+* ≥ 3.0 sky (template)
+* ≥ 2.0 amber (canonical)
+* < 2.0 slate (skip)
 
 Same bands appear in the inbox table and the detail panel's score breakdown,
 so the operator learns one mapping. The dimension breakdown uses simple
@@ -96,22 +99,24 @@ Sections in order of action density (top = most-used):
    bottom-of-panel because rarely actioned.
 
 ### Cost transparency
+
 The single most expensive UX failure was "click and discover you spent $20".
 The fix:
 
-- **Inline estimate in selection bar.** As you select rows, the bar shows
+* **Inline estimate in selection bar.** As you select rows, the bar shows
   estimated total cost based on tier (heuristic: bespoke ~$14, template
   ~$0.20). False precision avoided — the estimate is a midpoint of a range.
-- **Preview before tailor.** Clicking "Tailor now" doesn't tailor — it
+* **Preview before tailor.** Clicking "Tailor now" doesn't tailor — it
   shows a preview card with the cost range and a downgrade option.
-- **Confirmation above threshold.** Above `MATCHBOX_COST_CONFIRM_USD` (default
+* **Confirmation above threshold.** Above `MATCHBOX_COST_CONFIRM_USD` (default
   $1), the preview requires `confirmed=1` in the POST. Defence against
   accidental clicks (`hx-confirm` is *not* enough — server enforces).
-- **Downgrade-in-place.** The preview card offers a one-click "↓ Downgrade
+* **Downgrade-in-place.** The preview card offers a one-click "↓ Downgrade
   to template" so the user can rescue an expensive misroute without leaving
   the panel.
 
 ### Gate violations
+
 The previous flow logged gate failures to stdout where nobody read them.
 Now: after a tailor, violations are surfaced as a rose card in the detail
 panel, with the offending text highlighted. The PDF is still produced
@@ -170,31 +175,31 @@ options because it requires the smaller commitment.
 
 ## Engineering principles applied
 
-- **SSOT** for visual decisions: `web/filters.py` owns all formatting
+* **SSOT** for visual decisions: `web/filters.py` owns all formatting
   (currency, score, badges, relative time). Templates never hand-format.
-- **DRY**: `_job_rows.html` is shared between full-page inbox and the
+* **DRY**: `_job_rows.html` is shared between full-page inbox and the
   HTMX rows partial. `build_inbox_context` is shared between full-page
   and partial routes — they cannot disagree about filtering.
-- **Single responsibility per file**: each route module owns one concern
+* **Single responsibility per file**: each route module owns one concern
   (pages, jobs, bulk, profile, files, system).
-- **Least privilege**: profile names are validated by regex at the
+* **Least privilege**: profile names are validated by regex at the
   FastAPI layer *and* by directory existence at the dependency layer.
   PDF serving requires the resolved path to stay under the job's output
   directory. Filename pattern restricted to `*.pdf|*.png`.
-- **Pure-function adapters**: `tailor_view.estimate()` and `alternative_tier()`
+* **Pure-function adapters**: `tailor_view.estimate()` and `alternative_tier()`
   are pure functions over `Job`. Testable with no DB, no network.
-- **Atomic writes**: weight save uses `tempfile.mkstemp` in same dir,
+* **Atomic writes**: weight save uses `tempfile.mkstemp` in same dir,
   fsync, `os.replace`. Cannot half-write profile.yaml.
 
 ## What's intentionally not built
 
-- Real-time WebSocket updates. The pipeline isn't multi-user; HTMX polling
+* Real-time WebSocket updates. The pipeline isn't multi-user; HTMX polling
   is enough if needed.
-- Dark mode. Single user, single environment, not worth the design cost.
-- Mobile responsive. Triaging 200 jobs on a phone is not a real workflow.
-- Rich text editor for cover letters. Cover letters are LLM-generated;
+* Dark mode. Single user, single environment, not worth the design cost.
+* Mobile responsive. Triaging 200 jobs on a phone is not a real workflow.
+* Rich text editor for cover letters. Cover letters are LLM-generated;
   if the operator wants to edit, they can edit the YAML/PDF source.
-- Drag-and-drop reordering. Sort columns + filters cover the same need.
+* Drag-and-drop reordering. Sort columns + filters cover the same need.
 
 ## Future moves (numbered for tracking)
 
@@ -209,10 +214,10 @@ options because it requires the smaller commitment.
 This is a single-user local tool. Threat model is **"my own machine, my own
 network"** — not "untrusted users on the internet". Specifically:
 
-- **No auth.** Anyone who can reach the port can do everything.
-- **No CSRF.** A malicious page in the same browser could trigger form POSTs.
-- **No rate limiting.** A bug or runaway script could spam state changes.
-- **Binds to 127.0.0.1 by default.** The CLI prints a red warning if you
+* **No auth.** Anyone who can reach the port can do everything.
+* **No CSRF.** A malicious page in the same browser could trigger form POSTs.
+* **No rate limiting.** A bug or runaway script could spam state changes.
+* **Binds to 127.0.0.1 by default.** The CLI prints a red warning if you
   change `--host`.
 
 If you need to share Matchbox between machines, put it behind a reverse

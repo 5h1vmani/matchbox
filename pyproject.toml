@@ -4,11 +4,29 @@ build-backend = "hatchling.build"
 
 [project]
 name = "matchbox"
-version = "0.2.0"
-description = "AI-assisted job application pipeline — scan, score, tailor, track."
+version = "0.3.0"
+description = "Precision job-application pipeline: scan ATS boards, score by fit, tailor at the right cost tier, track outcomes."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
+keywords = ["jobs", "ats", "cv", "tailor", "anthropic", "claude", "htmx", "fastapi"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/5h1vmani/matchbox"
+Documentation = "https://github.com/5h1vmani/matchbox/tree/main/docs"
+Repository = "https://github.com/5h1vmani/matchbox"
+Changelog = "https://github.com/5h1vmani/matchbox/blob/main/CHANGELOG.md"
+Issues = "https://github.com/5h1vmani/matchbox/issues"
 dependencies = [
     "anthropic>=0.49.0",
     "pydantic>=2.7",
@@ -58,3 +76,28 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.codespell]
+# Skip these directories and patterns entirely.
+skip = [
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".secrets.baseline",
+    "docs/history",
+    "archive",
+    "node_modules",
+    "plans",
+    "*.lock",
+    "people/*/db.sqlite",
+    # Verbatim upstream — don't second-guess the Contributor Covenant's wording.
+    "CODE_OF_CONDUCT.md",
+]
+# Allow these words even though codespell would flag them.
+# - NEET/neet: Indian education/visa term (NEET-UG/PG, "NEET-eligible")
+# - alot/thru: occasionally used intentionally in informal copy
+# - master/strat/nam: false positives in tech contexts
+ignore-words-list = "alot,thru,master,strat,nam,neet"
+# Don't auto-fix; flag and let the human decide.
+check-filenames = true

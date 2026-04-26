@@ -1,0 +1,47 @@
+{
+    // markdownlint-cli2 config — both rules and ignores in one file.
+    // Docs: https://github.com/DavidAnson/markdownlint-cli2
+
+    "config": {
+        "default": true,
+
+        // Allow long lines — we wrap by sentence, not by column count.
+        "MD013": false,
+
+        // Allow inline HTML (<details>, <kbd>, <iframe>) — we use it deliberately.
+        "MD033": false,
+
+        // Allow duplicate H2/H3 under different parents (ADRs have multiple "## Context").
+        "MD024": { "siblings_only": true },
+
+        // Allow first line not to be a heading (license preambles, frontmatter).
+        "MD041": false,
+
+        // Bare URLs are OK in changelog footnotes and security advisories.
+        "MD034": false,
+
+        // Ordered list prefix: pick one style per file, don't enforce 1.1.1. across all.
+        "MD029": { "style": "ordered" },
+
+        // Tables: don't enforce padding style. Both compact and padded forms are valid.
+        "MD060": false,
+
+        // Unordered list bullets: asterisk. Auto-fix already normalised.
+        "MD004": { "style": "asterisk" }
+    },
+
+    "ignores": [
+        // Historical / frozen content
+        "docs/history/**",
+        "archive/**",
+        "plans/**",
+
+        // Vendored / generated
+        ".venv/**",
+        "node_modules/**",
+        ".git/**",
+
+        // Auto-generated upstream content (CoC is verbatim from contributor-covenant.org)
+        "CODE_OF_CONDUCT.md"
+    ]
+}

@@ -1,0 +1,59 @@
+name: Feature request
+description: Suggest an enhancement.
+title: "[feat] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: check [docs/decisions/](https://github.com/5h1vmani/matchbox/tree/main/docs/decisions) — some things are deliberately out of scope (auth, multi-user, mobile).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the user pain. Don't lead with the solution.
+      placeholder: |
+        When I do X, Y is annoying because…
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What do you want to happen? UI mockup, CLI sketch, anything that helps us picture it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you try? Why didn't they work?
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Which part of Matchbox?
+      multiple: true
+      options:
+        - Discovery (ATS scanning)
+        - Scoring / rubric
+        - Tailor pipeline
+        - Web dashboard
+        - CLI
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues and discussions for similar requests.
+          required: true
+        - label: I read [docs/decisions/](https://github.com/5h1vmani/matchbox/tree/main/docs/decisions) to make sure this isn't already-decided-against.
+          required: true

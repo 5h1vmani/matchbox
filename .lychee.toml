@@ -1,0 +1,42 @@
+# lychee — markdown link checker. https://lychee.cli.rs/
+# Run locally:  lychee --config .lychee.toml '**/*.md'
+
+# Skip GitHub anchor links (lychee can't validate fragments without rendering).
+include_fragments = false
+
+# Skip private hosts that 404 in CI but exist locally.
+exclude_private = true
+
+# Tolerate flaky public sites.
+max_retries = 2
+retry_wait_time = 2
+
+# Don't check links inside code blocks.
+include_verbatim = false
+
+# Avoid hammering rate-limited endpoints.
+max_concurrency = 8
+
+# Treat these as success even if they 403/429 (anti-bot for valid pages).
+accept = [
+    "200..=299",
+    "403",  # GitHub's UA-block on some pages
+    "429",  # Rate limit — link likely valid
+]
+
+# Skip these files.
+exclude_path = [
+    "docs/history/",
+    "archive/",
+    ".venv/",
+    "node_modules/",
+    "plans/",
+]
+
+# Skip these patterns. The example.com hosts are intentionally unresolvable.
+exclude = [
+    "^https?://example\\.com",
+    "^https?://jobs\\.example\\.com",
+    "^http://localhost",
+    "^http://127\\.0\\.0\\.1",
+]

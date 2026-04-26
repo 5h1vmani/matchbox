@@ -6,9 +6,18 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel in-progress runs when a new commit is pushed to the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -16,6 +25,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install uv
         run: pip install uv
@@ -34,3 +44,39 @@ jobs:
 
       - name: Tests (pytest)
         run: pytest tests/ -v
+
+  docs-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint markdown
+        uses: DavidAnson/markdownlint-cli2-action@v17
+        with:
+          globs: "**/*.md"
+
+      - name: Spell check (codespell)
+        uses: codespell-project/actions-codespell@v2
+        with:
+          # Config is in pyproject.toml [tool.codespell].
+          # The action reads it via codespell's --toml option.
+          check_filenames: true
+
+  link-check:
+    # Soft job: lychee on every PR but doesn't gate merge if a remote URL
+    # is flaky. Marked as "continue-on-error" so a 503 elsewhere never
+    # blocks shipping correct docs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Link check (lychee)
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --config .lychee.toml --no-progress '**/*.md'
+          fail: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

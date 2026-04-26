@@ -1,0 +1,23 @@
+# CODEOWNERS — who reviews what.
+# Each line: <pattern> <user-or-team>. Last matching pattern wins.
+# See: https://docs.github.com/en/repositories/managing-your-repositories-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default — maintainer reviews everything.
+*                               @5h1vmani
+
+# Web layer (FastAPI + HTMX) — same owner today, separated for future delegation.
+/src/matchbox/web/              @5h1vmani
+
+# Scoring and tailor pipelines — high-blast-radius areas; keep visible.
+/src/matchbox/scoring/          @5h1vmani
+/src/matchbox/tailor/           @5h1vmani
+
+# Decision records require explicit acknowledgement.
+/docs/decisions/                @5h1vmani
+
+# CI + hooks + security config — restrict drift.
+/.github/                       @5h1vmani
+/.githooks/                     @5h1vmani
+/.pre-commit-config.yaml        @5h1vmani
+/.secrets.baseline              @5h1vmani
+/SECURITY.md                    @5h1vmani

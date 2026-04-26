@@ -16,12 +16,13 @@ cp -r people/demo people/yourname
 ```
 
 Each profile directory contains:
-- `profile.yaml` — structured identity, targets, work history, skills, projects
-- `voice.yaml` — per-person voice rules and example phrasings (merges with shared/voice-rules.yaml)
-- `stories.md` — STAR+R narratives for cover letters and interview prep
-- `anchor-packs.yaml` — pre-approved bullet variants per role family (generated from profile.yaml)
-- `db.sqlite` — pipeline state (gitignored)
-- `output/` — tailored CVs and cover letters per job (gitignored)
-- `runs/` — scan run artefacts (gitignored)
-- `reports/` — per-role evaluation reports (gitignored)
-- `log.md` — activity log (written via `matchbox log-response` only)
+
+* `profile.yaml` — structured identity, targets, work history, skills, projects
+* `voice.yaml` — per-person voice rules and example phrasings (merges with shared/voice-rules.yaml)
+* `stories.md` — STAR+R narratives for cover letters and interview prep
+* `anchor-packs.yaml` — pre-approved bullet variants per role family (generated from profile.yaml)
+* `db.sqlite` — pipeline state (gitignored)
+* `output/` — tailored CVs and cover letters per job (gitignored)
+* `runs/` — scan run artefacts (gitignored)
+* `reports/` — per-role evaluation reports (gitignored)
+* `log.md` — activity log (written via `matchbox log-response` only)

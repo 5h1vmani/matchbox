@@ -71,7 +71,7 @@ matchbox analytics shiva
 # Shows conversion funnel and flags jobs that need a nudge
 ```
 
-Or in the dashboard: **Follow-ups** tab.
+Or in the dashboard: **Insights** page (the "Action needed" card at the top).
 
 ## Rebuild canonical PDFs
 
@@ -87,9 +87,11 @@ matchbox rebuild-canonicals shiva
 
 1. Find the company's ATS slug (the URL subdomain on their jobs board).
 2. Add to `src/matchbox/discovery/sources.py → KNOWN_SOURCES`:
+
    ```python
    greenhouse("new-company", "New Company", country="uk", sector="ai"),
    ```
+
 3. Next `matchbox scan` picks it up automatically.
 
 ## Probe a funded company
@@ -105,21 +107,26 @@ results = probe_funded_companies([
 ## Troubleshooting
 
 ### `typst not found`
+
 Install: `brew install typst` or `cargo install typst-cli`.
 Canonical-tier tailing does not need Typst (pre-rendered copy only).
 
 ### `anthropic.AuthenticationError`
+
 Check `ANTHROPIC_API_KEY` is set. Only `matchbox tailor` (non-canonical) calls the API.
 
 ### DB locked / WAL error
+
 SQLite WAL mode is enabled; multiple readers are safe.
 If stuck: `sqlite3 people/shiva/db.sqlite "PRAGMA wal_checkpoint(TRUNCATE)"`.
 
 ### ATS probe returns 0 jobs
-- Check `source.base_url` is still valid (ATS slugs occasionally change).
-- Run `--verbose` to see per-source counts.
-- Test manually: `curl -s "https://boards-api.greenhouse.io/v1/boards/anthropic/jobs" | python -m json.tool | head -50`.
+
+* Check `source.base_url` is still valid (ATS slugs occasionally change).
+* Run `--verbose` to see per-source counts.
+* Test manually: `curl -s "https://boards-api.greenhouse.io/v1/boards/anthropic/jobs" | python -m json.tool | head -50`.
 
 ### Gate violations on generated content
+
 Use `--gate-mode warn` (default) to continue, `--gate-mode raise` to fail, or `--gate-mode skip` to abandon that job.
 Check `shared/voice-rules.yaml` and `people/shiva/voice.yaml` for the rule that triggered.

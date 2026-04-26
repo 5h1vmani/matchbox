@@ -32,6 +32,23 @@ repos:
       - id: ruff-format
 
   # ──────────────────────────────────────────────
+  # Docs-as-code (markdown + typos)
+  # ──────────────────────────────────────────────
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.14.0
+    hooks:
+      - id: markdownlint-cli2
+        args: ["--fix"]
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        # Config in pyproject.toml [tool.codespell].
+        additional_dependencies: ["tomli"]
+
+  # ──────────────────────────────────────────────
   # Security (blocks disasters)
   # ──────────────────────────────────────────────
 
