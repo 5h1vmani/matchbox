@@ -1,0 +1,100 @@
+{% extends "base.html.j2" %}
+{% block title %}Inbox — Matchbox{% endblock %}
+
+{% block content %}
+<section class="space-y-2 mb-6">
+  <h1 class="text-xl font-semibold">Inbox</h1>
+  <p class="text-sm text-text-muted">
+    Pick the jobs to tailor. Toggle CV and cover letter per job. Pick a palette and font for the run.
+    "Start tailoring" writes a work-queue.json the brain picks up.
+  </p>
+</section>
+
+<section class="mb-4 flex items-center gap-3 text-xs text-text-muted">
+  <form method="get" class="flex items-center gap-2">
+    <label>
+      status
+      <select name="status" class="border border-border rounded px-2 py-0.5">
+        <option value="" {% if not filter_status %}selected{% endif %}>any (open)</option>
+        <option value="new"      {% if filter_status == "new" %}selected{% endif %}>new</option>
+        <option value="scored"   {% if filter_status == "scored" %}selected{% endif %}>scored</option>
+        <option value="selected" {% if filter_status == "selected" %}selected{% endif %}>selected</option>
+        <option value="skipped"  {% if filter_status == "skipped" %}selected{% endif %}>skipped</option>
+        <option value="rejected" {% if filter_status == "rejected" %}selected{% endif %}>rejected</option>
+      </select>
+    </label>
+    <label>
+      min score
+      <input name="min_score" type="number" step="0.05" min="0" max="1" value="{{ filter_min_score or '' }}" class="w-16 border border-border rounded px-1 py-0.5" />
+    </label>
+    <label>
+      contains
+      <input name="q" value="{{ filter_q or '' }}" class="border border-border rounded px-1 py-0.5" placeholder="company or title" />
+    </label>
+    <button class="text-text-muted underline">apply</button>
+    <a href="/inbox" class="text-text-muted underline">reset</a>
+  </form>
+
+  <span class="ml-auto">
+    {% for s, n in counts.items() %}
+      <span class="ml-2">{{ s }}: {{ n }}</span>
+    {% endfor %}
+  </span>
+</section>
+
+<section class="mb-4">
+  <button
+    class="bg-accent text-white rounded px-3 py-1 text-sm"
+    hx-post="/inbox/score-all"
+    hx-target="#score-status"
+    hx-swap="outerHTML"
+  >Score new jobs</button>
+  <span id="score-status" class="text-xs text-text-muted ml-2"></span>
+</section>
+
+<form
+  hx-post="/runs"
+  hx-target="#run-started"
+  hx-swap="outerHTML"
+>
+  <div class="mb-3 flex flex-wrap items-end gap-3 border border-border bg-surface rounded p-3">
+    <label class="text-xs text-text-muted">
+      Palette
+      <select name="palette" class="block border border-border rounded px-2 py-0.5 text-sm">
+        {% for p in palettes %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="text-xs text-text-muted">
+      Font
+      <select name="font" class="block border border-border rounded px-2 py-0.5 text-sm">
+        {% for f in fonts %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+      </select>
+    </label>
+    <button class="ml-auto bg-accent text-white rounded px-3 py-1 text-sm">Start tailoring</button>
+  </div>
+  <div id="run-started"></div>
+
+  {% if not jobs %}
+    <p class="text-sm text-text-muted">No jobs in the inbox yet. <a class="underline" href="/sources">Add a source</a> and scan.</p>
+  {% else %}
+    <table class="w-full text-sm border border-border bg-surface rounded">
+      <thead class="bg-bg text-xs text-text-muted text-left">
+        <tr>
+          <th class="px-2 py-1">CV</th>
+          <th class="px-2 py-1">Cover</th>
+          <th class="px-2 py-1">Score</th>
+          <th class="px-2 py-1">Company · Title</th>
+          <th class="px-2 py-1">Location</th>
+          <th class="px-2 py-1">Status</th>
+          <th class="px-2 py-1">Breakdown</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+          {% include "inbox/_job_row.html.j2" %}
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</form>
+{% endblock %}

@@ -1,0 +1,11 @@
+<div id="run-started" class="border border-success bg-surface rounded p-3 text-sm mb-3">
+  <div class="font-medium text-success">Run {{ run_id }} queued.</div>
+  <div class="text-xs text-text-muted">
+    {{ job_count }} job{{ "" if job_count == 1 else "s" }} written to
+    <code>{{ work_queue_path }}</code>.
+  </div>
+  <div class="text-xs mt-2">
+    Now run Claude Code in this repo. Paste:
+    <pre class="bg-bg border border-border rounded text-[11px] p-2 mt-1 select-all">process run {{ run_id }}</pre>
+  </div>
+</div>
