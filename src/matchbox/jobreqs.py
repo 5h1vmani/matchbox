@@ -29,9 +29,21 @@ def _validator() -> Draft202012Validator:
 
 
 def save_requirements(conn: sqlite3.Connection, job_id: int, payload: dict[str, object]) -> None:
-    """Validate then upsert the requirements JSON onto the job row."""
-    if payload.get("job_id") != job_id:
-        # Tolerate: the file may have been authored by hand without the id.
+    """Validate then upsert the requirements JSON onto the job row.
+
+    If the payload includes a `job_id` and it does not match the CLI's
+    --job, that is a hard error: a wrong-job file usually means the
+    brain saved the right requirements against the wrong job. Earlier
+    versions silently overwrote the field; that hid the mistake.
+    """
+    payload_job_id = payload.get("job_id")
+    if payload_job_id is not None and payload_job_id != job_id:
+        raise ValueError(
+            f"job_id mismatch: --job {job_id} but payload says {payload_job_id}. "
+            "Re-author the file or correct the --job argument."
+        )
+    if payload_job_id is None:
+        # Tolerate omission only — a hand-edited file without the field.
         payload = {**payload, "job_id": job_id}
     errors = sorted(_validator().iter_errors(payload), key=lambda e: list(e.absolute_path))
     if errors:

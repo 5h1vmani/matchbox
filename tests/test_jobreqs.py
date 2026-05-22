@@ -86,6 +86,29 @@ def test_save_requirements_unknown_job(
         save_requirements(conn, 99999, _payload(99999))
 
 
+def test_save_requirements_rejects_job_id_mismatch(
+    db_with_job: tuple[Path, int, sqlite3.Connection],
+) -> None:
+    """A payload authored for a different job must not silently overwrite."""
+    _, job_id, conn = db_with_job
+    wrong_payload = _payload(job_id + 100)  # payload says a different job
+    with pytest.raises(ValueError) as exc:
+        save_requirements(conn, job_id, wrong_payload)
+    assert "job_id mismatch" in str(exc.value)
+
+
+def test_save_requirements_tolerates_omitted_job_id(
+    db_with_job: tuple[Path, int, sqlite3.Connection],
+) -> None:
+    """Hand-edited files without job_id still work — only mismatches fail."""
+    _, job_id, conn = db_with_job
+    p = _payload(job_id)
+    p.pop("job_id")
+    save_requirements(conn, job_id, p)
+    row = conn.execute("SELECT requirements_json FROM job WHERE id = ?", (job_id,)).fetchone()
+    assert json.loads(row["requirements_json"])["job_id"] == job_id
+
+
 def test_main_writes(db_with_job: tuple[Path, int, sqlite3.Connection], tmp_path: Path) -> None:
     db, job_id, _ = db_with_job
     path = tmp_path / "reqs.json"
