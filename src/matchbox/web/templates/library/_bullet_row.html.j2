@@ -26,11 +26,19 @@
       {% if b.facts_verified %}<span class="text-success">verified</span>{% else %}<span class="text-warning">unverified</span>{% endif %}
     </div>
   </div>
-  <button
-    class="text-xs text-danger opacity-0 group-hover:opacity-100 transition"
-    hx-delete="/library/bullets/{{ b.id }}"
-    hx-target="#bullet-{{ b.id }}"
-    hx-swap="outerHTML"
-    hx-confirm="Delete this bullet?"
-  >Delete</button>
+  <div class="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition">
+    <button
+      class="text-xs text-text-muted hover:text-text"
+      hx-get="/library/bullets/{{ b.id }}/edit"
+      hx-target="#bullet-{{ b.id }}"
+      hx-swap="outerHTML"
+    >Edit</button>
+    <button
+      class="text-xs text-danger"
+      hx-delete="/library/bullets/{{ b.id }}"
+      hx-target="#bullet-{{ b.id }}"
+      hx-swap="outerHTML"
+      hx-confirm="Delete this bullet?"
+    >Delete</button>
+  </div>
 </li>

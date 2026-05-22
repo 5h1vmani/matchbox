@@ -1,0 +1,34 @@
+{% set b = tagged.item %}
+<li id="bullet-{{ b.id }}" class="border border-accent bg-surface rounded p-2">
+  <form
+    hx-patch="/library/bullets/{{ b.id }}"
+    hx-target="#bullet-{{ b.id }}"
+    hx-swap="outerHTML"
+  >
+    <textarea
+      class="w-full border border-border rounded px-2 py-1 text-sm"
+      name="text"
+      rows="2"
+      autofocus
+    >{{ b.text }}</textarea>
+    <div class="mt-2 flex items-center gap-3 text-xs">
+      <label class="flex items-center gap-1">
+        <input type="checkbox" name="has_metric" {% if b.has_metric %}checked{% endif %} />
+        has metric
+      </label>
+      <label class="flex items-center gap-1">
+        <input type="checkbox" name="facts_verified" {% if b.facts_verified %}checked{% endif %} />
+        verified
+      </label>
+      <span class="ml-auto"></span>
+      <button class="bg-accent text-white rounded px-3 py-1">Save</button>
+      <button
+        type="button"
+        class="text-text-muted underline"
+        hx-get="/library/bullets/{{ b.id }}/row"
+        hx-target="#bullet-{{ b.id }}"
+        hx-swap="outerHTML"
+      >Cancel</button>
+    </div>
+  </form>
+</li>

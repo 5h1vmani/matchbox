@@ -107,6 +107,67 @@ def test_tag_attach_and_detach(client: TestClient) -> None:
     assert f"tag-bullet-{bullet_id}-{tag_id}" not in full
 
 
+def test_edit_form_then_save(client: TestClient) -> None:
+    exp = client.post("/library/experiences", data={"company": "X", "role": "Y"})
+    import re
+
+    exp_id = int(re.search(r'experience-(\d+)"', exp.text).group(1))  # type: ignore[union-attr]
+    b = client.post("/library/bullets", data={"experience_id": str(exp_id), "text": "old text"})
+    bullet_id = int(re.search(r'bullet-(\d+)"', b.text).group(1))  # type: ignore[union-attr]
+
+    # GET edit form
+    form = client.get(f"/library/bullets/{bullet_id}/edit")
+    assert form.status_code == 200
+    assert "old text" in form.text
+    assert "Save" in form.text and "Cancel" in form.text
+
+    # PATCH with new text and toggles checked
+    save = client.patch(
+        f"/library/bullets/{bullet_id}",
+        data={"text": "new text", "has_metric": "on", "facts_verified": "on"},
+    )
+    assert save.status_code == 200
+    assert "new text" in save.text
+    assert "metric" in save.text
+    assert ">verified<" in save.text
+
+
+def test_edit_form_unchecks_clear_flags(client: TestClient) -> None:
+    """The full-edit PATCH treats missing checkboxes as false. Editing a
+    verified bullet with the checkboxes unchecked clears those flags."""
+    exp = client.post("/library/experiences", data={"company": "X", "role": "Y"})
+    import re
+
+    exp_id = int(re.search(r'experience-(\d+)"', exp.text).group(1))  # type: ignore[union-attr]
+    b = client.post(
+        "/library/bullets",
+        data={"experience_id": str(exp_id), "text": "x", "has_metric": "on"},
+    )
+    bullet_id = int(re.search(r'bullet-(\d+)"', b.text).group(1))  # type: ignore[union-attr]
+
+    save = client.patch(
+        f"/library/bullets/{bullet_id}",
+        data={"text": "still x"},  # no checkboxes → both false
+    )
+    assert save.status_code == 200
+    assert ">unverified<" in save.text
+    assert ">metric<" not in save.text
+
+
+def test_edit_cancel_returns_read_only_row(client: TestClient) -> None:
+    exp = client.post("/library/experiences", data={"company": "X", "role": "Y"})
+    import re
+
+    exp_id = int(re.search(r'experience-(\d+)"', exp.text).group(1))  # type: ignore[union-attr]
+    b = client.post("/library/bullets", data={"experience_id": str(exp_id), "text": "stable"})
+    bullet_id = int(re.search(r'bullet-(\d+)"', b.text).group(1))  # type: ignore[union-attr]
+
+    row = client.get(f"/library/bullets/{bullet_id}/row")
+    assert row.status_code == 200
+    assert "stable" in row.text
+    assert "<textarea" not in row.text
+
+
 def test_delete_bullet(client: TestClient) -> None:
     exp = client.post("/library/experiences", data={"company": "X", "role": "Y"})
     import re

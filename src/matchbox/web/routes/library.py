@@ -153,17 +153,47 @@ def patch_bullet(
     request: Request,
     bullet_id: int,
     conn: ConnDep,
-    text: str | None = Form(None),
+    text: str = Form(...),
     has_metric: str | None = Form(None),
     facts_verified: str | None = Form(None),
 ) -> HTMLResponse:
+    """Full edit from the inline editor. `text` is required; the
+    checkboxes are read as present-or-absent (unchecked → false), which
+    is the standard browser-checkbox semantic. Partial-update via PATCH
+    is not supported; future callers should POST a more specific route.
+    """
     lib.update_bullet(
         conn,
         bullet_id,
-        text=text.strip() if text is not None else None,
-        has_metric=(has_metric == "on") if has_metric is not None else None,
-        facts_verified=(facts_verified == "on") if facts_verified is not None else None,
+        text=text.strip(),
+        has_metric=(has_metric == "on"),
+        facts_verified=(facts_verified == "on"),
     )
+    bullet = lib.get_bullet(conn, bullet_id)
+    tags = lib.tags_for(conn, item_type="bullet", item_id=bullet_id)
+    return templates.TemplateResponse(
+        request,
+        "library/_bullet_row.html.j2",
+        {"tagged": _wrap_bullet(bullet, tags), "facets": sorted(VALID_FACETS)},
+    )
+
+
+@router.get("/library/bullets/{bullet_id}/edit", response_class=HTMLResponse)
+def edit_bullet_form(request: Request, bullet_id: int, conn: ConnDep) -> HTMLResponse:
+    """Return the inline edit form for one bullet — HTMX swaps it in
+    place of the read-only row."""
+    bullet = lib.get_bullet(conn, bullet_id)
+    tags = lib.tags_for(conn, item_type="bullet", item_id=bullet_id)
+    return templates.TemplateResponse(
+        request,
+        "library/_bullet_edit.html.j2",
+        {"tagged": _wrap_bullet(bullet, tags)},
+    )
+
+
+@router.get("/library/bullets/{bullet_id}/row", response_class=HTMLResponse)
+def bullet_row(request: Request, bullet_id: int, conn: ConnDep) -> HTMLResponse:
+    """Return the read-only row — used by the edit form's Cancel button."""
     bullet = lib.get_bullet(conn, bullet_id)
     tags = lib.tags_for(conn, item_type="bullet", item_id=bullet_id)
     return templates.TemplateResponse(
