@@ -12,7 +12,9 @@ triage UI; this module:
 
 from __future__ import annotations
 
+import functools
 import json
+import os
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -25,14 +27,10 @@ from matchbox.core.db import PROJECT_ROOT, transaction
 RUNS_DIR = PROJECT_ROOT / "runs"
 SCHEMA_PATH = PROJECT_ROOT / "schemas" / "work-queue.v1.json"
 
-_VALIDATOR: Draft202012Validator | None = None
 
-
+@functools.cache
 def _validator() -> Draft202012Validator:
-    global _VALIDATOR
-    if _VALIDATOR is None:
-        _VALIDATOR = Draft202012Validator(json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
-    return _VALIDATOR
+    return Draft202012Validator(json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
 
 
 @dataclass(slots=True)
@@ -59,8 +57,6 @@ def _resolve_profile_db(conn: sqlite3.Connection) -> str:
     """Return the path to the live DB, expressed relative to the repo root
     when possible (matches the schema's expectation).
     """
-    import os
-
     path_str = os.environ.get("MATCHBOX_DB")
     if path_str:
         p = Path(path_str).expanduser().resolve()

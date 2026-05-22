@@ -11,11 +11,12 @@ dropped because they could not be computed honestly from a JD alone.
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from matchbox.core.text import tokenize as _tokens_list
 
 RUBRIC_PATH = Path(__file__).resolve().parents[3] / "shared" / "rubric.json"
 
@@ -64,16 +65,14 @@ def _weights() -> dict[str, float]:
 
 
 # ─── tokenization ─────────────────────────────────────────────────────
-
-
-_TOKEN_RE = re.compile(r"[a-z0-9]+")
+#
+# Shared with matching/bm25.py via core/text.py so the two cannot drift.
+# We work in sets here because rubric scoring is overlap-based, not
+# ranked retrieval.
 
 
 def _tokens(text: str) -> set[str]:
-    """Lowercase word tokenization. Hyphens, slashes, punctuation all split.
-    So "forward-deployed-engineer" → {forward, deployed, engineer}; that lets
-    a hyphenated role_family match a space-separated job title."""
-    return set(_TOKEN_RE.findall(text.lower()))
+    return set(_tokens_list(text))
 
 
 # ─── per-dimension scorers ────────────────────────────────────────────
@@ -322,15 +321,14 @@ def rescore_all(conn: sqlite3.Connection) -> int:
     for r in rows:
         job = dict(r)
         result = score_job(job=job, target=target, user_tech_tokens=tokens)
-        new_status = "scored" if job["id"] else "scored"  # always at least 'scored'
         conn.execute(
             """
             UPDATE job
                SET score = ?, score_breakdown_json = ?,
-                   status = CASE WHEN status = 'new' THEN ? ELSE status END
+                   status = CASE WHEN status = 'new' THEN 'scored' ELSE status END
              WHERE id = ?
             """,
-            (result.total, json.dumps(result.to_breakdown_dict()), new_status, job["id"]),
+            (result.total, json.dumps(result.to_breakdown_dict()), job["id"]),
         )
         n += 1
     return n

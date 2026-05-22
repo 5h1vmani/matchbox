@@ -1,23 +1,16 @@
 """BM25 sparse retrieval — thin wrapper over `rank_bm25.BM25Okapi`.
 
-Tokenization (per the plan):
-- lowercase
-- split on every non-alphanumeric character
-- keep only ASCII letters and digits
-- no stemming in v1
+Tokenization lives in `matchbox.core.text.tokenize` and is shared with
+the scoring rubric so the two cannot drift.
 """
 
 from __future__ import annotations
 
-import re
-
 from rank_bm25 import BM25Okapi  # type: ignore[import-untyped]
 
-_TOKEN_RE = re.compile(r"[a-z0-9]+")
+from matchbox.core.text import tokenize
 
-
-def tokenize(text: str) -> list[str]:
-    return _TOKEN_RE.findall(text.lower())
+__all__ = ["BM25Index", "tokenize"]
 
 
 class BM25Index:

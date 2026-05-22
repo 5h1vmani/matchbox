@@ -152,12 +152,35 @@ def test_pdf_serving_returns_file(client: TestClient, tmp_path: Path) -> None:
     assert r.content.startswith(b"%PDF")
 
 
-def test_pdf_serving_rejects_traversal(client: TestClient, tmp_path: Path) -> None:
+def test_pdf_serving_rejects_dotfiles(client: TestClient, tmp_path: Path) -> None:
+    """Filenames starting with '.' are refused (no dotfile reads)."""
     run_id, job_id = _seed_run_and_job(tmp_path)
     (tmp_path / "runs" / run_id / "output" / str(job_id)).mkdir(parents=True, exist_ok=True)
-    # The route validates `/` is not in filename — anything else is route-segment'ed by FastAPI.
     r = client.get(f"/runs/{run_id}/output/{job_id}/.env")
+    assert r.status_code == 400
+
+
+def test_pdf_serving_rejects_path_traversal(client: TestClient, tmp_path: Path) -> None:
+    """URL-encoded ../ in the filename segment is refused.
+
+    The route's `/` check rules out raw slashes; this exercise the
+    resolve+relative_to check by encoding the slash. A secret file is
+    planted *outside* the run output dir to make a successful traversal
+    detectable.
+    """
+    run_id, job_id = _seed_run_and_job(tmp_path)
+    base = tmp_path / "runs" / run_id / "output" / str(job_id)
+    base.mkdir(parents=True, exist_ok=True)
+    # secret sibling to the per-job output dir
+    secret = tmp_path / "runs" / run_id / "secret.txt"
+    secret.write_text("don't leak this")
+
+    # Percent-encoded ../secret.txt — the URL-decoded leaf would escape.
+    r = client.get(f"/runs/{run_id}/output/{job_id}/..%2Fsecret.txt")
+    # Either FastAPI rejects the route (404 / 400) or our route refuses it.
+    # Critically, the secret bytes must never appear.
     assert r.status_code in (400, 404)
+    assert b"don't leak this" not in r.content
 
 
 def test_pdf_serving_rejects_unsupported_type(client: TestClient, tmp_path: Path) -> None:
