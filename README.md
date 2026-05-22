@@ -78,14 +78,22 @@ Open the browser. Empty profile state lands you at **/onboarding**:
    exclusions.
 
 5. **Sources.** `/sources`. Add a company by ATS type (Greenhouse,
-   Lever, Ashby, Workable, SmartRecruiters, Recruitee) and slug. Click
+   Lever, Ashby, SmartRecruiters, Recruitee) and slug. Click
    "Test the slug" before saving to verify the endpoint. Click
-   "Scan all enabled" to fetch jobs.
+   "Scan all enabled" to fetch jobs. See
+   [docs/supported-ats.md](docs/supported-ats.md) for live-verified
+   example slugs per vendor. Workable is deferred — their public
+   no-auth API was removed by the vendor.
 
 6. **Triage.** `/inbox`. The five-dimension rubric scores every new
    job; click "Score new jobs" to refresh. Per row: Skip, Reject, or
    include in a tailoring run by ticking CV and/or cover. Pick palette
    and font for the run. Click "Start tailoring".
+
+   Have a LinkedIn link or a JD that is not on a polled ATS? Expand
+   **Add a job by hand** at the top of `/inbox`. Paste company, title,
+   URL, and the full JD text. The row lands as `new` and goes through
+   the same score / triage / tailor flow.
 
 7. **Process the run.** A new `runs/<id>/work-queue.json` is on disk.
    Copy the prompt the page shows you, paste into Claude Code:
@@ -153,8 +161,14 @@ path-traversal guards.
 
 ## Documentation
 
+* [Testing guide](docs/testing-guide.md) — step-by-step runbook for
+  testers (shortcut + real flow)
+* [Supported ATS](docs/supported-ats.md) — per-vendor live status with
+  verified example slugs
 * [v0.3 design](docs/v0.3-design.md) — the design document this build
   follows
+* [Live-fire walkthrough](docs/examples/livefire-walkthrough.md) — the
+  end-to-end verification record
 * [Decision records](docs/decisions/) — durable architectural choices
 * [Contributing](CONTRIBUTING.md)
 * [Security policy](SECURITY.md)

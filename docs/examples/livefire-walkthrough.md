@@ -174,4 +174,5 @@ new strict validation refused to install. Fixed in the same commit
 as this walkthrough.
 
 Otherwise the loop works end to end against the real embedder and
-real Typst binary, with all 182 tests passing afterward.
+real Typst binary. The full test suite (186 passing, 3 fastembed
+opt-in skipped at the time of this commit) stays green throughout.
