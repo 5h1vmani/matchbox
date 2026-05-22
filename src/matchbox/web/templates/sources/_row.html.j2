@@ -1,0 +1,39 @@
+{% set source = source if source is defined else s %}
+<tr id="source-{{ source.id }}" class="border-t border-border align-top {{ '' if source.enabled else 'opacity-50' }}">
+  <td class="px-2 py-1 font-medium">{{ source.company }}</td>
+  <td class="px-2 py-1 text-xs">{{ source.ats_type }}</td>
+  <td class="px-2 py-1 text-xs"><code>{{ source.slug }}</code></td>
+  <td class="px-2 py-1 text-xs">{{ source.job_count if source.job_count is defined else "—" }}</td>
+  <td class="px-2 py-1 text-xs">
+    {% if source.last_error %}
+      <span class="text-danger" title="{{ source.last_error }}">error</span>
+      <div class="text-[10px] text-text-muted truncate max-w-xs" title="{{ source.last_error }}">{{ source.last_error }}</div>
+    {% elif source.last_ok_at %}
+      <span class="text-success">ok</span>
+      <div class="text-[10px] text-text-muted">{{ source.last_ok_at[:16] }}</div>
+    {% else %}
+      <span class="text-text-muted">never scanned</span>
+    {% endif %}
+  </td>
+  <td class="px-2 py-1 text-xs text-right space-x-2 whitespace-nowrap">
+    <button
+      class="text-text-muted underline"
+      hx-post="/sources/{{ source.id }}/scan"
+      hx-target="#source-{{ source.id }}"
+      hx-swap="outerHTML"
+    >Scan</button>
+    <button
+      class="text-text-muted underline"
+      hx-post="/sources/{{ source.id }}/toggle"
+      hx-target="#source-{{ source.id }}"
+      hx-swap="outerHTML"
+    >{{ "disable" if source.enabled else "enable" }}</button>
+    <button
+      class="text-danger underline"
+      hx-delete="/sources/{{ source.id }}"
+      hx-target="#source-{{ source.id }}"
+      hx-swap="outerHTML"
+      hx-confirm="Delete this source? Existing jobs stay; the source link is cleared."
+    >delete</button>
+  </td>
+</tr>

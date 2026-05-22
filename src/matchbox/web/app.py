@@ -13,7 +13,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from matchbox.web.deps import ConnDep
-from matchbox.web.routes import library, onboarding, review, targets
+from matchbox.web.routes import library, onboarding, review, sources, targets
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(library.router)
     app.include_router(onboarding.router)
     app.include_router(review.router)
+    app.include_router(sources.router)
     app.include_router(targets.router)
 
     @app.get("/healthz")
