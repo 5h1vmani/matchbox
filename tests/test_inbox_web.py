@@ -147,6 +147,54 @@ def test_start_run_rejects_unknown_palette(client: TestClient) -> None:
     assert r.status_code == 400
 
 
+def test_skip_job_moves_to_skipped(client: TestClient) -> None:
+    job_ids = _seed_jobs(client)
+    r = client.post(f"/inbox/jobs/{job_ids[0]}/status", data={"to": "skipped"})
+    assert r.status_code == 200
+    assert "skipped" in r.text
+
+    page = client.get("/inbox?status=skipped").text
+    # Top job is the FDE; assert the row shows under the skipped filter.
+    assert "Forward Deployed Engineer" in page
+
+
+def test_reject_then_reopen_round_trips(client: TestClient) -> None:
+    job_ids = _seed_jobs(client)
+    client.post(f"/inbox/jobs/{job_ids[0]}/status", data={"to": "rejected"})
+    page = client.get("/inbox?status=rejected").text
+    assert "Forward Deployed Engineer" in page
+
+    r = client.post(f"/inbox/jobs/{job_ids[0]}/status", data={"to": "scored"})
+    assert r.status_code == 200
+    # Comes back to the default (open) view; rejected filter no longer shows it.
+    assert "Forward Deployed Engineer" not in client.get("/inbox?status=rejected").text
+
+
+def test_set_status_rejects_unknown_transition(client: TestClient) -> None:
+    job_ids = _seed_jobs(client)
+    r = client.post(f"/inbox/jobs/{job_ids[0]}/status", data={"to": "tailored"})
+    assert r.status_code == 400
+
+
+def test_set_status_rejects_tailored_or_applied_source(client: TestClient) -> None:
+    """Jobs that have been tailored are not user-skippable from /inbox."""
+    job_ids = _seed_jobs(client)
+    import os
+
+    from matchbox.core.db import connect
+
+    conn = connect(Path(os.environ["MATCHBOX_DB"]))
+    conn.execute("UPDATE job SET status = 'tailored' WHERE id = ?", (job_ids[0],))
+    conn.close()
+    r = client.post(f"/inbox/jobs/{job_ids[0]}/status", data={"to": "skipped"})
+    assert r.status_code == 409
+
+
+def test_set_status_unknown_job_is_404(client: TestClient) -> None:
+    r = client.post("/inbox/jobs/99999/status", data={"to": "skipped"})
+    assert r.status_code == 404
+
+
 def test_status_filter_narrows_list(client: TestClient) -> None:
     _seed_jobs(client)
     client.post("/inbox/score-all")  # all become 'scored'

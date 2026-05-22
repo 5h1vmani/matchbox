@@ -20,7 +20,37 @@
     </div>
   </td>
   <td class="px-2 py-1 text-xs text-text-muted">{{ job.location or "—" }}</td>
-  <td class="px-2 py-1 text-xs">{{ job.status }}</td>
+  <td class="px-2 py-1 text-xs">
+    <div>{{ job.status }}</div>
+    <div class="mt-1 flex gap-2">
+      {% if job.status in ("skipped", "rejected") %}
+        <button
+          class="text-[10px] text-text-muted underline"
+          hx-post="/inbox/jobs/{{ job.id }}/status"
+          hx-vals='{"to": "scored"}'
+          hx-target="#job-{{ job.id }}"
+          hx-swap="outerHTML"
+        >Re-open</button>
+      {% else %}
+        <button
+          class="text-[10px] text-text-muted underline"
+          hx-post="/inbox/jobs/{{ job.id }}/status"
+          hx-vals='{"to": "skipped"}'
+          hx-target="#job-{{ job.id }}"
+          hx-swap="outerHTML"
+          title="Skip for now"
+        >Skip</button>
+        <button
+          class="text-[10px] text-danger underline"
+          hx-post="/inbox/jobs/{{ job.id }}/status"
+          hx-vals='{"to": "rejected"}'
+          hx-target="#job-{{ job.id }}"
+          hx-swap="outerHTML"
+          title="Not interested"
+        >Reject</button>
+      {% endif %}
+    </div>
+  </td>
   <td class="px-2 py-1 text-xs text-text-muted">
     {% if job.breakdown %}
       <details>

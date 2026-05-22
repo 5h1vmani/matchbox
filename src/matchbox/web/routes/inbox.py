@@ -99,6 +99,43 @@ def score_all(request: Request, conn: ConnDep) -> HTMLResponse:
     )
 
 
+VALID_TRANSITIONS: set[str] = {"skipped", "rejected", "scored"}
+
+
+@router.post("/inbox/jobs/{job_id}/status", response_class=HTMLResponse)
+def set_job_status(
+    request: Request,
+    job_id: int,
+    conn: ConnDep,
+    to: Annotated[str, Form()],
+) -> HTMLResponse:
+    """Move a job between triage statuses.
+
+    Allowed targets: skipped (I do not want to apply now), rejected (no),
+    scored (re-open something I previously skipped or rejected). Selected
+    / tailored / applied happen elsewhere in the flow and are not user-
+    settable from here.
+    """
+    if to not in VALID_TRANSITIONS:
+        raise HTTPException(status_code=400, detail=f"cannot transition to {to!r}")
+    row = conn.execute("SELECT status FROM job WHERE id = ?", (job_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"no such job: {job_id}")
+    if row["status"] in ("tailored", "applied"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"job {job_id} is already {row['status']}; reset from /runs",
+        )
+    conn.execute("UPDATE job SET status = ? WHERE id = ?", (to, job_id))
+    # Return just the updated row fragment so HTMX can swap one row.
+    jobs = _list_jobs(conn)
+    updated = next((j for j in jobs if j["id"] == job_id), None)
+    if updated is None:
+        # The row may have left the triage filter (e.g. moved to 'tailored').
+        return HTMLResponse(status_code=200, content="")
+    return templates.TemplateResponse(request, "inbox/_job_row.html.j2", {"job": updated})
+
+
 @router.post("/runs", response_class=HTMLResponse)
 def start_run(
     request: Request,
