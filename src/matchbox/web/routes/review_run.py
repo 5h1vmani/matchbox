@@ -20,7 +20,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from jsonschema import Draft202012Validator
 
-from matchbox.assemble import re_render_cv
+from matchbox.assemble import drift_check, re_render_cv
 from matchbox.core.db import PROJECT_ROOT
 from matchbox.web.deps import ConnDep
 from matchbox.web.templates_env import templates
@@ -145,8 +145,25 @@ def review_run_index(request: Request, run_id: str, conn: ConnDep) -> HTMLRespon
     )
 
 
+def _drift_for_job(conn: sqlite3.Connection, run_id: str, job_id: int) -> list[dict[str, Any]]:
+    cv_json_path = RUNS_DIR / run_id / "output" / str(job_id) / "cv.json"
+    if not cv_json_path.exists():
+        return []
+    try:
+        cv_json = json.loads(cv_json_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    return drift_check(conn=conn, cv_json=cv_json)
+
+
 @router.get("/review-run/{run_id}/jobs/{job_id}/card", response_class=HTMLResponse)
-def job_card(request: Request, run_id: str, job_id: int, conn: ConnDep) -> HTMLResponse:
+def job_card(
+    request: Request,
+    run_id: str,
+    job_id: int,
+    conn: ConnDep,
+    drift: list[dict[str, Any]] | None = None,
+) -> HTMLResponse:
     """Returns one job card. HTMX polls this every few seconds while
     the brain works."""
     queued = _list_run_jobs(conn, run_id)
@@ -159,10 +176,12 @@ def job_card(request: Request, run_id: str, job_id: int, conn: ConnDep) -> HTMLR
         **_merge_job_state(queued_one, status_job),
         "applied": _applied_state(conn, run_id, job_id),
     }
+    if drift is None:
+        drift = _drift_for_job(conn, run_id, job_id)
     return templates.TemplateResponse(
         request,
         "review_run/_job_card.html.j2",
-        {"run_id": run_id, "job": job},
+        {"run_id": run_id, "job": job, "drift": drift},
     )
 
 
@@ -182,7 +201,7 @@ def restyle_cv(
     if font not in FONTS:
         raise HTTPException(status_code=400, detail=f"unknown font: {font}")
     try:
-        re_render_cv(run_id=run_id, job_id=job_id, palette=palette, font=font)
+        _, drift = re_render_cv(run_id=run_id, job_id=job_id, palette=palette, font=font, conn=conn)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     # Persist the new choice on the run_job row so the next render uses it.
@@ -190,7 +209,15 @@ def restyle_cv(
         "UPDATE run_job SET palette = ?, font = ? WHERE run_id = ? AND job_id = ?",
         (palette, font, run_id, job_id),
     )
-    return job_card(request=request, run_id=run_id, job_id=job_id, conn=conn)
+    if drift:
+        # Stamp the run row so the card can surface a warning. Cheap and
+        # visible — beats silently letting a stale CV ride.
+        conn.execute(
+            "UPDATE run SET status = CASE WHEN status = 'done' THEN 'done' ELSE status END "
+            "WHERE id = ?",
+            (run_id,),
+        )
+    return job_card(request=request, run_id=run_id, job_id=job_id, conn=conn, drift=drift)
 
 
 @router.post("/review-run/{run_id}/jobs/{job_id}/applied", response_class=HTMLResponse)

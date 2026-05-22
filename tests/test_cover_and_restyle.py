@@ -96,9 +96,13 @@ def _seed_run_with_finished_cv(tmp_path: Path) -> tuple[str, int]:
 
 def test_re_render_cv_changes_palette(tmp_path: Path) -> None:
     run_id, job_id = _seed_run_with_finished_cv(tmp_path)
-    pdf = re_render_cv(run_id=run_id, job_id=job_id, palette="forest", font="inter")
+    pdf, drift = re_render_cv(run_id=run_id, job_id=job_id, palette="forest", font="inter")
     assert pdf.exists()
     assert pdf.stat().st_size > 2000
+    # Seed has no _selected_bullets fingerprints, so drift is empty (no
+    # baseline to diff against). drift only triggers when assemble_one
+    # wrote the fingerprints.
+    assert drift == []
 
 
 def test_re_render_cv_missing_cv_json_raises(tmp_path: Path) -> None:

@@ -47,6 +47,16 @@
     <p class="text-xs text-danger mb-2">{{ job.error }}</p>
   {% endif %}
 
+  {% if drift %}
+    <div class="text-xs text-warning border border-warning bg-surface rounded p-2 mb-2">
+      <div class="font-medium">cv.json may be stale</div>
+      <div class="text-text-muted">
+        {{ drift|length }} bullet{{ "" if drift|length == 1 else "s" }} on this CV have been
+        edited in the library since this render. Re-tailor to pick them up.
+      </div>
+    </div>
+  {% endif %}
+
   {% if job.cv_status == "done" and job.cv_path %}
     <div class="mb-2 flex items-center gap-3 flex-wrap">
       <a class="text-xs text-accent underline" href="/runs/{{ run_id }}/output/{{ job.job_id }}/cv.pdf" target="_blank">

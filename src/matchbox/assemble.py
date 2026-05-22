@@ -16,6 +16,7 @@ pick component ids. That keeps the path reproducible and unit-testable.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import sqlite3
@@ -417,6 +418,9 @@ def assemble_one(
         summary_text=_pick_summary(conn),
         conn=conn,
     )
+    # Fingerprint the selected bullets so re_render_cv can warn when the
+    # DB has drifted (the user edited a bullet after this render).
+    cv_json["_selected_bullets"] = [{"id": c.id, "text_hash": _bullet_hash(c.text)} for c in chosen]
 
     out_dir = RUNS_DIR / run_id / "output" / str(job_id)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -639,22 +643,72 @@ def _append_polish_section_to_changes_md(
 # ─── re-render path (palette/font swap, no selection) ────────────────
 
 
+def _bullet_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def drift_check(
+    *,
+    conn: sqlite3.Connection,
+    cv_json: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Compare the fingerprints stored on cv.json against the live DB.
+
+    Returns a list of drift records: {id, was_hash, now_hash, db_text}.
+    Empty list means the cv.json reflects the current library.
+    """
+    fps = cv_json.get("_selected_bullets") or []
+    if not fps:
+        return []
+    ids = [int(fp["id"]) for fp in fps]
+    if not ids:
+        return []
+    rows = conn.execute(
+        "SELECT id, text FROM bullet WHERE id IN ({})".format(",".join("?" * len(ids))),
+        ids,
+    ).fetchall()
+    db_by_id = {r["id"]: r["text"] for r in rows}
+    drift: list[dict[str, Any]] = []
+    for fp in fps:
+        bid = int(fp["id"])
+        was = str(fp["text_hash"])
+        live = db_by_id.get(bid)
+        now = _bullet_hash(live) if live is not None else None
+        if now != was:
+            drift.append({"id": bid, "was_hash": was, "now_hash": now, "db_text": live})
+    return drift
+
+
 def re_render_cv(
     *,
     run_id: str,
     job_id: int,
     palette: str,
     font: str,
-) -> Path:
-    """Re-render a finished CV with a new palette/font. Requires cv.json
-    to exist in the output dir. No DB / no brain involvement."""
+    conn: sqlite3.Connection | None = None,
+) -> tuple[Path, list[dict[str, Any]]]:
+    """Re-render a finished CV with a new palette/font.
+
+    Returns (pdf_path, drift). `drift` is a list of bullets whose text
+    in the DB no longer matches what cv.json says was selected. The
+    caller decides whether to surface a warning. When `conn` is None
+    the drift check is skipped (legacy callers that did not have a
+    handy connection).
+    """
     out_dir = RUNS_DIR / run_id / "output" / str(job_id)
     cv_json_path = out_dir / "cv.json"
     if not cv_json_path.exists():
         raise FileNotFoundError(f"cv.json not found for run {run_id}, job {job_id}. Tailor first.")
     cv_pdf_path = out_dir / "cv.pdf"
     _render_pdf(cv_json_path, cv_pdf_path, palette, font)
-    return cv_pdf_path
+    drift: list[dict[str, Any]] = []
+    if conn is not None:
+        try:
+            cv_json = json.loads(cv_json_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return cv_pdf_path, drift
+        drift = drift_check(conn=conn, cv_json=cv_json)
+    return cv_pdf_path, drift
 
 
 # ─── cover letter render ──────────────────────────────────────────────
