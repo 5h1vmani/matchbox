@@ -5,110 +5,166 @@
 [![Python: 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](pyproject.toml)
 [![Type checked: mypy strict](https://img.shields.io/badge/type%20checked-mypy%20strict-2bbc8a.svg)](pyproject.toml)
 [![Code style: ruff](https://img.shields.io/badge/lint%20%2B%20format-ruff-261230.svg)](https://github.com/astral-sh/ruff)
-[![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196.svg)](https://www.conventionalcommits.org)
 
-> Precision job-application pipeline. Scan ATS boards → score by fit → tailor at the right cost tier → track outcomes.
+> Local desktop app that turns your career history into a tagged library,
+> scans ATS boards for matching roles, and assembles tailored CVs with
+> Claude Code as the reasoning engine. Your data stays on your laptop.
+> Matchbox holds no LLM credentials.
 
-Single-machine CLI + web dashboard. Your data stays on your laptop. The only network call is the optional Anthropic API for tailoring high-scoring jobs.
+## How it works (v0.3)
 
-## What it does
+Two halves joined by a file-based handoff:
 
-| Step | Command | Cost |
-|------|---------|------|
-| Scan 20+ ATS boards (Greenhouse / Lever / Ashby / Workable) | `matchbox scan alice` | $0 |
-| Score each job on 6 dimensions (deterministic, no LLM) | automatic | $0 |
-| Route to bespoke / template / canonical / skip | automatic | $0 |
-| Generate tailored CV + cover letter | `matchbox tailor alice 42` | $0–$20 |
-| Track outcomes (interview / offer / rejection) | one click in the web UI | $0 |
-| Conversion funnel + cost-per-stage analytics | `matchbox analytics alice` or **Insights** page | $0 |
+* **The app** (this repo): SQLite, FastAPI + HTMX web UI, ATS pollers,
+  deterministic scoring, Typst PDF rendering. Holds no LLM client.
+* **The brain** ([Claude Code](https://claude.com/claude-code)): parses
+  your old CVs, extracts JD requirements, polishes wording. Drives the
+  CLIs (`matchbox-ingest`, `matchbox-jobreqs`, `matchbox-assemble`)
+  through a versioned JSON contract in `runs/` and `schemas/`.
 
-## 60-second demo (no API key, no profile setup)
+Selection (which bullets land on a given CV) is deterministic math, not
+LLM judgement. The brain does only what is genuinely irreducible:
+parsing messy input, extracting JD requirements, optional wording
+polish.
+
+## Prerequisites
+
+* Python 3.12+
+* [Typst](https://github.com/typst/typst) for PDF rendering:
+  `brew install typst` (macOS) or download from the Typst releases.
+* [Claude Code](https://claude.com/claude-code) installed and runnable
+  from your terminal. The app never talks to an LLM API directly.
+
+## Install
 
 ```bash
 git clone https://github.com/5h1vmani/matchbox.git
 cd matchbox
 pip install -e ".[dev]"
-
-matchbox seed-demo            # 30 synthetic jobs in people/demo/
-matchbox web                  # http://127.0.0.1:8765
 ```
 
-Click around. Press `?` for shortcuts, `⌘K` for the command palette. **Zero spend.**
+The first time `matchbox-assemble` runs it downloads a ~30 MB ONNX
+embedding model (`BAAI/bge-small-en-v1.5`) via `fastembed`.
 
-## Real usage
+## Quickstart (real flow, ~10 minutes)
 
 ```bash
-matchbox init-profile alice                 # creates people/alice/ with starter YAML
-$EDITOR people/alice/profile.yaml           # candidate, target roles, weights, ...
-$EDITOR people/alice/stories.md             # 3-5 STAR+R career stories
-
-export ANTHROPIC_API_KEY=sk-ant-...         # only needed for `tailor`
-matchbox scan alice                         # populate people/alice/db.sqlite
-matchbox web                                # triage in the browser
+matchbox-web                  # starts http://127.0.0.1:8765
 ```
 
-Full install (Typst, uv, env vars): see **[docs/setup.md](docs/setup.md)**.
+Open the browser. Empty profile state lands you at **/onboarding**:
 
-## Tier routing
+1. **Onboarding.** Drag in old CVs (PDF/DOCX), LinkedIn exports, plain
+   text notes, anything that describes your work. Or paste freeform
+   text. Files stage into `inbox/` on this machine.
 
-| Score (0–5) | Tier | Action | Estimated cost |
-|---|---|---|---|
-| ≥ 4.0 | `bespoke` | Full Sonnet rewrite from anchor packs | $10–20 |
-| ≥ 3.0 | `template` | Lighter Sonnet prompt + anchor pack | $0.05–0.30 |
-| ≥ 2.0 | `canonical` | Copy a pre-rendered PDF | $0 |
-| < 2.0 | `skip` | No output | $0 |
+2. **Run Claude Code on the staged files.** Open a terminal in the
+   repo, start `claude` (or your Claude Code launcher), and paste the
+   prompt the page shows you:
 
-The UI **never spends money silently.** Above the configurable `MATCHBOX_COST_CONFIRM_USD` threshold (default $1) you must explicitly confirm. Bulk tailor is capped at 5 jobs in the UI; for batches use the CLI.
+   ```text
+   ingest my files
+   ```
 
-## Repository layout
+   The brain reads `inbox/`, extracts experiences and bullets and
+   skills, writes them to your DB via `matchbox-ingest`. Rows land
+   with `facts_verified = false`.
+
+3. **Review.** Open `/review`. Read every bullet. Fix wording. Delete
+   noise. Confirm what is true. Only confirmed bullets are eligible
+   for CV tailoring.
+
+4. **Targets.** `/targets`. Role families, dream companies, locations,
+   exclusions.
+
+5. **Sources.** `/sources`. Add a company by ATS type (Greenhouse,
+   Lever, Ashby, Workable, SmartRecruiters, Recruitee) and slug. Click
+   "Test the slug" before saving to verify the endpoint. Click
+   "Scan all enabled" to fetch jobs.
+
+6. **Triage.** `/inbox`. The five-dimension rubric scores every new
+   job; click "Score new jobs" to refresh. Per row: Skip, Reject, or
+   include in a tailoring run by ticking CV and/or cover. Pick palette
+   and font for the run. Click "Start tailoring".
+
+7. **Process the run.** A new `runs/<id>/work-queue.json` is on disk.
+   Copy the prompt the page shows you, paste into Claude Code:
+
+   ```text
+   process run 2026-05-22-001
+   ```
+
+   The brain processes each job: extracts requirements via
+   `matchbox-jobreqs`, runs `matchbox-assemble` to render the PDF,
+   writes `status.json` as it progresses. The CV PDF, coverage report,
+   and a `changes.md` diff land under `runs/<id>/output/<job>/`.
+
+8. **Review run + apply.** `/review-run/<id>` polls `status.json` and
+   shows each CV inline. The page surfaces uncovered must-haves, any
+   ATS keyword misses, and (M7+) "Polish candidates" the brain can
+   rephrase to carry missing keywords. When you click **Apply**, the
+   job's apply URL opens in a new tab. **Mark applied** when you
+   submit.
+
+## Architecture (one screen)
 
 ```text
-matchbox/
-├── src/matchbox/
-│   ├── core/          # Pydantic schema, SQLite layer, person loader
-│   ├── scoring/       # Exclusions, 6-dim rubric, tier router
-│   ├── discovery/     # ATS probers, daily scan, funding scan
-│   ├── tailor/        # Quality gates, content gen, Typst render, dispatch
-│   ├── outcome/       # Response logging, follow-ups, analytics
-│   ├── web/           # FastAPI + HTMX + Jinja + Tailwind dashboard
-│   └── cli.py         # Typer entry point
-├── people/
-│   ├── demo/          # Demo profile (committed, gets you running in 30s)
-│   └── {your_name}/   # Your real profile (gitignored automatically)
-├── shared/
-│   ├── rubric.yaml             # 6-dimension scoring weights
-│   ├── voice-rules.yaml        # Universal voice constraints
-│   └── templates/              # Typst CV + cover letter templates
-├── tests/                       # 109 tests; ruff + mypy strict + pytest in CI
-└── docs/                        # See docs/index.md
+inbox/                  user drops files                        app stages
+runs/<id>/              app writes work-queue.json              brain reads
+                        brain writes status.json                app polls
+
+people/<slug>/matchbox.db    one SQLite DB per profile
+shared/rubric.json           deterministic 5-dimension scoring
+shared/voice-rules.json      polish-pass guardrails
+schemas/*.v1.json            JSON Schema contracts
+src/matchbox/
+  core/                      DB, models, library CRUD
+  onboarding/                ingest CLI
+  discovery/                 ATS pollers + scan runner
+  scoring/                   rubric + run creation
+  matching/                  embed, BM25, RRF, MMR, coverage
+  polish.py                  voice-rules-validated keyword alignment
+  templates/typst/           cv.typ + cover.typ
+  web/                       FastAPI + HTMX routes + Jinja templates
+  assemble.py                deterministic select + render orchestrator
+  jobreqs.py                 brain's requirements writer
 ```
 
-## Documentation
+## Commands
 
-* **[Setup](docs/setup.md)** — install, prerequisites, verifying
-* **[Operator runbook](docs/operator-runbook.md)** — daily commands
-* **[Architecture](docs/architecture.md)** — module map, data flow, gates
-* **[UX design rationale](docs/ux-design.md)** — *why* the dashboard looks the way it does
-* **[CLI reference](docs/cli-reference.md)** — every command + flags
-* **[Troubleshooting](docs/troubleshooting.md)** — common errors
-* **[Decision records (ADRs)](docs/decisions/)** — durable architectural choices
-* **[Contributing](CONTRIBUTING.md)** — code standards, PR flow
-* **[Development guide](docs/development.md)** — local dev workflow
-* **[Changelog](CHANGELOG.md)** — release history
-* **[Security policy](SECURITY.md)** — how to report vulnerabilities
-* **[Code of conduct](CODE_OF_CONDUCT.md)** — community standards
+```bash
+matchbox-web                                          # web UI on 127.0.0.1:8765
+matchbox-ingest --file payload.json                   # brain writes the library
+matchbox-jobreqs save --job 42 --file reqs.json       # brain saves JD requirements
+matchbox-assemble --run <run-id> --job 42             # select + render CV
+matchbox-assemble --run <run-id> --job 42 --cover     # render cover letter
+matchbox-assemble --run <run-id> --job 42 \
+    --polish polish.json                              # apply the polish pass
+```
 
-Full index at **[docs/index.md](docs/index.md)**.
+CLAUDE.md at the repo root tells Claude Code how to drive these.
 
 ## Security
 
-Matchbox is a **single-user local tool**: no auth, no CSRF protection, no rate limiting. The web dashboard binds to `127.0.0.1` only by default. **Do not** expose it to the network without a reverse proxy + auth — anyone who can reach the port can read your jobs and spend your Anthropic API budget.
+Single-user local tool. No auth. No CSRF. The web server binds to
+`127.0.0.1` only (ADR-0005). Do not expose to the network. The PDF
+serving route is sandboxed to `runs/<id>/output/<job-id>/` with
+path-traversal guards.
 
-To report a security issue, see [SECURITY.md](SECURITY.md). Please do not open a public issue.
+## Documentation
 
-## Contributing
+* [v0.3 design](docs/v0.3-design.md) — the design document this build
+  follows
+* [Decision records](docs/decisions/) — durable architectural choices
+* [Contributing](CONTRIBUTING.md)
+* [Security policy](SECURITY.md)
+* [Changelog](CHANGELOG.md)
 
-PRs welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) — short version: ruff + mypy strict + pytest must pass, conventional commits, no PII in commits.
+Earlier versions of the docs (architecture, cli-reference, ux-design,
+setup, troubleshooting, operator-runbook, index) lived under `docs/`.
+They described v0.2 and now sit under `archive/v0.2/docs/`. v0.3
+documentation is the README plus `docs/v0.3-design.md` plus this
+section.
 
 ## License
 

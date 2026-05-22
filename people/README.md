@@ -1,28 +1,30 @@
 # people/
 
-Each subdirectory is one candidate profile. All profile directories are gitignored except `demo/`.
+Each subdirectory is one candidate profile. All profile directories are
+gitignored except `demo/` (which exists so the v0.3 demo flow has a place
+to land its `matchbox.db`).
 
-To create your profile:
+The active profile is chosen by the `MATCHBOX_PROFILE` env var (defaults
+to `demo`). The path is resolved as `people/<MATCHBOX_PROFILE>/matchbox.db`.
+`MATCHBOX_DB` overrides the whole path when set.
 
-```bash
-matchbox init-profile --name yourname
+Per-profile layout (v0.3):
+
+```text
+people/<slug>/
+  matchbox.db        Single SQLite DB. Profile row, library, jobs, runs,
+                     applications, embeddings, settings. Gitignored.
 ```
 
-Or copy `demo/` as a starting point:
+Earlier versions kept YAML (`profile.yaml`, `voice.yaml`, `stories.md`,
+`anchor-packs.yaml`) per profile. v0.3 dropped all of that. Profile data
+is rows in the DB now; voice rules and the scoring rubric live in
+`shared/` and are repo-wide.
+
+To create a new profile:
 
 ```bash
-cp -r people/demo people/yourname
-# then edit people/yourname/profile.yaml
+MATCHBOX_PROFILE=alice matchbox-web
 ```
 
-Each profile directory contains:
-
-* `profile.yaml` — structured identity, targets, work history, skills, projects
-* `voice.yaml` — per-person voice rules and example phrasings (merges with shared/voice-rules.yaml)
-* `stories.md` — STAR+R narratives for cover letters and interview prep
-* `anchor-packs.yaml` — pre-approved bullet variants per role family (generated from profile.yaml)
-* `db.sqlite` — pipeline state (gitignored)
-* `output/` — tailored CVs and cover letters per job (gitignored)
-* `runs/` — scan run artefacts (gitignored)
-* `reports/` — per-role evaluation reports (gitignored)
-* `log.md` — activity log (written via `matchbox log-response` only)
+The DB is created on first request. Use the web UI to populate it.
