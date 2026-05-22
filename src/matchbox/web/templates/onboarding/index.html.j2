@@ -1,5 +1,5 @@
 {% extends "base.html.j2" %}
-{% block title %}Onboarding — Matchbox{% endblock %}
+{% block title %}Onboarding · Matchbox{% endblock %}
 
 {% block content %}
 <section class="space-y-2 mb-6">
@@ -43,21 +43,20 @@
 </section>
 
 <section class="mb-8 border border-border bg-surface rounded p-4">
-  <h2 class="text-lg font-semibold mb-2">Now run the brain</h2>
+  <h2 class="text-lg font-semibold mb-2">Now process these files with Claude Code</h2>
   <p class="text-sm text-text-muted mb-3">
-    Open a terminal in this repo and run Claude Code. Paste the prompt below.
-    Matchbox holds no LLM credentials — Claude Code is the reasoning engine.
+    Open a terminal in this repo and start Claude Code. Paste the prompt below.
   </p>
   <pre class="bg-bg border border-border rounded text-xs p-3 overflow-auto select-all">ingest my files</pre>
   <p class="text-xs text-text-muted mt-2">
-    The brain will read everything in <code>inbox/</code>, extract experiences, bullets,
-    projects, skills, and tags, then call <code>matchbox-ingest</code> to write them. Come back to
-    <a class="text-accent underline" href="/review">/review</a> to confirm them.
+    Claude Code will read your files, pull out experiences and bullets and skills,
+    and write them to your library. When it finishes, open
+    <a class="text-accent underline" href="/review">Review</a> to confirm what it found.
   </p>
 </section>
 
 <section>
   <h2 class="text-lg font-semibold mb-2">Then set your targets</h2>
-  <a href="/targets" class="bg-accent text-white rounded px-3 py-1 text-sm inline-block">Open targets form</a>
+  <a href="/targets" class="bg-accent text-white rounded px-3 py-1 text-sm inline-block">Set your targets</a>
 </section>
 {% endblock %}

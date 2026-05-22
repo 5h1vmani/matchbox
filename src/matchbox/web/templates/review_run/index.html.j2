@@ -1,5 +1,5 @@
 {% extends "base.html.j2" %}
-{% block title %}Run {{ run.id }} — Matchbox{% endblock %}
+{% block title %}Run {{ run.id }} · Matchbox{% endblock %}
 
 {% block content %}
 <section class="space-y-2 mb-6">
@@ -10,7 +10,7 @@
     {% if status and status.error %}<span class="text-danger">({{ status.error }})</span>{% endif %}
   </div>
   <div class="text-xs text-text-muted">
-    Polling <code>runs/{{ run.id }}/status.json</code> every 3 seconds while jobs are in flight.
+    Updates as Claude Code processes each job.
     <a class="underline" href="/runs">All runs</a>
   </div>
 </section>

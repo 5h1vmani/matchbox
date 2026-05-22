@@ -1,12 +1,12 @@
 {% extends "base.html.j2" %}
-{% block title %}Sources — Matchbox{% endblock %}
+{% block title %}Sources · Matchbox{% endblock %}
 
 {% block content %}
 <section class="space-y-2 mb-6">
   <h1 class="text-xl font-semibold">Sources</h1>
   <p class="text-sm text-text-muted">
-    Companies whose ATS we poll for jobs. Add a company, then scan all to fetch new jobs.
-    Failures stay visible so you know exactly what is broken.
+    Companies you want to track. Add a company, then scan to pull in new jobs.
+    Failures stay visible so you can see exactly which source broke.
   </p>
 </section>
 
@@ -46,7 +46,7 @@
       hx-include="closest section form"
       hx-target="#probe-result"
       hx-swap="outerHTML"
-    >Probe first</button>
+    >Test the slug</button>
     <span id="probe-result" class="text-xs"></span>
   </div>
 </section>

@@ -1,13 +1,13 @@
 {% extends "base.html.j2" %}
-{% block title %}Review — Matchbox{% endblock %}
+{% block title %}Review · Matchbox{% endblock %}
 
 {% block content %}
 <section class="space-y-2 mb-6">
   <h1 class="text-xl font-semibold">Review</h1>
   <p class="text-sm text-text-muted">
-    The brain extracted these components from your files. Read each one. Fix the wording
-    where needed. Delete noise. Confirm what is true.
-    Only verified components are eligible for tailoring.
+    Claude Code pulled these out of your files. Read each one. Fix the wording where
+    needed. Delete noise. Confirm what is true. Only confirmed bullets are eligible
+    for tailoring later.
   </p>
   <p class="text-xs text-text-muted">
     {{ unverified_bullets }} bullet{{ "" if unverified_bullets == 1 else "s" }} and
