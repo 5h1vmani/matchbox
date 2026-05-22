@@ -64,6 +64,15 @@ def _wrap_summary(s: SummaryVariant, tags: list[Tag] | None = None) -> TaggedIte
 # ─── library index page ───────────────────────────────────────────────
 
 
+def _tag_values(conn: sqlite3.Connection) -> dict[str, list[str]]:
+    """All known tag values grouped by facet, for datalist autocomplete."""
+    rows = conn.execute("SELECT facet, value FROM tag ORDER BY facet, value").fetchall()
+    by_facet: dict[str, list[str]] = {}
+    for r in rows:
+        by_facet.setdefault(r["facet"], []).append(r["value"])
+    return by_facet
+
+
 @router.get("/library", response_class=HTMLResponse)
 def library_index(request: Request, conn: ConnDep) -> HTMLResponse:
     experiences = lib.list_experiences(conn)
@@ -83,6 +92,7 @@ def library_index(request: Request, conn: ConnDep) -> HTMLResponse:
             "skills": lib.skills_with_tags(conn),
             "summaries": lib.summaries_with_tags(conn),
             "facets": sorted(VALID_FACETS),
+            "tag_values_by_facet": _tag_values(conn),
         },
     )
 

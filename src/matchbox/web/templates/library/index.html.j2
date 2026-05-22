@@ -2,6 +2,13 @@
 {% block title %}Library · Matchbox{% endblock %}
 
 {% block content %}
+{# Tag autocomplete datalists — one per facet, plus an "all" list as a
+   fallback. Tag inputs across the page reference list="tags-all". #}
+<datalist id="tags-all">
+  {% for facet, values in tag_values_by_facet.items() %}
+    {% for v in values %}<option value="{{ v }}">{{ facet }}</option>{% endfor %}
+  {% endfor %}
+</datalist>
 <section class="space-y-2 mb-8">
   <h1 class="text-xl font-semibold">Library</h1>
   <p class="text-sm text-text-muted">

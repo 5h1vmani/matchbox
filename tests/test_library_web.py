@@ -77,6 +77,23 @@ def test_create_experience_then_bullet(client: TestClient) -> None:
     assert "Shipped X." in r3.text
 
 
+def test_library_index_renders_tag_autocomplete_datalist(client: TestClient) -> None:
+    """Once any tag exists, the datalist surfaces it for the autocomplete."""
+    exp = client.post("/library/experiences", data={"company": "X", "role": "Y"})
+    import re
+
+    exp_id = int(re.search(r'experience-(\d+)"', exp.text).group(1))  # type: ignore[union-attr]
+    b = client.post("/library/bullets", data={"experience_id": str(exp_id), "text": "X"})
+    bullet_id = int(re.search(r'bullet-(\d+)"', b.text).group(1))  # type: ignore[union-attr]
+    client.post(f"/library/tags/bullet/{bullet_id}", data={"facet": "tech", "value": "python"})
+
+    page = client.get("/library").text
+    assert '<datalist id="tags-all">' in page
+    assert '<option value="python">tech</option>' in page
+    # The bullet's add-tag input references the list.
+    assert 'list="tags-all"' in page
+
+
 def test_tag_attach_and_detach(client: TestClient) -> None:
     exp = client.post("/library/experiences", data={"company": "Modal", "role": "FDE"})
     import re
