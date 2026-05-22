@@ -43,6 +43,11 @@ from matchbox.matching.select import (
     Requirement,
     select_components,
 )
+from matchbox.polish import (
+    BulletPolish,
+    apply_polish,
+    validate_polish_payload,
+)
 
 RUNS_DIR = PROJECT_ROOT / "runs"
 TEMPLATE_DIR = PROJECT_ROOT / "src" / "matchbox" / "templates" / "typst"
@@ -489,6 +494,148 @@ def _requirement_synth_id(job_id: int, idx: int) -> int:
     return job_id * 10_000 + idx
 
 
+# ─── polish path (rewording selected bullets, no re-selection) ────────
+
+
+def polish_run(
+    *,
+    conn: sqlite3.Connection,
+    run_id: str,
+    job_id: int,
+    palette: str,
+    font: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Apply a polish payload to an already-rendered run.
+
+    Steps:
+    1. Validate payload against schemas/polish.v1.json.
+    2. Pull the existing coverage.json to find the bullet selected_ids.
+    3. apply_polish() validates each polish against voice-rules.json,
+       replaces bullet text in cv.json. Truthfulness is the brain's
+       concern.
+    4. Re-render cv.pdf from the updated cv.json.
+    5. Re-run keyword-presence check on the new PDF text.
+    6. Write a new coverage.json with the updated keyword presence;
+       semantic coverage carries over unchanged.
+    7. Append a "Polished" section to changes.md.
+
+    Returns a summary dict suitable for stdout: {applied, rejected,
+    keyword_presence_before, keyword_presence_after}.
+    """
+    errors = validate_polish_payload(payload)
+    if errors:
+        raise ValueError("polish.json failed schema validation: " + "; ".join(errors))
+    out_dir = RUNS_DIR / run_id / "output" / str(job_id)
+    coverage_path = out_dir / "coverage.json"
+    if not coverage_path.exists():
+        raise FileNotFoundError(f"no coverage.json at {coverage_path}. Run assemble first.")
+    coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
+
+    # selected_ids are not stored on disk; reconstruct from the DB
+    # selected status flag, which assemble sets on run_job, or — easier
+    # — re-run the matcher? No, that defeats the point. Persist
+    # selected_ids in cv.json next time. For now, we load them from
+    # run_job's job_id via the bullets that appear in cv.json:
+    cv_json_path = out_dir / "cv.json"
+    if not cv_json_path.exists():
+        raise FileNotFoundError(f"no cv.json at {cv_json_path}. Run assemble first.")
+    cv_json = json.loads(cv_json_path.read_text(encoding="utf-8"))
+    # Find which DB bullet ids match the bullets in cv.json.
+    bullets_in_cv = {b for exp in cv_json.get("experiences", []) for b in exp.get("bullets", [])}
+    rows = conn.execute("SELECT id, text FROM bullet").fetchall()
+    selected_ids = [r["id"] for r in rows if r["text"] in bullets_in_cv]
+    # Plus any rows whose text appears as original_text in the payload —
+    # this catches bullets already polished once.
+    proposed_ids = {entry["id"] for entry in payload.get("polished", [])}
+    selected_ids = sorted(set(selected_ids) | proposed_ids)
+
+    applied, rejected, _new_cv = apply_polish(
+        conn=conn,
+        out_dir=out_dir,
+        selected_ids=selected_ids,
+        payload=payload,
+    )
+
+    keyword_presence_before = coverage.get("keyword_presence", [])
+
+    if applied:
+        # Re-render: cv.json was updated in place by apply_polish.
+        _render_pdf(cv_json_path, out_dir / "cv.pdf", palette, font)
+
+        # Re-run keyword presence on the new PDF text.
+        pdf_text = _extract_pdf_text(out_dir / "cv.pdf")
+        # Reconstruct Requirement objects from the cached job.requirements_json.
+        requirements = _load_requirements(conn, job_id)
+        keyword_presence_after = [
+            {
+                "requirement": kp.requirement_text,
+                "matched_term": kp.matched_term,
+                "present": kp.present,
+            }
+            for kp in check_keyword_presence(pdf_text, requirements)
+        ]
+        coverage["keyword_presence"] = keyword_presence_after
+        coverage_path.write_text(json.dumps(coverage, indent=2), encoding="utf-8")
+    else:
+        keyword_presence_after = keyword_presence_before
+
+    _append_polish_section_to_changes_md(out_dir=out_dir, applied=applied, rejected=rejected)
+
+    return {
+        "applied": [{"id": bp.bullet_id, "new_text": bp.new_text} for bp in applied],
+        "rejected": [
+            {
+                "id": bp.bullet_id,
+                "violations": [{"rule": v.rule, "detail": v.detail} for v in bp.violations],
+            }
+            for bp in rejected
+        ],
+        "keyword_presence_before": keyword_presence_before,
+        "keyword_presence_after": keyword_presence_after,
+    }
+
+
+def _append_polish_section_to_changes_md(
+    *,
+    out_dir: Path,
+    applied: list[BulletPolish],
+    rejected: list[BulletPolish],
+) -> None:
+    """Append a 'Polished' section to changes.md so the user can read
+    exactly how the wording changed and why anything was rejected."""
+    changes_path = out_dir / "changes.md"
+    lines: list[str] = []
+    if changes_path.exists():
+        lines.append("")  # spacer if appending
+    lines.append("## Polished")
+    lines.append("")
+    if applied:
+        for bp in applied:
+            covers = f" (covers: {', '.join(bp.covers)})" if bp.covers else ""
+            lines.append(f"- **bullet {bp.bullet_id}**{covers}")
+            if bp.original_text:
+                lines.append(f"  - was: {bp.original_text}")
+            lines.append(f"  - now: {bp.new_text}")
+    else:
+        lines.append("_No bullets applied._")
+    if rejected:
+        lines.append("")
+        lines.append("### Rejected")
+        lines.append("")
+        for bp in rejected:
+            why = "; ".join(f"{v.rule}: {v.detail}" for v in bp.violations)
+            lines.append(f"- bullet {bp.bullet_id} — {why}")
+            lines.append(f"  - proposed: {bp.new_text}")
+    lines.append("")
+
+    if changes_path.exists():
+        existing = changes_path.read_text(encoding="utf-8")
+        changes_path.write_text(existing + "\n".join(lines), encoding="utf-8")
+    else:
+        changes_path.write_text("\n".join(lines), encoding="utf-8")
+
+
 # ─── re-render path (palette/font swap, no selection) ────────────────
 
 
@@ -617,6 +764,13 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="render the cover letter (reads cover.txt the brain wrote)",
     )
+    parser.add_argument(
+        "--polish",
+        type=Path,
+        default=None,
+        metavar="POLISH_JSON",
+        help="apply a polish payload (per schemas/polish.v1.json) to an already-rendered run",
+    )
     parser.add_argument("--db", type=Path, default=None, help="override DB path")
     args = parser.parse_args(argv)
 
@@ -624,6 +778,37 @@ def main(argv: list[str] | None = None) -> int:
     try:
         migrate(conn)
         palette, font = _palette_and_font_for(conn, args.run, args.job)
+
+        if args.polish is not None:
+            try:
+                payload = json.loads(args.polish.read_text(encoding="utf-8"))
+            except OSError as e:
+                print(f"error: cannot read {args.polish}: {e}", file=sys.stderr)
+                return 2
+            except json.JSONDecodeError as e:
+                print(f"error: invalid JSON in {args.polish}: {e}", file=sys.stderr)
+                return 2
+            try:
+                summary = polish_run(
+                    conn=conn,
+                    run_id=args.run,
+                    job_id=args.job,
+                    palette=palette,
+                    font=font,
+                    payload=payload,
+                )
+            except FileNotFoundError as e:
+                print(f"error: {e}", file=sys.stderr)
+                return 5
+            except ValueError as e:
+                print(f"schema error: {e}", file=sys.stderr)
+                return 3
+            print(f"polish: applied {len(summary['applied'])}, rejected {len(summary['rejected'])}")
+            for r in summary["rejected"]:
+                print(f"  rejected bullet {r['id']}:")
+                for v in r["violations"]:
+                    print(f"    {v['rule']}: {v['detail']}")
+            return 0
 
         if args.cover:
             try:

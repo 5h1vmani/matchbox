@@ -11,6 +11,7 @@ The contract between the app and you lives in `schemas/` as JSON Schema
 * `schemas/job-requirements.v1.json` — extracted JD requirements
 * `schemas/work-queue.v1.json` — the app's tailoring queue
 * `schemas/status.v1.json` — your progress reports back to the app
+* `schemas/polish.v1.json` — the keyword-alignment polish payload
 
 A `schema_version` mismatch is a hard error. Stop and report.
 
@@ -89,10 +90,41 @@ For each job in the queue:
 3. **Read the coverage report.** Uncovered must-haves are expected;
    record them as `gaps`. Do NOT cover them by inventing content.
 
-4. **(M7+) Cover letter, polish pass.** Cover-letter drafting and the
-   keyword-alignment polish pass land in M7. Skip them for now.
+4. **Keyword-alignment polish pass (default for must-haves).** Read
+   `runs/<run-id>/output/<job-id>/coverage.json`. For every entry under
+   `keyword_presence` where `present` is false, find the most-relevant
+   selected bullet (the matcher already chose it; you see it in
+   `changes.md` under Selected) and rephrase it so the new wording
+   carries the missing keyword — **but only when the new wording is a
+   truthful description of the same fact**. Never invent.
 
-5. **Update `runs/<run-id>/status.json`** with this job's progress.
+   The voice-rules guard form, not facts: `shared/voice-rules.json`
+   has banned words, banned openers, hard rules (no em-dashes, no
+   contractions), and quality gates (word counts). Stay inside them.
+
+   Write the proposals to `runs/<run-id>/output/<job-id>/polish.json`
+   per `schemas/polish.v1.json`, then apply:
+
+   ```bash
+   python -m matchbox.assemble --run <run-id> --job <job_id> \
+       --polish runs/<run-id>/output/<job-id>/polish.json
+   ```
+
+   The deterministic side validates each entry against the schema and
+   the voice rules, replaces the bullet text in `cv.json`, re-renders
+   `cv.pdf`, re-runs the keyword-presence check, and appends a
+   "Polished" section to `changes.md`. Rejected polishes are reported
+   with the rule that failed. The CLI exits 0 on success, 3 on schema
+   failure, 5 if there is no prior assemble to polish.
+
+5. **(M7+) Cover letter.** If `want_cover` is true, write the body to
+   `runs/<run-id>/output/<job-id>/cover.txt` and render:
+
+   ```bash
+   python -m matchbox.assemble --run <run-id> --job <job_id> --cover
+   ```
+
+6. **Update `runs/<run-id>/status.json`** with this job's progress.
    Validate against `schemas/status.v1.json` before writing. The shape:
 
    ```json
@@ -117,7 +149,7 @@ For each job in the queue:
    You MAY rewrite the whole file each time (the app file-watches it).
    The app shows live progress in `/review-run/<run-id>`.
 
-6. When every job is processed, set the top-level `status` to `"done"`.
+7. When every job is processed, set the top-level `status` to `"done"`.
 
 If anything fails, set the job's `cv_status` (or top-level `status`) to
 `"error"` and put the message in the `error` field. Fail loud.
