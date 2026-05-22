@@ -6,10 +6,24 @@ people/*
 !people/README.md
 !people/demo/
 !people/demo/**
-# But never commit generated artifacts even for demo:
-people/demo/db.sqlite
+# Generated artifacts are never committed, even for demo.
+people/demo/matchbox.db
 people/demo/output/*
 !people/demo/output/.gitkeep
+people/*/matchbox.db
+people/*/matchbox.db-*
+
+# Brain-app handoff folders — derived state, never committed.
+runs/*
+!runs/.gitkeep
+
+# Onboarding staging — user files, never committed.
+inbox/*
+!inbox/.gitkeep
+
+# Embedding model cache (fastembed downloads weights on first use).
+.fastembed_cache/
+
 __pycache__/
 *.pyc
 *.pyo

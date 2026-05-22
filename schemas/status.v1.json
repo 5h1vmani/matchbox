@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matchbox.local/schemas/status.v1.json",
+  "title": "Matchbox status (brain → app)",
+  "description": "Written and updated by the brain as it processes a run. The app file-watches this and re-renders the review screen on every change.",
+  "type": "object",
+  "required": ["schema_version", "run_id", "status", "jobs"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{3}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["queued", "running", "done", "error"]
+    },
+    "error": {
+      "type": "string",
+      "description": "Set only when status == 'error'. Human-readable."
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["job_id", "cv_status", "cover_status"],
+        "additionalProperties": false,
+        "properties": {
+          "job_id": { "type": "integer", "minimum": 1 },
+          "cv_status": {
+            "type": "string",
+            "enum": ["pending", "running", "done", "skipped", "error"]
+          },
+          "cover_status": {
+            "type": "string",
+            "enum": ["pending", "running", "done", "skipped", "error"]
+          },
+          "cv_path": { "type": ["string", "null"] },
+          "cover_path": { "type": ["string", "null"] },
+          "gaps": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Uncovered must-have requirements. Plain language."
+          },
+          "notes": { "type": ["string", "null"] },
+          "error": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}
