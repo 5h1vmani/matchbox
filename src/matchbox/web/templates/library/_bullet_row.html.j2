@@ -1,0 +1,36 @@
+{% set b = tagged.item %}
+<li id="bullet-{{ b.id }}" class="flex items-start gap-2 group">
+  <div class="flex-1">
+    <div class="text-sm">{{ b.text }}</div>
+    <div class="mt-1 flex flex-wrap items-center gap-1">
+      {% for t in tagged.tags %}
+        {% include "library/_tag_chip.html.j2" %}
+      {% endfor %}
+
+      <form
+        class="inline-flex items-center gap-1"
+        hx-post="/library/tags/bullet/{{ b.id }}"
+        hx-target="this"
+        hx-swap="beforebegin"
+        hx-on::after-request="if (event.detail.successful) this.reset()"
+      >
+        <select class="border border-border rounded text-xs px-1 py-0.5" name="facet">
+          {% for f in facets %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+        </select>
+        <input class="border border-border rounded text-xs px-1 py-0.5 w-28" name="value" placeholder="tag…" required />
+        <button class="text-xs text-text-muted hover:text-text">+</button>
+      </form>
+    </div>
+    <div class="mt-1 text-[10px] text-text-muted flex gap-3">
+      {% if b.has_metric %}<span class="text-success">metric</span>{% endif %}
+      {% if b.facts_verified %}<span class="text-success">verified</span>{% else %}<span class="text-warning">unverified</span>{% endif %}
+    </div>
+  </div>
+  <button
+    class="text-xs text-danger opacity-0 group-hover:opacity-100 transition"
+    hx-delete="/library/bullets/{{ b.id }}"
+    hx-target="#bullet-{{ b.id }}"
+    hx-swap="outerHTML"
+    hx-confirm="Delete this bullet?"
+  >Delete</button>
+</li>

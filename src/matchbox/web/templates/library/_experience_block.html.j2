@@ -1,0 +1,39 @@
+{% set exp = block.experience %}
+<article id="experience-{{ exp.id }}" class="border border-border bg-surface rounded p-4">
+  <header class="flex items-start justify-between gap-4 mb-3">
+    <div>
+      <div class="font-semibold">{{ exp.company }} · <span class="font-normal">{{ exp.role }}</span></div>
+      <div class="text-xs text-text-muted">
+        {{ exp.start_date or "—" }} → {{ exp.end_date or "present" }}{% if exp.location %} · {{ exp.location }}{% endif %}
+      </div>
+    </div>
+    <button
+      class="text-xs text-danger hover:underline"
+      hx-delete="/library/experiences/{{ exp.id }}"
+      hx-target="#experience-{{ exp.id }}"
+      hx-swap="outerHTML"
+      hx-confirm="Delete this experience and all its bullets?"
+    >Delete</button>
+  </header>
+
+  <ul id="bullets-{{ exp.id }}" class="space-y-2">
+    {% for tagged in block.bullets %}
+      {% include "library/_bullet_row.html.j2" %}
+    {% endfor %}
+  </ul>
+
+  <form
+    class="mt-3 flex gap-2"
+    hx-post="/library/bullets"
+    hx-target="#bullets-{{ exp.id }}"
+    hx-swap="beforeend"
+    hx-on::after-request="if (event.detail.successful) this.reset()"
+  >
+    <input type="hidden" name="experience_id" value="{{ exp.id }}" />
+    <input class="flex-1 border border-border rounded px-2 py-1 text-sm" name="text" placeholder="Add a bullet…" required />
+    <label class="text-xs text-text-muted flex items-center gap-1">
+      <input type="checkbox" name="has_metric" /> has metric
+    </label>
+    <button class="bg-accent text-white rounded px-3 py-1 text-sm">Add</button>
+  </form>
+</article>

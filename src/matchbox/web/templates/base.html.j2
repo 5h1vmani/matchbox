@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{% block title %}Matchbox{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: "#fafaf9",
+            surface: "#ffffff",
+            border: "#e7e5e4",
+            text: "#1c1917",
+            "text-muted": "#78716c",
+            accent: "#3c6e9c",
+            success: "#15803d",
+            warning: "#a16207",
+            danger: "#b91c1c",
+          },
+          fontFamily: {
+            sans: [
+              "ui-sans-serif",
+              "system-ui",
+              "-apple-system",
+              "Segoe UI",
+              "Inter",
+              "sans-serif",
+            ],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.125rem 0.5rem; border-radius: 9999px;
+      background: #f5f5f4; color: #57534e; font-size: 0.75rem;
+      border: 1px solid #e7e5e4;
+    }
+    .chip button { color: #a8a29e; }
+    .chip button:hover { color: #b91c1c; }
+  </style>
+</head>
+<body class="bg-bg text-text">
+  <header class="border-b border-border bg-surface">
+    <div class="mx-auto max-w-5xl px-4 py-3 flex items-center gap-6">
+      <a href="/library" class="font-semibold">Matchbox</a>
+      <nav class="text-sm text-text-muted flex gap-4">
+        <a href="/library" class="hover:text-text">Library</a>
+      </nav>
+    </div>
+  </header>
+  <main class="mx-auto max-w-5xl px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

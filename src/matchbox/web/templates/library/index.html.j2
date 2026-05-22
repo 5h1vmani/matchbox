@@ -1,0 +1,120 @@
+{% extends "base.html.j2" %}
+{% block title %}Library — Matchbox{% endblock %}
+
+{% block content %}
+<section class="space-y-2 mb-8">
+  <h1 class="text-xl font-semibold">Library</h1>
+  <p class="text-sm text-text-muted">
+    Every achievement is written once and tagged. CVs differ because different
+    components are selected, never because the same fact is regenerated.
+  </p>
+</section>
+
+{# ───────── Experiences + bullets ───────── #}
+<section class="mb-12">
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-lg font-semibold">Experience</h2>
+    <span class="text-xs text-text-muted">{{ experience_blocks|length }} role{{ "" if experience_blocks|length == 1 else "s" }}</span>
+  </header>
+
+  <div id="experience-list" class="space-y-4">
+    {% for block in experience_blocks %}
+      {% include "library/_experience_block.html.j2" %}
+    {% endfor %}
+  </div>
+
+  <form
+    class="mt-4 grid grid-cols-2 gap-2 p-4 border border-border bg-surface rounded"
+    hx-post="/library/experiences"
+    hx-target="#experience-list"
+    hx-swap="beforeend"
+    hx-on::after-request="if (event.detail.successful) this.reset()"
+  >
+    <input class="border border-border rounded px-2 py-1 col-span-1" name="company" placeholder="Company" required />
+    <input class="border border-border rounded px-2 py-1 col-span-1" name="role" placeholder="Role" required />
+    <input class="border border-border rounded px-2 py-1 col-span-1" name="start_date" placeholder="Start (YYYY-MM)" />
+    <input class="border border-border rounded px-2 py-1 col-span-1" name="end_date" placeholder="End (YYYY-MM or blank)" />
+    <input class="border border-border rounded px-2 py-1 col-span-2" name="location" placeholder="Location (optional)" />
+    <button class="col-span-2 bg-accent text-white rounded px-3 py-1 text-sm">Add experience</button>
+  </form>
+</section>
+
+{# ───────── Projects ───────── #}
+<section class="mb-12">
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-lg font-semibold">Projects</h2>
+    <span class="text-xs text-text-muted">{{ projects|length }}</span>
+  </header>
+  <div id="project-list" class="space-y-2">
+    {% for tagged in projects %}
+      {% include "library/_project_row.html.j2" %}
+    {% endfor %}
+  </div>
+  <form
+    class="mt-3 grid grid-cols-3 gap-2 p-3 border border-border bg-surface rounded"
+    hx-post="/library/projects"
+    hx-target="#project-list"
+    hx-swap="beforeend"
+    hx-on::after-request="if (event.detail.successful) this.reset()"
+  >
+    <input class="border border-border rounded px-2 py-1" name="name" placeholder="Name" required />
+    <input class="border border-border rounded px-2 py-1 col-span-2" name="url" placeholder="URL (optional)" />
+    <textarea class="border border-border rounded px-2 py-1 col-span-3" name="text" rows="2" placeholder="Description" required></textarea>
+    <button class="col-span-3 bg-accent text-white rounded px-3 py-1 text-sm">Add project</button>
+  </form>
+</section>
+
+{# ───────── Skills ───────── #}
+<section class="mb-12">
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-lg font-semibold">Skills</h2>
+    <span class="text-xs text-text-muted">{{ skills|length }}</span>
+  </header>
+  <div id="skill-list" class="space-y-2">
+    {% for tagged in skills %}
+      {% include "library/_skill_row.html.j2" %}
+    {% endfor %}
+  </div>
+  <form
+    class="mt-3 grid grid-cols-3 gap-2 p-3 border border-border bg-surface rounded"
+    hx-post="/library/skills"
+    hx-target="#skill-list"
+    hx-swap="beforeend"
+    hx-on::after-request="if (event.detail.successful) this.reset()"
+  >
+    <input class="border border-border rounded px-2 py-1" name="name" placeholder="Name" required />
+    <input class="border border-border rounded px-2 py-1" name="category" placeholder="Category" />
+    <select class="border border-border rounded px-2 py-1" name="proficiency">
+      <option value="">Proficiency (optional)</option>
+      <option value="working">working</option>
+      <option value="fluent">fluent</option>
+      <option value="expert">expert</option>
+    </select>
+    <button class="col-span-3 bg-accent text-white rounded px-3 py-1 text-sm">Add skill</button>
+  </form>
+</section>
+
+{# ───────── Summary variants ───────── #}
+<section class="mb-12">
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-lg font-semibold">Summary variants</h2>
+    <span class="text-xs text-text-muted">{{ summaries|length }}</span>
+  </header>
+  <div id="summary-list" class="space-y-2">
+    {% for tagged in summaries %}
+      {% include "library/_summary_row.html.j2" %}
+    {% endfor %}
+  </div>
+  <form
+    class="mt-3 grid grid-cols-3 gap-2 p-3 border border-border bg-surface rounded"
+    hx-post="/library/summaries"
+    hx-target="#summary-list"
+    hx-swap="beforeend"
+    hx-on::after-request="if (event.detail.successful) this.reset()"
+  >
+    <input class="border border-border rounded px-2 py-1" name="label" placeholder="Label (e.g. ml-focus)" required />
+    <textarea class="border border-border rounded px-2 py-1 col-span-2" name="text" rows="2" placeholder="One-sentence positioning" required></textarea>
+    <button class="col-span-3 bg-accent text-white rounded px-3 py-1 text-sm">Add summary</button>
+  </form>
+</section>
+{% endblock %}

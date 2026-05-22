@@ -1,12 +1,20 @@
-"""FastAPI web application — placeholder for M0.
+"""FastAPI application — the local web UI.
 
-Real routes land in M1 (library) and onwards. This module exists so the
-`matchbox-web` entry point resolves and the package imports cleanly.
+Binds 127.0.0.1 only (ADR-0005, no auth, no remote access). Real routes live
+in the `routes/` subpackage and are mounted here.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+
+from matchbox.web.routes import library
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 def create_app() -> FastAPI:
@@ -17,9 +25,18 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
 
+    if STATIC_DIR.exists():
+        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    app.include_router(library.router)
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/", include_in_schema=False)
+    def root() -> RedirectResponse:
+        return RedirectResponse(url="/library", status_code=302)
 
     return app
 
