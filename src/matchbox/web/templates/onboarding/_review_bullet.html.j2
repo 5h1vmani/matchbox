@@ -1,0 +1,44 @@
+{% set b = tagged.item %}
+<li id="review-bullet-{{ b.id }}" class="flex items-start gap-2 group">
+  <div class="flex-1">
+    <div class="text-sm">{{ b.text }}</div>
+    <div class="mt-1 flex flex-wrap items-center gap-1">
+      {% for t in tagged.tags %}
+        <span class="chip"><span class="text-text-muted">{{ t.facet }}:</span>{{ t.value }}</span>
+      {% endfor %}
+    </div>
+    <div class="mt-1 text-[10px] flex gap-3">
+      {% if b.has_metric %}<span class="text-success">metric</span>{% endif %}
+      {% if b.source_file %}<span class="text-text-muted">from {{ b.source_file }}</span>{% endif %}
+      {% if b.facts_verified %}
+        <span class="text-success">verified</span>
+      {% else %}
+        <span class="text-warning">unverified</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="flex flex-col gap-1">
+    {% if not b.facts_verified %}
+      <button
+        class="text-xs bg-success text-white rounded px-2 py-0.5"
+        hx-post="/review/bullets/{{ b.id }}/verify"
+        hx-target="#review-bullet-{{ b.id }}"
+        hx-swap="outerHTML"
+      >Verify</button>
+    {% else %}
+      <button
+        class="text-xs text-text-muted underline"
+        hx-post="/review/bullets/{{ b.id }}/unverify"
+        hx-target="#review-bullet-{{ b.id }}"
+        hx-swap="outerHTML"
+      >Unverify</button>
+    {% endif %}
+    <button
+      class="text-xs text-danger opacity-0 group-hover:opacity-100 transition"
+      hx-delete="/review/bullets/{{ b.id }}"
+      hx-target="#review-bullet-{{ b.id }}"
+      hx-swap="outerHTML"
+      hx-confirm="Delete this bullet?"
+    >Delete</button>
+  </div>
+</li>

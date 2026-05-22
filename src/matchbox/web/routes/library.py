@@ -8,9 +8,9 @@ fragments suitable for HTMX swap-in (or 200 with no body for deletes).
 from __future__ import annotations
 
 import sqlite3
-from typing import Annotated, Literal
+from typing import Literal
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 
 from matchbox.core import library as lib
@@ -24,12 +24,10 @@ from matchbox.core.models import (
     Tag,
     TaggedItem,
 )
-from matchbox.web.deps import get_conn
+from matchbox.web.deps import ConnDep
 from matchbox.web.templates_env import templates
 
 router = APIRouter()
-
-ConnDep = Annotated[sqlite3.Connection, Depends(get_conn)]
 
 VALID_FACETS: set[str] = {"role_family", "tech", "seniority", "impact"}
 VALID_ITEM_TYPES: set[str] = {"bullet", "project", "skill", "summary_variant"}

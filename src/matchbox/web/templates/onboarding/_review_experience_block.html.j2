@@ -1,0 +1,26 @@
+{% set exp = block.experience %}
+<article id="review-experience-{{ exp.id }}" class="border border-border bg-surface rounded p-4">
+  <header class="flex items-baseline justify-between gap-3 mb-3">
+    <div>
+      <div class="font-semibold">{{ exp.company }} · <span class="font-normal">{{ exp.role }}</span></div>
+      <div class="text-xs text-text-muted">{{ exp.start_date or "—" }} → {{ exp.end_date or "present" }}</div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-text-muted">{{ block.verified_count }}/{{ block.total_count }} verified</span>
+      {% if block.verified_count < block.total_count %}
+        <button
+          class="text-xs bg-success text-white rounded px-2 py-1"
+          hx-post="/review/experiences/{{ exp.id }}/verify-all"
+          hx-target="#review-experience-{{ exp.id }}"
+          hx-swap="outerHTML"
+        >Verify all</button>
+      {% endif %}
+    </div>
+  </header>
+
+  <ul id="review-bullets-{{ exp.id }}" class="space-y-2">
+    {% for tagged in block.bullets %}
+      {% include "onboarding/_review_bullet.html.j2" %}
+    {% endfor %}
+  </ul>
+</article>

@@ -1,0 +1,61 @@
+{% extends "base.html.j2" %}
+{% block title %}Targets — Matchbox{% endblock %}
+
+{% block content %}
+<section class="space-y-2 mb-6">
+  <h1 class="text-xl font-semibold">Targets</h1>
+  <p class="text-sm text-text-muted">
+    What you are looking for. Used for scoring jobs and for routing the right summary variant
+    per CV.
+  </p>
+</section>
+
+<form
+  class="space-y-4 border border-border bg-surface rounded p-4"
+  hx-post="/targets"
+  hx-target="#targets-saved"
+  hx-swap="outerHTML"
+>
+  <label class="block">
+    <span class="block text-sm font-medium mb-1">Role families</span>
+    <textarea class="w-full border border-border rounded px-2 py-1 text-sm" name="role_families" rows="2" placeholder="One per line or comma-separated">{{ target.role_families | join("\n") }}</textarea>
+    <span class="text-xs text-text-muted">e.g. forward-deployed-engineer, ml-platform-engineer</span>
+  </label>
+
+  <label class="block">
+    <span class="block text-sm font-medium mb-1">Dream companies</span>
+    <textarea class="w-full border border-border rounded px-2 py-1 text-sm" name="dream_companies" rows="2" placeholder="One per line or comma-separated">{{ target.dream_companies | join("\n") }}</textarea>
+  </label>
+
+  <label class="block">
+    <span class="block text-sm font-medium mb-1">Locations</span>
+    <textarea class="w-full border border-border rounded px-2 py-1 text-sm" name="locations" rows="2" placeholder="e.g. remote, sf, london">{{ target.locations | join("\n") }}</textarea>
+  </label>
+
+  <fieldset class="grid grid-cols-3 gap-2">
+    <legend class="text-sm font-medium mb-1 col-span-3">Comp expectation</legend>
+    <label class="text-xs text-text-muted">
+      Min
+      <input class="block w-full border border-border rounded px-2 py-1 text-sm" name="comp_min" value="{{ target.comp.min if target.comp.min is defined else '' }}" placeholder="e.g. 180000" />
+    </label>
+    <label class="text-xs text-text-muted">
+      Max
+      <input class="block w-full border border-border rounded px-2 py-1 text-sm" name="comp_max" value="{{ target.comp.max if target.comp.max is defined else '' }}" placeholder="e.g. 260000" />
+    </label>
+    <label class="text-xs text-text-muted">
+      Currency
+      <input class="block w-full border border-border rounded px-2 py-1 text-sm" name="comp_currency" value="{{ target.comp.currency if target.comp.currency is defined else 'USD' }}" />
+    </label>
+  </fieldset>
+
+  <label class="block">
+    <span class="block text-sm font-medium mb-1">Exclusions</span>
+    <textarea class="w-full border border-border rounded px-2 py-1 text-sm" name="exclusions" rows="2" placeholder="e.g. defense, gambling, on-site-only">{{ target.exclusions | join("\n") }}</textarea>
+  </label>
+
+  <div class="flex items-center gap-3">
+    <button class="bg-accent text-white rounded px-3 py-1 text-sm">Save targets</button>
+    <span id="targets-saved" class="text-xs text-text-muted"></span>
+  </div>
+</form>
+{% endblock %}

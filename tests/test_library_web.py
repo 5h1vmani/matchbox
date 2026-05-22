@@ -33,7 +33,15 @@ def test_index_page_renders(client: TestClient) -> None:
     assert "Add experience" in r.text
 
 
-def test_root_redirects_to_library(client: TestClient) -> None:
+def test_root_redirects_to_onboarding_when_empty(client: TestClient) -> None:
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers["location"] == "/onboarding"
+
+
+def test_root_redirects_to_library_when_profile_exists(client: TestClient) -> None:
+    # Once any experience exists, the root sends the user to the library.
+    client.post("/library/experiences", data={"company": "Modal", "role": "FDE"})
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 302
     assert r.headers["location"] == "/library"

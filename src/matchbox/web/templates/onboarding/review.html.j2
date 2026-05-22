@@ -1,0 +1,35 @@
+{% extends "base.html.j2" %}
+{% block title %}Review — Matchbox{% endblock %}
+
+{% block content %}
+<section class="space-y-2 mb-6">
+  <h1 class="text-xl font-semibold">Review</h1>
+  <p class="text-sm text-text-muted">
+    The brain extracted these components from your files. Read each one. Fix the wording
+    where needed. Delete noise. Confirm what is true.
+    Only verified components are eligible for tailoring.
+  </p>
+  <p class="text-xs text-text-muted">
+    {{ unverified_bullets }} bullet{{ "" if unverified_bullets == 1 else "s" }} and
+    {{ unverified_projects }} project{{ "" if unverified_projects == 1 else "s" }} still need verification.
+  </p>
+</section>
+
+<section class="mb-12">
+  <h2 class="text-lg font-semibold mb-3">Experience</h2>
+  <div id="review-experiences" class="space-y-4">
+    {% for block in experience_blocks %}
+      {% include "onboarding/_review_experience_block.html.j2" %}
+    {% endfor %}
+  </div>
+</section>
+
+<section class="mb-12">
+  <h2 class="text-lg font-semibold mb-3">Projects</h2>
+  <div id="review-projects" class="space-y-2">
+    {% for tagged in projects %}
+      {% include "onboarding/_review_project.html.j2" %}
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

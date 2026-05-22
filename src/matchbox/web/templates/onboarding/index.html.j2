@@ -1,0 +1,63 @@
+{% extends "base.html.j2" %}
+{% block title %}Onboarding — Matchbox{% endblock %}
+
+{% block content %}
+<section class="space-y-2 mb-6">
+  <h1 class="text-xl font-semibold">Onboarding</h1>
+  <p class="text-sm text-text-muted">
+    Drop in old CVs, LinkedIn exports, plain-text notes, anything that describes your work.
+    The more you give, the better. Files stay on this machine.
+  </p>
+</section>
+
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+  <form
+    class="border border-border bg-surface rounded p-4"
+    hx-post="/onboarding/upload"
+    hx-encoding="multipart/form-data"
+    hx-target="#staged-list"
+    hx-swap="outerHTML"
+  >
+    <label class="block text-sm font-medium mb-2">Add files</label>
+    <input class="block w-full text-sm" type="file" name="files" multiple required />
+    <p class="text-xs text-text-muted mt-2">PDF, DOCX, DOC, TXT, MD, JSON, HTML, RTF · 25 MB max each.</p>
+    <button class="mt-3 bg-accent text-white rounded px-3 py-1 text-sm">Stage files</button>
+  </form>
+
+  <form
+    class="border border-border bg-surface rounded p-4"
+    hx-post="/onboarding/paste"
+    hx-target="#staged-list"
+    hx-swap="outerHTML"
+    hx-on::after-request="if (event.detail.successful) this.reset()"
+  >
+    <label class="block text-sm font-medium mb-2">Paste notes</label>
+    <textarea class="w-full border border-border rounded px-2 py-1 text-sm" name="text" rows="6" placeholder="Type any rough stories, descriptions, achievements…"></textarea>
+    <button class="mt-3 bg-accent text-white rounded px-3 py-1 text-sm">Stage paste</button>
+  </form>
+</section>
+
+<section class="mb-8">
+  <h2 class="text-lg font-semibold mb-2">Staged</h2>
+  {% include "onboarding/_staged_list.html.j2" %}
+</section>
+
+<section class="mb-8 border border-border bg-surface rounded p-4">
+  <h2 class="text-lg font-semibold mb-2">Now run the brain</h2>
+  <p class="text-sm text-text-muted mb-3">
+    Open a terminal in this repo and run Claude Code. Paste the prompt below.
+    Matchbox holds no LLM credentials — Claude Code is the reasoning engine.
+  </p>
+  <pre class="bg-bg border border-border rounded text-xs p-3 overflow-auto select-all">ingest my files</pre>
+  <p class="text-xs text-text-muted mt-2">
+    The brain will read everything in <code>inbox/</code>, extract experiences, bullets,
+    projects, skills, and tags, then call <code>matchbox-ingest</code> to write them. Come back to
+    <a class="text-accent underline" href="/review">/review</a> to confirm them.
+  </p>
+</section>
+
+<section>
+  <h2 class="text-lg font-semibold mb-2">Then set your targets</h2>
+  <a href="/targets" class="bg-accent text-white rounded px-3 py-1 text-sm inline-block">Open targets form</a>
+</section>
+{% endblock %}

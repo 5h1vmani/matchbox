@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterator
+from typing import Annotated
+
+from fastapi import Depends
 
 from matchbox.core.db import connect
 from matchbox.core.migrations import migrate
@@ -22,3 +25,6 @@ def get_conn() -> Iterator[sqlite3.Connection]:
         yield conn
     finally:
         conn.close()
+
+
+ConnDep = Annotated[sqlite3.Connection, Depends(get_conn)]
