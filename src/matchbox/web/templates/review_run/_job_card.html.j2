@@ -48,10 +48,32 @@
   {% endif %}
 
   {% if job.cv_status == "done" and job.cv_path %}
-    <div class="mb-2">
+    <div class="mb-2 flex items-center gap-3 flex-wrap">
       <a class="text-xs text-accent underline" href="/runs/{{ run_id }}/output/{{ job.job_id }}/cv.pdf" target="_blank">
         Open CV PDF ↗
       </a>
+      <form
+        class="flex items-center gap-2 text-xs"
+        hx-post="/review-run/{{ run_id }}/jobs/{{ job.job_id }}/restyle"
+        hx-target="#job-card-{{ job.job_id }}"
+        hx-swap="outerHTML"
+      >
+        <label>palette
+          <select name="palette" class="border border-border rounded px-1 py-0.5 text-xs">
+            {% for p in ["slate", "ink", "forest", "claret", "bronze"] %}
+              <option value="{{ p }}" {% if p == job.palette %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>font
+          <select name="font" class="border border-border rounded px-1 py-0.5 text-xs">
+            {% for f in ["source-serif", "source-sans", "inter", "atkinson-hyperlegible"] %}
+              <option value="{{ f }}" {% if f == job.font %}selected{% endif %}>{{ f }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="underline text-text-muted">Re-render</button>
+      </form>
     </div>
     <iframe
       src="/runs/{{ run_id }}/output/{{ job.job_id }}/cv.pdf"

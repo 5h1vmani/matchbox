@@ -20,9 +20,13 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from jsonschema import Draft202012Validator
 
+from matchbox.assemble import re_render_cv
 from matchbox.core.db import PROJECT_ROOT
 from matchbox.web.deps import ConnDep
 from matchbox.web.templates_env import templates
+
+PALETTES = ["slate", "ink", "forest", "claret", "bronze"]
+FONTS = ["source-serif", "source-sans", "inter", "atkinson-hyperlegible"]
 
 router = APIRouter()
 
@@ -149,6 +153,33 @@ def job_card(request: Request, run_id: str, job_id: int, conn: ConnDep) -> HTMLR
         "review_run/_job_card.html.j2",
         {"run_id": run_id, "job": job},
     )
+
+
+@router.post("/review-run/{run_id}/jobs/{job_id}/restyle", response_class=HTMLResponse)
+def restyle_cv(
+    request: Request,
+    run_id: str,
+    job_id: int,
+    conn: ConnDep,
+    palette: Annotated[str, Form()],
+    font: Annotated[str, Form()],
+) -> HTMLResponse:
+    """Re-render the CV PDF with a new palette/font. No brain involved —
+    cv.json is already on disk."""
+    if palette not in PALETTES:
+        raise HTTPException(status_code=400, detail=f"unknown palette: {palette}")
+    if font not in FONTS:
+        raise HTTPException(status_code=400, detail=f"unknown font: {font}")
+    try:
+        re_render_cv(run_id=run_id, job_id=job_id, palette=palette, font=font)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    # Persist the new choice on the run_job row so the next render uses it.
+    conn.execute(
+        "UPDATE run_job SET palette = ?, font = ? WHERE run_id = ? AND job_id = ?",
+        (palette, font, run_id, job_id),
+    )
+    return job_card(request=request, run_id=run_id, job_id=job_id, conn=conn)
 
 
 @router.post("/review-run/{run_id}/jobs/{job_id}/applied", response_class=HTMLResponse)

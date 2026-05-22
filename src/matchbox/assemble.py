@@ -22,6 +22,7 @@ import sqlite3
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -46,6 +47,7 @@ from matchbox.matching.select import (
 RUNS_DIR = PROJECT_ROOT / "runs"
 TEMPLATE_DIR = PROJECT_ROOT / "src" / "matchbox" / "templates" / "typst"
 CV_TEMPLATE = TEMPLATE_DIR / "cv.typ"
+COVER_TEMPLATE = TEMPLATE_DIR / "cover.typ"
 DEFAULT_K = 12  # max bullets across all roles
 
 
@@ -371,6 +373,111 @@ def _requirement_synth_id(job_id: int, idx: int) -> int:
     return job_id * 10_000 + idx
 
 
+# ─── re-render path (palette/font swap, no selection) ────────────────
+
+
+def re_render_cv(
+    *,
+    run_id: str,
+    job_id: int,
+    palette: str,
+    font: str,
+) -> Path:
+    """Re-render a finished CV with a new palette/font. Requires cv.json
+    to exist in the output dir. No DB / no brain involvement."""
+    out_dir = RUNS_DIR / run_id / "output" / str(job_id)
+    cv_json_path = out_dir / "cv.json"
+    if not cv_json_path.exists():
+        raise FileNotFoundError(f"cv.json not found for run {run_id}, job {job_id}. Tailor first.")
+    cv_pdf_path = out_dir / "cv.pdf"
+    _render_pdf(cv_json_path, cv_pdf_path, palette, font)
+    return cv_pdf_path
+
+
+# ─── cover letter render ──────────────────────────────────────────────
+
+
+def _render_cover_pdf(
+    cover_txt_path: Path,
+    cover_meta_path: Path,
+    out_path: Path,
+    palette: str,
+    font: str,
+) -> None:
+    typst = _ensure_typst()
+    root_dir = cover_txt_path.parent
+    local_template = root_dir / "cover.typ"
+    shutil.copy2(COVER_TEMPLATE, local_template)
+    cmd = [
+        typst,
+        "compile",
+        str(local_template),
+        str(out_path),
+        "--root",
+        str(root_dir),
+        "--input",
+        f"data={cover_txt_path.name}",
+        "--input",
+        f"meta={cover_meta_path.name}",
+        "--input",
+        f"palette={palette}",
+        "--input",
+        f"font={font}",
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"typst compile failed (rc={proc.returncode}):\n{proc.stderr or proc.stdout}"
+        )
+
+
+def assemble_cover(
+    *,
+    conn: sqlite3.Connection,
+    run_id: str,
+    job_id: int,
+    palette: str,
+    font: str,
+) -> Path:
+    """Render cover.txt → cover.pdf. The brain writes cover.txt; this
+    builds cover_meta.json from the profile + job, then calls Typst."""
+    job = _load_job(conn, job_id)
+    profile = _load_profile(conn)
+
+    out_dir = RUNS_DIR / run_id / "output" / str(job_id)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cover_txt = out_dir / "cover.txt"
+    if not cover_txt.exists():
+        raise FileNotFoundError(
+            f"cover.txt missing at {cover_txt}. The brain writes the body; "
+            "this renderer formats it."
+        )
+
+    contact: list[str] = []
+    if profile.get("email"):
+        contact.append(str(profile["email"]))
+    if profile.get("phone"):
+        contact.append(str(profile["phone"]))
+    if profile.get("location"):
+        contact.append(str(profile["location"]))
+    contact.extend(json.loads(str(profile.get("links_json") or "[]")))
+
+    meta = {
+        "candidate_name": str(profile.get("full_name", "Your Name")),
+        "contact": contact,
+        "date": datetime.now(UTC).strftime("%B %d, %Y"),
+        "recipient": ["Hiring Team", str(job["company"])],
+        "salutation": "Dear Hiring Team,",
+        "closing": "Sincerely,",
+    }
+    cover_meta = out_dir / "cover_meta.json"
+    cover_meta.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+    cover_pdf = out_dir / "cover.pdf"
+    _render_cover_pdf(cover_txt, cover_meta, cover_pdf, palette, font)
+    return cover_pdf
+
+
 def _palette_and_font_for(
     conn: sqlite3.Connection,
     run_id: str,
@@ -389,19 +496,34 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", required=True, help="run id (YYYY-MM-DD-NNN)")
     parser.add_argument("--job", required=True, type=int, help="job id")
-    parser.add_argument("--cover", action="store_true", help="render the cover letter instead")
+    parser.add_argument(
+        "--cover",
+        action="store_true",
+        help="render the cover letter (reads cover.txt the brain wrote)",
+    )
     parser.add_argument("--db", type=Path, default=None, help="override DB path")
     args = parser.parse_args(argv)
-
-    if args.cover:
-        # Cover-letter rendering lands in M7 — placeholder for now.
-        print("--cover: cover letters land in M7", file=sys.stderr)
-        return 4
 
     conn = connect(args.db) if args.db else connect()
     try:
         migrate(conn)
         palette, font = _palette_and_font_for(conn, args.run, args.job)
+
+        if args.cover:
+            try:
+                cover_path = assemble_cover(
+                    conn=conn,
+                    run_id=args.run,
+                    job_id=args.job,
+                    palette=palette,
+                    font=font,
+                )
+            except FileNotFoundError as e:
+                print(f"error: {e}", file=sys.stderr)
+                return 5
+            print(f"cover: {cover_path}")
+            return 0
+
         result = assemble_one(
             conn=conn,
             run_id=args.run,
