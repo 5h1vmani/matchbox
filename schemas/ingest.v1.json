@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matchbox.local/schemas/ingest.v1.json",
+  "title": "Onboarding ingest payload (brain → app)",
+  "description": "Written by the brain after parsing files in inbox/. Consumed by `python -m matchbox.onboarding.ingest_cli`. All rows land with facts_verified = false (where the column exists); the user confirms them in the review screen.",
+  "type": "object",
+  "required": ["schema_version"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "full_name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "location": { "type": "string" },
+        "links": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "headline": { "type": "string" }
+      }
+    },
+    "experiences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["company", "role"],
+        "additionalProperties": false,
+        "properties": {
+          "company": { "type": "string", "minLength": 1 },
+          "role": { "type": "string", "minLength": 1 },
+          "start_date": { "type": ["string", "null"] },
+          "end_date": { "type": ["string", "null"] },
+          "location": { "type": ["string", "null"] },
+          "sort_order": { "type": "integer", "default": 0 },
+          "bullets": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/bullet" }
+          }
+        }
+      }
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "text": { "type": "string", "minLength": 1 },
+          "url": { "type": ["string", "null"] },
+          "tags": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/tag" }
+          }
+        }
+      }
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "category": { "type": ["string", "null"] },
+          "proficiency": {
+            "type": ["string", "null"],
+            "enum": [null, "working", "fluent", "expert"]
+          },
+          "tags": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/tag" }
+          }
+        }
+      }
+    },
+    "summaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "text": { "type": "string", "minLength": 1 },
+          "tags": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/tag" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "bullet": {
+      "type": "object",
+      "required": ["text"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "has_metric": { "type": "boolean", "default": false },
+        "source_file": { "type": ["string", "null"] },
+        "tags": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tag" }
+        }
+      }
+    },
+    "tag": {
+      "type": "object",
+      "required": ["facet", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "facet": {
+          "type": "string",
+          "enum": ["role_family", "tech", "seniority", "impact"]
+        },
+        "value": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
