@@ -1,0 +1,31 @@
+{% extends "base.html.j2" %}
+{% block title %}Run {{ run.id }} — Matchbox{% endblock %}
+
+{% block content %}
+<section class="space-y-2 mb-6">
+  <h1 class="text-xl font-semibold">Run {{ run.id }}</h1>
+  <div class="text-xs text-text-muted">
+    Created {{ run.created_at[:16] }} · top-level status:
+    <span class="font-medium">{{ status.status if status else "queued" }}</span>
+    {% if status and status.error %}<span class="text-danger">({{ status.error }})</span>{% endif %}
+  </div>
+  <div class="text-xs text-text-muted">
+    Polling <code>runs/{{ run.id }}/status.json</code> every 3 seconds while jobs are in flight.
+    <a class="underline" href="/runs">All runs</a>
+  </div>
+</section>
+
+<section class="space-y-4">
+  {% for job in jobs %}
+    <div
+      hx-get="/review-run/{{ run.id }}/jobs/{{ job.job_id }}/card"
+      {% if job.cv_status not in ("done", "skipped", "error") or (job.want_cover and job.cover_status not in ("done", "skipped", "error")) %}
+      hx-trigger="every 3s"
+      {% endif %}
+      hx-swap="outerHTML"
+    >
+      {% include "review_run/_job_card.html.j2" %}
+    </div>
+  {% endfor %}
+</section>
+{% endblock %}

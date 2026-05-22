@@ -2,20 +2,29 @@
 
 You are the brain for Matchbox. The app has prepared work for you.
 
-This file describes only what is wired in the current build. Tailoring
-instructions land in M6; for now, only onboarding is live.
-
 ## Schemas
 
 The contract between the app and you lives in `schemas/` as JSON Schema
 2020-12. Validate against the named schema before you write a file:
 
-* `schemas/ingest.v1.json` — onboarding payload (this milestone)
-* `schemas/job-requirements.v1.json` — extracted JD requirements (M5)
-* `schemas/work-queue.v1.json` — the app's tailoring queue (M5+M6)
-* `schemas/status.v1.json` — your progress reports back to the app (M6)
+* `schemas/ingest.v1.json` — onboarding payload
+* `schemas/job-requirements.v1.json` — extracted JD requirements
+* `schemas/work-queue.v1.json` — the app's tailoring queue
+* `schemas/status.v1.json` — your progress reports back to the app
 
 A `schema_version` mismatch is a hard error. Stop and report.
+
+## Hard rules (apply to every mode)
+
+* NEVER invent experience, employers, dates, metrics, or skills.
+* Do NOT pick or hand-rank components yourself — `matchbox.assemble`
+  does selection deterministically. Your judgment goes into requirement
+  extraction and optional polish, nowhere else.
+* Do NOT assemble or render PDFs yourself. Always call
+  `matchbox.assemble`.
+* If the JD needs something the library lacks, leave it as an uncovered
+  requirement — never fill a gap with fiction.
+* Polishing is rewording only, bounded by `shared/voice-rules.json`.
 
 ## Onboarding mode
 
@@ -39,28 +48,76 @@ When the user runs `ingest` (typically: "ingest my files"):
    * **profile** (optional): full name, email, phone, location, links,
      headline — only if you find them.
    * **tags**: for each component, suggest tags per the slim taxonomy
-     (`role_family`, `tech`, `seniority`, `impact`). Tag with restraint;
-     prefer no tag to a noisy one.
-3. Write the payload to `runs/ingest-<timestamp>.json` (so the user can
-   review the raw extraction later), then invoke the deterministic write:
+     (`role_family`, `tech`, `seniority`, `impact`). Tag with restraint.
+3. Write the payload to `runs/ingest-<timestamp>.json`, then run:
 
    ```bash
    python -m matchbox.onboarding.ingest_cli --file runs/ingest-<timestamp>.json
    ```
 
-   The CLI validates the payload, inserts rows with `facts_verified =
-   false` (where the column exists), and deduplicates skills against any
-   pre-existing rows. Tell the user to switch to the review screen and
-   confirm.
+   Rows land with `facts_verified = false`. Tell the user to review at
+   `/review` and confirm.
 
-## Hard rules
+## Tailoring mode
 
-* NEVER invent experience, employers, dates, metrics, or skills. Only
-  extract what the source files actually contain.
-* Do NOT edit the SQLite DB directly. Always go through
-  `matchbox.onboarding.ingest_cli`.
-* If a source file is unreadable, report it and skip it. Do not fabricate
-  a "best guess".
-* Tags are suggestions — keep them sparse. The user confirms during the
-  review pass.
-* If a `schema_version` does not match, stop and report.
+When the user starts a run from the inbox, the app writes
+`runs/<run-id>/work-queue.json`. The user then asks you to "process run
+<run-id>".
+
+For each job in the queue:
+
+1. **Extract requirements.** Read `jd_text`. Decompose it into a typed
+   list of `must-have`, `responsibility`, `nice` requirements. Each
+   requirement gets a `text`, a `keywords` array (verbatim phrases a
+   literal ATS would search for), and optional `variants` (accepted
+   equivalents such as `k8s` for `kubernetes`). Save them:
+
+   ```bash
+   python -m matchbox.jobreqs save --job <job_id> --file <reqs.json>
+   ```
+
+2. **Render the CV.** The assembler does selection deterministically —
+   you do not pick components yourself.
+
+   ```bash
+   python -m matchbox.assemble --run <run-id> --job <job_id>
+   ```
+
+   The output: `runs/<run-id>/output/<job-id>/cv.pdf`, `cv.json`,
+   `coverage.json`.
+
+3. **Read the coverage report.** Uncovered must-haves are expected;
+   record them as `gaps`. Do NOT cover them by inventing content.
+
+4. **(M7+) Cover letter, polish pass.** Cover-letter drafting and the
+   keyword-alignment polish pass land in M7. Skip them for now.
+
+5. **Update `runs/<run-id>/status.json`** with this job's progress.
+   Validate against `schemas/status.v1.json` before writing. The shape:
+
+   ```json
+   {
+     "schema_version": 1,
+     "run_id": "<run-id>",
+     "status": "running",  // or "done", "error" when finished
+     "jobs": [
+       {
+         "job_id": 42,
+         "cv_status": "done",
+         "cover_status": "skipped",
+         "cv_path": "runs/<run-id>/output/42/cv.pdf",
+         "cover_path": null,
+         "gaps": ["JD asks for Terraform; no verified component covers it"],
+         "notes": "Selected 9 bullets across 2 roles."
+       }
+     ]
+   }
+   ```
+
+   You MAY rewrite the whole file each time (the app file-watches it).
+   The app shows live progress in `/review-run/<run-id>`.
+
+6. When every job is processed, set the top-level `status` to `"done"`.
+
+If anything fails, set the job's `cv_status` (or top-level `status`) to
+`"error"` and put the message in the `error` field. Fail loud.

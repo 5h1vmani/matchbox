@@ -1,0 +1,36 @@
+{% extends "base.html.j2" %}
+{% block title %}Runs — Matchbox{% endblock %}
+
+{% block content %}
+<section class="space-y-2 mb-6">
+  <h1 class="text-xl font-semibold">Runs</h1>
+  <p class="text-sm text-text-muted">Every tailoring run, newest first.</p>
+</section>
+
+{% if not runs %}
+  <p class="text-sm text-text-muted">No runs yet. <a class="underline" href="/inbox">Triage the inbox</a> to start one.</p>
+{% else %}
+  <table class="w-full text-sm border border-border bg-surface rounded">
+    <thead class="bg-bg text-xs text-text-muted text-left">
+      <tr>
+        <th class="px-2 py-1">Run id</th>
+        <th class="px-2 py-1">Created</th>
+        <th class="px-2 py-1">Status</th>
+        <th class="px-2 py-1">Jobs</th>
+        <th class="px-2 py-1">Applied</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in runs %}
+        <tr class="border-t border-border">
+          <td class="px-2 py-1 font-mono text-xs"><a class="underline" href="/review-run/{{ r.id }}">{{ r.id }}</a></td>
+          <td class="px-2 py-1 text-xs">{{ r.created_at[:16] }}</td>
+          <td class="px-2 py-1 text-xs">{{ r.status }}</td>
+          <td class="px-2 py-1 text-xs">{{ r.job_count }}</td>
+          <td class="px-2 py-1 text-xs">{{ r.applied_count }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+{% endblock %}
