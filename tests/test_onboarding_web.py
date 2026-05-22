@@ -157,6 +157,48 @@ def test_review_screen_after_ingest(client_in_tmp: TestClient, tmp_path: Path) -
     assert "verified" in r.text
 
 
+def test_verify_all_globally(client_in_tmp: TestClient, tmp_path: Path) -> None:
+    """The global verify-all flips every unverified bullet + project at once."""
+    from matchbox.onboarding.ingest_cli import main as ingest_main
+
+    payload = {
+        "schema_version": 1,
+        "experiences": [
+            {
+                "company": "A",
+                "role": "X",
+                "bullets": [{"text": "alpha"}, {"text": "beta"}],
+            },
+            {
+                "company": "B",
+                "role": "Y",
+                "bullets": [{"text": "gamma"}],
+            },
+        ],
+        "projects": [{"name": "P", "text": "a project"}],
+    }
+    payload_path = tmp_path / "p.json"
+    payload_path.write_text(json.dumps(payload))
+    ingest_main(["--file", str(payload_path), "--db", str(tmp_path / "matchbox.db")])
+
+    page_before = client_in_tmp.get("/review").text
+    assert "Verify all unverified" in page_before
+
+    r = client_in_tmp.post("/review/verify-all")
+    assert r.status_code == 200
+    # The refreshed page has zero unverified items.
+    assert "0 bullet" in r.text or "still need verification" not in r.text
+    # The bullets are verified in the DB.
+    from matchbox.core.db import connect
+
+    conn = connect(tmp_path / "matchbox.db")
+    rows = conn.execute("SELECT facts_verified FROM bullet").fetchall()
+    assert all(r["facts_verified"] == 1 for r in rows)
+    proj = conn.execute("SELECT facts_verified FROM project").fetchall()
+    assert all(r["facts_verified"] == 1 for r in proj)
+    conn.close()
+
+
 def test_verify_all_in_experience(client_in_tmp: TestClient, tmp_path: Path) -> None:
     from matchbox.onboarding.ingest_cli import main as ingest_main
 

@@ -13,6 +13,19 @@
     {{ unverified_bullets }} bullet{{ "" if unverified_bullets == 1 else "s" }} and
     {{ unverified_projects }} project{{ "" if unverified_projects == 1 else "s" }} still need verification.
   </p>
+  {% if unverified_bullets or unverified_projects %}
+    <form
+      class="mt-2"
+      hx-post="/review/verify-all"
+      hx-target="main"
+      hx-swap="innerHTML"
+      hx-confirm="Mark every unverified bullet and project as verified? You can still unverify individual items afterward."
+    >
+      <button class="text-xs bg-success text-white rounded px-3 py-1">
+        Verify all unverified
+      </button>
+    </form>
+  {% endif %}
 </section>
 
 <section class="mb-12">

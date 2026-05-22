@@ -105,6 +105,18 @@ def verify_all_in_experience(request: Request, exp_id: int, conn: ConnDep) -> HT
     )
 
 
+@router.post("/review/verify-all", response_class=HTMLResponse)
+def verify_all(request: Request, conn: ConnDep) -> HTMLResponse:
+    """Mark every unverified bullet across the whole library + every
+    unverified project as verified. Returns the refreshed review page
+    so the user can see the change in context.
+    """
+    conn.execute("UPDATE bullet SET facts_verified = 1 WHERE facts_verified = 0")
+    conn.execute("UPDATE project SET facts_verified = 1 WHERE facts_verified = 0")
+    # Re-render the full review screen.
+    return review_index(request=request, conn=conn)
+
+
 @router.post("/review/projects/{project_id}/verify", response_class=HTMLResponse)
 def verify_project(request: Request, project_id: int, conn: ConnDep) -> HTMLResponse:
     conn.execute("UPDATE project SET facts_verified = 1 WHERE id = ?", (project_id,))
