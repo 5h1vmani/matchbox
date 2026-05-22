@@ -135,6 +135,64 @@ def test_changes_md_is_written_with_selected_and_skipped(
     assert "FDE" in md
 
 
+def test_changes_md_keyword_misses_link_to_candidate_bullets(
+    seeded: tuple[sqlite3.Connection, Path, int],
+) -> None:
+    """A must-have keyword the rendered PDF does not literally contain
+    should list the top selected bullets that could carry it after polish."""
+    conn, tmp_path, job_id = seeded
+    # Replace requirements with one whose keyword is unlikely to appear
+    # in the rendered text but matches semantically against the
+    # Kubernetes bullet.
+    conn.execute(
+        "UPDATE job SET requirements_json = ?",
+        (
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "job_id": job_id,
+                    "model_version": "t",
+                    "requirements": [
+                        {
+                            "type": "must-have",
+                            "text": "Operate Kubernetes clusters",
+                            "keywords": ["k8s"],
+                            "variants": [],
+                        }
+                    ],
+                }
+            ),
+        ),
+    )
+    vocab = sorted(
+        set(
+            w
+            for t in [
+                "Operated Kubernetes clusters.",
+                "Built ETL pipelines.",
+                "Wrote PHP utilities.",
+                "Operate Kubernetes clusters kubernetes k8s",
+            ]
+            for w in tokenize(t)
+        )
+    )
+    result = assemble_one(
+        conn=conn,
+        run_id="2026-05-22-003",
+        job_id=job_id,
+        palette="slate",
+        font="source-serif",
+        embedder=FakeEmbedder(vocab=vocab),
+        coverage_floor=0.2,
+    )
+    md = result.changes_md_path.read_text()
+    assert "ATS keyword misses" in md
+    assert "Operate Kubernetes clusters" in md
+    # The candidate bullets section appears for the miss.
+    assert "Polish candidates" in md
+    assert "Operated Kubernetes clusters." in md
+
+
 def test_changes_md_lists_uncovered_must_haves(
     seeded: tuple[sqlite3.Connection, Path, int],
 ) -> None:

@@ -134,6 +134,10 @@ def _write_changes_md(
     raw_bullets: dict[int, dict[str, Any]],
     semantic_gaps: list[str],
     keyword_presence: list[Any],
+    components: list[Component] | None = None,
+    requirements: list[Requirement] | None = None,
+    similarity_matrix: Any = None,
+    candidate_count: int = 2,
 ) -> Path:
     """Write a human-readable summary of what changed vs. the master library.
 
@@ -216,8 +220,40 @@ def _write_changes_md(
             "if doing so remains truthful."
         )
         lines.append("")
+        # Build a sim lookup by requirement text → column index.
+        req_idx_by_text: dict[str, int] = {}
+        if requirements is not None:
+            for ridx, r in enumerate(requirements):
+                req_idx_by_text[r.text] = ridx
+        comp_idx_by_id: dict[int, int] = {}
+        if components is not None:
+            for cidx, c in enumerate(components):
+                comp_idx_by_id[c.id] = cidx
+
         for kp in missing_keywords:
-            lines.append(f"- {kp.requirement_text}")
+            lines.append(f"- **{kp.requirement_text}**")
+            req_idx = req_idx_by_text.get(kp.requirement_text)
+            if (
+                req_idx is not None
+                and similarity_matrix is not None
+                and components is not None
+                and similarity_matrix.size
+            ):
+                # Score each selected bullet against this requirement;
+                # surface the top N as polish candidates.
+                candidates: list[tuple[int, float]] = []
+                for cid in selected_ids:
+                    comp_idx = comp_idx_by_id.get(cid)
+                    if comp_idx is None:
+                        continue
+                    sim = float(similarity_matrix[comp_idx, req_idx])
+                    candidates.append((cid, sim))
+                candidates.sort(key=lambda x: -x[1])
+                top = [c for c in candidates if c[0] in raw_bullets][:candidate_count]
+                if top:
+                    lines.append("  Polish candidates (highest semantic similarity):")
+                    for cid, sim in top:
+                        lines.append(f"    - ({sim:.2f}) {raw_bullets[cid]['text']}")
         lines.append("")
 
     out_path = out_dir / "changes.md"
@@ -479,6 +515,9 @@ def assemble_one(
         job_company=str(job["company"]),
         job_title=str(job["title"]),
         selected_ids=result.selected_ids,
+        components=components,
+        requirements=requirements,
+        similarity_matrix=result.similarity_matrix,
         relevance=result.relevance_by_component,
         raw_bullets=raw_bullets,
         semantic_gaps=semantic_gaps,
