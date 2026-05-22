@@ -12,12 +12,13 @@ that resolves paths and refuses anything that escapes that directory.
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from jsonschema import Draft202012Validator
 
 from matchbox.assemble import drift_check, re_render_cv
@@ -251,6 +252,76 @@ def mark_applied(
     conn.execute("UPDATE job SET status = 'applied' WHERE id = ?", (job_id,))
     # Re-render the card with applied state.
     return job_card(request=request, run_id=run_id, job_id=job_id, conn=conn)
+
+
+# ─── abandon / delete run ─────────────────────────────────────────────
+
+
+@router.post("/runs/{run_id}/abandon", response_class=HTMLResponse)
+def abandon_run(request: Request, run_id: str, conn: ConnDep) -> HTMLResponse:
+    """Mark a run dead so the user can move on.
+
+    Sets run.status = 'error' (terminal — the index will stop polling
+    pending cards). Any jobs that were 'selected' but never reached
+    'tailored' or 'applied' fall back to 'scored' so they reappear in
+    /inbox. Tailored / applied jobs are intentionally left in place —
+    their artifacts still exist and the apply records still matter.
+    """
+    row = conn.execute("SELECT status FROM run WHERE id = ?", (run_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"no such run: {run_id}")
+    if row["status"] in ("done", "error"):
+        # Already terminal; harmless no-op.
+        return runs_index(request=request, conn=conn)
+    conn.execute("UPDATE run SET status = 'error' WHERE id = ?", (run_id,))
+    conn.execute(
+        """
+        UPDATE job
+           SET status = 'scored'
+         WHERE id IN (SELECT job_id FROM run_job WHERE run_id = ?)
+           AND status = 'selected'
+        """,
+        (run_id,),
+    )
+    return runs_index(request=request, conn=conn)
+
+
+@router.delete("/runs/{run_id}", response_class=Response)
+def delete_run(run_id: str, conn: ConnDep) -> Response:
+    """Delete a run row, its run_job links, its application rows, and
+    its runs/<id>/ directory on disk.
+
+    The job rows themselves stay — those came from ATS scans and belong
+    to the inbox. Their .status field is reset to 'scored' so the user
+    can re-queue them. cv.pdf / cover.pdf for an already-applied job
+    are gone after this; the user is told so by the confirm dialog.
+    """
+    row = conn.execute("SELECT 1 FROM run WHERE id = ?", (run_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"no such run: {run_id}")
+    # Reset the jobs that were touched by this run.
+    conn.execute(
+        """
+        UPDATE job
+           SET status = CASE WHEN status IN ('selected', 'tailored') THEN 'scored' ELSE status END
+         WHERE id IN (SELECT job_id FROM run_job WHERE run_id = ?)
+        """,
+        (run_id,),
+    )
+    conn.execute("DELETE FROM application WHERE run_id = ?", (run_id,))
+    conn.execute("DELETE FROM run_job WHERE run_id = ?", (run_id,))
+    conn.execute("DELETE FROM run WHERE id = ?", (run_id,))
+
+    # Tear down the on-disk artifacts. Refuse to follow a symlink as the
+    # run directory.
+    run_dir = (RUNS_DIR / run_id).resolve()
+    try:
+        run_dir.relative_to(RUNS_DIR.resolve())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="run id escapes runs/") from e
+    if run_dir.exists() and run_dir.is_dir():
+        shutil.rmtree(run_dir)
+    return Response(status_code=200)
 
 
 # ─── sandboxed PDF serving ─────────────────────────────────────────────

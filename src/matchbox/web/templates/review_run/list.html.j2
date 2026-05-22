@@ -18,16 +18,35 @@
         <th class="px-2 py-1">Status</th>
         <th class="px-2 py-1">Jobs</th>
         <th class="px-2 py-1">Applied</th>
+        <th class="px-2 py-1"></th>
       </tr>
     </thead>
     <tbody>
       {% for r in runs %}
-        <tr class="border-t border-border">
+        <tr id="run-row-{{ r.id }}" class="border-t border-border">
           <td class="px-2 py-1 font-mono text-xs"><a class="underline" href="/review-run/{{ r.id }}">{{ r.id }}</a></td>
           <td class="px-2 py-1 text-xs">{{ r.created_at[:16] }}</td>
           <td class="px-2 py-1 text-xs">{{ r.status }}</td>
           <td class="px-2 py-1 text-xs">{{ r.job_count }}</td>
           <td class="px-2 py-1 text-xs">{{ r.applied_count }}</td>
+          <td class="px-2 py-1 text-xs text-right space-x-3 whitespace-nowrap">
+            {% if r.status in ("queued", "running") %}
+              <button
+                class="text-text-muted underline"
+                hx-post="/runs/{{ r.id }}/abandon"
+                hx-target="main"
+                hx-swap="innerHTML"
+                hx-confirm="Mark run {{ r.id }} as dead and free its jobs to be re-queued from /inbox?"
+              >Abandon</button>
+            {% endif %}
+            <button
+              class="text-danger underline"
+              hx-delete="/runs/{{ r.id }}"
+              hx-target="#run-row-{{ r.id }}"
+              hx-swap="outerHTML"
+              hx-confirm="Delete run {{ r.id }} and remove its PDFs and coverage reports from disk? Applied job records will also be cleared. This cannot be undone."
+            >Delete</button>
+          </td>
         </tr>
       {% endfor %}
     </tbody>

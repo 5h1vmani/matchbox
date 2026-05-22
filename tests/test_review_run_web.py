@@ -236,3 +236,66 @@ def test_runs_index_lists_run(client: TestClient, tmp_path: Path) -> None:
 def test_unknown_run_is_404(client: TestClient) -> None:
     r = client.get("/review-run/9999-99-99-999")
     assert r.status_code == 404
+
+
+def test_abandon_run_flips_status_and_frees_jobs(client: TestClient, tmp_path: Path) -> None:
+    run_id, job_id = _seed_run_and_job(tmp_path)
+    r = client.post(f"/runs/{run_id}/abandon")
+    assert r.status_code == 200
+
+    import os
+
+    from matchbox.core.db import connect
+
+    conn = connect(Path(os.environ["MATCHBOX_DB"]))
+    run_row = conn.execute("SELECT status FROM run WHERE id = ?", (run_id,)).fetchone()
+    job_row = conn.execute("SELECT status FROM job WHERE id = ?", (job_id,)).fetchone()
+    conn.close()
+    assert run_row["status"] == "error"
+    # The seeded job was 'selected'; abandon flips it back to 'scored'.
+    assert job_row["status"] == "scored"
+
+
+def test_abandon_run_on_already_terminal_is_noop(client: TestClient, tmp_path: Path) -> None:
+    run_id, _ = _seed_run_and_job(tmp_path)
+    # Move run to 'done' directly.
+    import os
+
+    from matchbox.core.db import connect
+
+    conn = connect(Path(os.environ["MATCHBOX_DB"]))
+    conn.execute("UPDATE run SET status = 'done' WHERE id = ?", (run_id,))
+    conn.close()
+
+    r = client.post(f"/runs/{run_id}/abandon")
+    assert r.status_code == 200  # renders the list, harmless
+
+
+def test_delete_run_removes_rows_and_dir(client: TestClient, tmp_path: Path) -> None:
+    run_id, job_id = _seed_run_and_job(tmp_path)
+    out_dir = tmp_path / "runs" / run_id / "output" / str(job_id)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "cv.pdf").write_bytes(b"%PDF-fake")
+
+    r = client.delete(f"/runs/{run_id}")
+    assert r.status_code == 200
+    assert not (tmp_path / "runs" / run_id).exists()
+
+    import os
+
+    from matchbox.core.db import connect
+
+    conn = connect(Path(os.environ["MATCHBOX_DB"]))
+    assert conn.execute("SELECT 1 FROM run WHERE id = ?", (run_id,)).fetchone() is None
+    assert conn.execute("SELECT 1 FROM run_job WHERE run_id = ?", (run_id,)).fetchone() is None
+    # The job row stays, but its status falls back to 'scored'.
+    assert (
+        conn.execute("SELECT status FROM job WHERE id = ?", (job_id,)).fetchone()["status"]
+        == "scored"
+    )
+    conn.close()
+
+
+def test_delete_unknown_run_is_404(client: TestClient) -> None:
+    r = client.delete("/runs/no-such-id")
+    assert r.status_code == 404
