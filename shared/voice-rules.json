@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "_comment": "v0.3 voice rules. Ported from v0.2/voice-rules.yaml. The polish pass and the cover-letter drafter both validate output against this file.",
+  "hard_rules": {
+    "no_em_dashes": true,
+    "no_contractions": true,
+    "no_passive_voice": true
+  },
+  "banned_words": [
+    "leverage",
+    "synergy",
+    "synergize",
+    "passionate about",
+    "spearhead",
+    "orchestrate",
+    "spearheaded",
+    "seasoned",
+    "results-driven",
+    "dynamic",
+    "thought leader",
+    "visionary",
+    "innovative",
+    "cutting-edge",
+    "robust",
+    "scalable",
+    "utilize",
+    "facilitate"
+  ],
+  "banned_openers": [
+    "I am writing to",
+    "I am excited to",
+    "As a [role] with [years]",
+    "I have always been passionate",
+    "Throughout my career",
+    "I am a highly motivated"
+  ],
+  "required_signals": {
+    "min_named_entities_per_150_words": 3,
+    "min_numbers_per_150_words": 2,
+    "min_authenticity_signals": 3
+  },
+  "quality_gates": {
+    "max_word_count_cv_bullet": 25,
+    "min_word_count_cv_bullet": 8,
+    "max_bullets_per_role": 5,
+    "min_bullets_per_role": 2
+  }
+}
