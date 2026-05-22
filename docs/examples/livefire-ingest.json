@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "profile": {
+    "full_name": "Riley Chen",
+    "email": "riley@example.com",
+    "location": "Remote",
+    "links": ["https://github.com/riley-example"],
+    "headline": "Generalist engineer, ML-leaning"
+  },
+  "experiences": [
+    {
+      "company": "Modal",
+      "role": "Forward Deployed Engineer",
+      "start_date": "2024-01",
+      "end_date": null,
+      "location": "Remote",
+      "sort_order": 1,
+      "bullets": [
+        {
+          "text": "Built ETL data pipelines processing 30M rows per day in Python.",
+          "has_metric": true,
+          "source_file": "livefire-sample-cv.md",
+          "tags": [
+            {"facet": "tech", "value": "python"},
+            {"facet": "impact", "value": "metric"}
+          ]
+        },
+        {
+          "text": "Operated Kubernetes clusters across three regions serving ML inference.",
+          "has_metric": false,
+          "source_file": "livefire-sample-cv.md",
+          "tags": [
+            {"facet": "tech", "value": "kubernetes"},
+            {"facet": "tech", "value": "ml"}
+          ]
+        },
+        {
+          "text": "Mentored two junior engineers on streaming systems.",
+          "has_metric": true,
+          "source_file": "livefire-sample-cv.md",
+          "tags": [{"facet": "impact", "value": "scope"}]
+        }
+      ]
+    },
+    {
+      "company": "OldCo",
+      "role": "Junior Engineer",
+      "start_date": "2020-06",
+      "end_date": "2023-12",
+      "location": "NYC",
+      "sort_order": 2,
+      "bullets": [
+        {
+          "text": "Wrote SQL ETL jobs for the analytics team.",
+          "has_metric": false,
+          "source_file": "livefire-sample-cv.md",
+          "tags": [
+            {"facet": "tech", "value": "sql"},
+            {"facet": "tech", "value": "etl"}
+          ]
+        },
+        {
+          "text": "Shipped a Rails monolith feature for the billing module.",
+          "source_file": "livefire-sample-cv.md",
+          "tags": [{"facet": "tech", "value": "rails"}]
+        },
+        {
+          "text": "Built ad hoc PHP scripts for legacy systems.",
+          "source_file": "livefire-sample-cv.md",
+          "tags": [{"facet": "tech", "value": "php"}]
+        }
+      ]
+    }
+  ],
+  "skills": [
+    {"name": "Python", "category": "Languages", "proficiency": "expert"},
+    {"name": "Rust", "category": "Languages", "proficiency": "working"},
+    {"name": "SQL", "category": "Languages", "proficiency": "fluent"},
+    {"name": "Kubernetes", "category": "Infra", "proficiency": "fluent"},
+    {"name": "Docker", "category": "Infra", "proficiency": "fluent"},
+    {"name": "Postgres", "category": "Infra", "proficiency": "fluent"}
+  ],
+  "summaries": [
+    {
+      "label": "ml-focus",
+      "text": "ML-leaning generalist engineer. Five years of production ML systems, two of them on Kubernetes at scale."
+    }
+  ]
+}

@@ -20,13 +20,6 @@ classifiers = [
     "Topic :: Office/Business",
     "Topic :: Utilities",
 ]
-
-[project.urls]
-Homepage = "https://github.com/5h1vmani/matchbox"
-Documentation = "https://github.com/5h1vmani/matchbox/tree/main/docs"
-Repository = "https://github.com/5h1vmani/matchbox"
-Changelog = "https://github.com/5h1vmani/matchbox/blob/main/CHANGELOG.md"
-Issues = "https://github.com/5h1vmani/matchbox/issues"
 dependencies = [
     "pydantic>=2.7",
     "typer>=0.12",
@@ -43,6 +36,13 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "pypdf>=4.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/5h1vmani/matchbox"
+Documentation = "https://github.com/5h1vmani/matchbox/tree/main/docs"
+Repository = "https://github.com/5h1vmani/matchbox"
+Changelog = "https://github.com/5h1vmani/matchbox/blob/main/CHANGELOG.md"
+Issues = "https://github.com/5h1vmani/matchbox/issues"
 
 [project.optional-dependencies]
 dev = [

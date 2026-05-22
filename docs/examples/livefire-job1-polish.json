@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-05-22-001",
+  "job_id": 1,
+  "polished": [
+    {
+      "id": 1,
+      "text": "Built and operated ETL data pipelines processing 30M rows per day in production Python.",
+      "original_text": "Built ETL data pipelines processing 30M rows per day in Python.",
+      "covers": ["pipelines", "etl", "python"]
+    }
+  ]
+}
