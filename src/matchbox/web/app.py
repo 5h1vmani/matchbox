@@ -17,6 +17,7 @@ from matchbox.web.routes import (
     inbox,
     library,
     onboarding,
+    profile,
     review,
     review_run,
     sources,
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(inbox.router)
     app.include_router(library.router)
     app.include_router(onboarding.router)
+    app.include_router(profile.router)
     app.include_router(review.router)
     app.include_router(review_run.router)
     app.include_router(sources.router)

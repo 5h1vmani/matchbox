@@ -1,0 +1,55 @@
+{% extends "base.html.j2" %}
+{% block title %}Profile · Matchbox{% endblock %}
+
+{% block content %}
+<section class="space-y-2 mb-6">
+  <h1 class="text-xl font-semibold">Profile</h1>
+  <p class="text-sm text-text-muted">
+    The header of every rendered CV. Onboarding writes this row; come back here
+    to fix typos or add anything you missed.
+  </p>
+</section>
+
+<form
+  class="space-y-4 border border-border bg-surface rounded p-4"
+  hx-post="/profile"
+  hx-target="#profile-saved"
+  hx-swap="outerHTML"
+>
+  <label class="block">
+    <span class="block text-sm font-medium mb-1">Full name</span>
+    <input class="w-full border border-border rounded px-2 py-1 text-sm" name="full_name" value="{{ profile.full_name or '' }}" required />
+  </label>
+
+  <label class="block">
+    <span class="block text-sm font-medium mb-1">Headline</span>
+    <input class="w-full border border-border rounded px-2 py-1 text-sm" name="headline" value="{{ profile.headline or '' }}" placeholder="e.g. Generalist engineer" />
+  </label>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+    <label class="block">
+      <span class="block text-sm font-medium mb-1">Email</span>
+      <input class="w-full border border-border rounded px-2 py-1 text-sm" name="email" value="{{ profile.email or '' }}" />
+    </label>
+    <label class="block">
+      <span class="block text-sm font-medium mb-1">Phone</span>
+      <input class="w-full border border-border rounded px-2 py-1 text-sm" name="phone" value="{{ profile.phone or '' }}" />
+    </label>
+    <label class="block">
+      <span class="block text-sm font-medium mb-1">Location</span>
+      <input class="w-full border border-border rounded px-2 py-1 text-sm" name="location" value="{{ profile.location or '' }}" />
+    </label>
+  </div>
+
+  <label class="block">
+    <span class="block text-sm font-medium mb-1">Links</span>
+    <textarea class="w-full border border-border rounded px-2 py-1 text-sm" name="links" rows="3" placeholder="One per line or comma-separated">{{ profile.links | join("\n") }}</textarea>
+    <span class="text-xs text-text-muted">GitHub, personal site, LinkedIn, anything you would put on a CV.</span>
+  </label>
+
+  <div class="flex items-center gap-3">
+    <button class="bg-accent text-white rounded px-3 py-1 text-sm">Save profile</button>
+    <span id="profile-saved" class="text-xs text-text-muted"></span>
+  </div>
+</form>
+{% endblock %}
