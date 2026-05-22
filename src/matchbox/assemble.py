@@ -56,6 +56,7 @@ class AssembleResult:
     cv_path: Path
     cv_json_path: Path
     coverage_report_path: Path
+    changes_md_path: Path
     gaps: list[str]
     keyword_presence: list[dict[str, object]]
     selected_component_ids: list[int]
@@ -115,6 +116,107 @@ def _load_requirements(conn: sqlite3.Connection, job_id: int) -> list[Requiremen
         )
         for r in payload.get("requirements", [])
     ]
+
+
+def _write_changes_md(
+    *,
+    out_dir: Path,
+    job_company: str,
+    job_title: str,
+    selected_ids: list[int],
+    relevance: dict[int, float],
+    raw_bullets: dict[int, dict[str, Any]],
+    semantic_gaps: list[str],
+    keyword_presence: list[Any],
+) -> Path:
+    """Write a human-readable summary of what changed vs. the master library.
+
+    The "master" baseline is every verified bullet in the library, grouped
+    by experience. The tailored CV shows a subset. This document spells
+    out exactly which bullets made it and which were dropped, with
+    relevance scores, so the user can sanity-check the matcher's choices.
+    """
+    selected_set = set(selected_ids)
+    grouped: dict[int, dict[str, Any]] = {}
+    for bullet_id, row in raw_bullets.items():
+        ex_id = row["experience_id"]
+        if ex_id not in grouped:
+            grouped[ex_id] = {
+                "_sort": row["sort_order"],
+                "company": row["company"],
+                "role": row["role"],
+                "start_date": row["start_date"] or "",
+                "end_date": row["end_date"] or "present",
+                "selected": [],
+                "skipped": [],
+            }
+        bucket = "selected" if bullet_id in selected_set else "skipped"
+        grouped[ex_id][bucket].append(
+            {
+                "id": bullet_id,
+                "text": row["text"],
+                "relevance": relevance.get(bullet_id, 0.0),
+            }
+        )
+    ordered = sorted(grouped.values(), key=lambda g: g["_sort"])
+
+    lines: list[str] = []
+    lines.append(f"# Changes for {job_company} — {job_title}")
+    lines.append("")
+    total_selected = len(selected_set)
+    total_library = len(raw_bullets)
+    lines.append(
+        f"Selected **{total_selected}** of **{total_library}** verified bullets "
+        f"across **{len(grouped)}** role{'' if len(grouped) == 1 else 's'}."
+    )
+    lines.append("")
+
+    for ex in ordered:
+        lines.append(f"## {ex['company']} — {ex['role']}")
+        lines.append(f"_{ex['start_date']} → {ex['end_date']}_")
+        lines.append("")
+        if ex["selected"]:
+            lines.append("**Selected:**")
+            for b in sorted(ex["selected"], key=lambda x: -x["relevance"]):
+                lines.append(f"- ({b['relevance']:.2f}) {b['text']}")
+            lines.append("")
+        if ex["skipped"]:
+            lines.append("**Skipped:**")
+            for b in sorted(ex["skipped"], key=lambda x: -x["relevance"]):
+                lines.append(f"- ({b['relevance']:.2f}) {b['text']}")
+            lines.append("")
+
+    if semantic_gaps:
+        lines.append("## Uncovered must-haves")
+        lines.append("")
+        lines.append(
+            "These JD requirements have no verified bullet matching above the "
+            "semantic floor. Consider adding a bullet that describes the work, "
+            "or marking the requirement as something you cannot honestly claim."
+        )
+        lines.append("")
+        for g in semantic_gaps:
+            lines.append(f"- {g}")
+        lines.append("")
+
+    missing_keywords = [kp for kp in keyword_presence if not kp.present]
+    if missing_keywords:
+        lines.append("## ATS keyword misses")
+        lines.append("")
+        lines.append(
+            "A literal ATS would not find these terms in the rendered CV, even "
+            "though the matcher considers the requirement semantically covered. "
+            "The polish pass can rephrase a selected bullet to carry the term, "
+            "if doing so remains truthful."
+        )
+        lines.append("")
+        for kp in missing_keywords:
+            lines.append(f"- {kp.requirement_text}")
+        lines.append("")
+
+    out_path = out_dir / "changes.md"
+    out_path.write_text("\n".join(lines), encoding="utf-8")
+    return out_path
 
 
 def _experiences_in_order(
@@ -355,10 +457,23 @@ def assemble_one(
     coverage_path = out_dir / "coverage.json"
     coverage_path.write_text(json.dumps(coverage, indent=2), encoding="utf-8")
 
+    job = _load_job(conn, job_id)
+    changes_path = _write_changes_md(
+        out_dir=out_dir,
+        job_company=str(job["company"]),
+        job_title=str(job["title"]),
+        selected_ids=result.selected_ids,
+        relevance=result.relevance_by_component,
+        raw_bullets=raw_bullets,
+        semantic_gaps=semantic_gaps,
+        keyword_presence=keyword_presence,
+    )
+
     return AssembleResult(
         cv_path=cv_pdf_path,
         cv_json_path=cv_json_path,
         coverage_report_path=coverage_path,
+        changes_md_path=changes_path,
         gaps=semantic_gaps,
         keyword_presence=[
             {"requirement": kp.requirement_text, "present": kp.present, "matched": kp.matched_term}

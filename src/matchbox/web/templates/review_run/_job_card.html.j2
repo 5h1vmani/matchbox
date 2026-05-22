@@ -52,6 +52,9 @@
       <a class="text-xs text-accent underline" href="/runs/{{ run_id }}/output/{{ job.job_id }}/cv.pdf" target="_blank">
         Open CV PDF ↗
       </a>
+      <a class="text-xs text-text-muted underline" href="/runs/{{ run_id }}/output/{{ job.job_id }}/changes.md" target="_blank">
+        What changed ↗
+      </a>
       <form
         class="flex items-center gap-2 text-xs"
         hx-post="/review-run/{{ run_id }}/jobs/{{ job.job_id }}/restyle"
