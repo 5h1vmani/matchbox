@@ -356,9 +356,15 @@ def assemble_one(
     palette: str,
     font: str,
     embedder: Embedder | None = None,
+    coverage_floor: float = SEMANTIC_COVERAGE_FLOOR,
 ) -> AssembleResult:
     """Selection + render path for a single job. Returns the artifact paths
-    and the gaps / keyword-presence reports."""
+    and the gaps / keyword-presence reports.
+
+    `coverage_floor` defaults to the production value (0.5) tuned for
+    bge-small-en-v1.5. Tests that use a weak FakeEmbedder pass a lower
+    value explicitly.
+    """
     _load_job(conn, job_id)  # ensure the job exists; raises LookupError
     profile = _load_profile(conn)
     requirements = _load_requirements(conn, job_id)
@@ -406,6 +412,7 @@ def assemble_one(
         requirement_embeddings=requirement_vecs,
         k=DEFAULT_K,
         per_role_cap=4,
+        coverage_floor=coverage_floor,
     )
 
     # Build the CV JSON with only the selected bullets.
@@ -443,7 +450,7 @@ def assemble_one(
 
     coverage = {
         "semantic": {
-            "floor": SEMANTIC_COVERAGE_FLOOR,
+            "floor": coverage_floor,
             "must_haves": [
                 {"text": r.text, "covered": ok}
                 for r, ok in zip(

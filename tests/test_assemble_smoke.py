@@ -194,6 +194,11 @@ def test_smoke_assemble_produces_valid_pdf_with_keywords(
         palette="slate",
         font="atkinson-hyperlegible",
         embedder=embedder,
+        # FakeEmbedder is bag-of-words; real bge clears 0.6 easily but
+        # synthetic vectors top out around 0.4 for paraphrases. Loosen
+        # the floor here so we are testing the assembly path, not the
+        # toy embedder's calibration.
+        coverage_floor=0.3,
     )
 
     # PDF is non-empty

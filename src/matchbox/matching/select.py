@@ -20,7 +20,13 @@ from matchbox.matching.embed import cosine_matrix
 from matchbox.matching.mmr import mmr_select
 from matchbox.matching.rrf import rrf_fuse
 
-SEMANTIC_COVERAGE_FLOOR = 0.35
+# Default semantic coverage floor for production use with bge-small-en-v1.5.
+# In benchmarking (tests/test_fastembed_integration.py), paraphrases of the
+# same fact reliably clear cosine > 0.6; unrelated text scores well below.
+# 0.5 puts the bar between those bands. Callers using a weaker embedder
+# (the synthetic FakeEmbedder in unit tests) override this via the
+# `coverage_floor` kwarg on select_components / assemble_one.
+SEMANTIC_COVERAGE_FLOOR = 0.5
 TOP_PER_REQUIREMENT = 8
 
 # One-page budget heuristic. Approximates ~450 words of body across all
