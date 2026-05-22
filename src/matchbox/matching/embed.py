@@ -53,7 +53,7 @@ class FastEmbedEmbedder:
 
     def _ensure(self) -> object:
         if self._model is None:
-            from fastembed import TextEmbedding  # type: ignore[import-not-found]  # heavy; lazy
+            from fastembed import TextEmbedding  # heavy; lazy import
 
             self._model = TextEmbedding(model_name=f"BAAI/{self.model_version}")
         return self._model
