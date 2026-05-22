@@ -149,6 +149,103 @@ def test_start_run_rejects_unknown_palette(client: TestClient) -> None:
     assert r.status_code == 400
 
 
+def test_add_job_manually_creates_row(client: TestClient) -> None:
+    """Pasted JD + URL lands in the inbox with source=NULL."""
+    r = client.post(
+        "/inbox/jobs",
+        data={
+            "company": "ScrappyCo",
+            "title": "Founding Engineer",
+            "url": "https://linkedin.com/jobs/view/1234567",
+            "apply_url": "https://scrappyco.example/apply",
+            "location": "Remote",
+            "jd_text": (
+                "Looking for a founding engineer to build the ML platform. "
+                "Python, Kubernetes, ETL pipelines."
+            ),
+        },
+    )
+    assert r.status_code == 200
+    assert "added" in r.text.lower()
+
+    page = client.get("/inbox").text
+    assert "ScrappyCo" in page
+    assert "Founding Engineer" in page
+
+    # The row is source=NULL.
+    import os
+
+    from matchbox.core.db import connect
+
+    conn = connect(Path(os.environ["MATCHBOX_DB"]))
+    row = conn.execute(
+        "SELECT source, status, jd_text FROM job WHERE company = 'ScrappyCo'"
+    ).fetchone()
+    conn.close()
+    assert row["source"] is None
+    assert row["status"] == "new"
+    assert "ML platform" in row["jd_text"]
+
+
+def test_add_job_manually_scorable(client: TestClient) -> None:
+    """A hand-added job goes through the same Score / triage / run flow."""
+    client.post(
+        "/inbox/jobs",
+        data={
+            "company": "Anthropic",
+            "title": "Forward Deployed Engineer",
+            "url": "https://example.com/anthropic-fde",
+            "jd_text": "Python, Kubernetes, ETL pipelines, mentor engineers.",
+        },
+    )
+    # Set a target so scoring has something to rank against.
+    client.post(
+        "/targets",
+        data={
+            "role_families": "forward-deployed-engineer",
+            "dream_companies": "Anthropic",
+            "locations": "remote",
+        },
+    )
+    r = client.post("/inbox/score-all")
+    assert "scored 1 new job" in r.text
+
+    import os
+
+    from matchbox.core.db import connect
+
+    conn = connect(Path(os.environ["MATCHBOX_DB"]))
+    score = conn.execute("SELECT score, status FROM job WHERE company = 'Anthropic'").fetchone()
+    conn.close()
+    assert score["status"] == "scored"
+    assert score["score"] is not None and score["score"] > 0.5
+
+
+def test_add_job_manually_rejects_duplicate_url(client: TestClient) -> None:
+    payload = {
+        "company": "X",
+        "title": "Y",
+        "url": "https://example.com/dup",
+        "jd_text": "anything",
+    }
+    client.post("/inbox/jobs", data=payload)
+    r = client.post("/inbox/jobs", data=payload)
+    assert r.status_code == 409
+
+
+def test_add_job_manually_requires_jd_text(client: TestClient) -> None:
+    r = client.post(
+        "/inbox/jobs",
+        data={
+            "company": "X",
+            "title": "Y",
+            "url": "https://example.com/notxt",
+            "jd_text": "   ",
+        },
+    )
+    assert r.status_code == 400
+
+
 def test_skip_job_moves_to_skipped(client: TestClient) -> None:
     job_ids = _seed_jobs(client)
     r = client.post(f"/inbox/jobs/{job_ids[0]}/status", data={"to": "skipped"})

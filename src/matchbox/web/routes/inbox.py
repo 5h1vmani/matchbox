@@ -99,6 +99,61 @@ def score_all(request: Request, conn: ConnDep) -> HTMLResponse:
     )
 
 
+@router.post("/inbox/jobs", response_class=HTMLResponse)
+def add_job_manually(
+    request: Request,
+    conn: ConnDep,
+    company: Annotated[str, Form()],
+    title: Annotated[str, Form()],
+    url: Annotated[str, Form()],
+    jd_text: Annotated[str, Form()],
+    apply_url: Annotated[str, Form()] = "",
+    location: Annotated[str, Form()] = "",
+) -> HTMLResponse:
+    """Add a job by hand from a URL + pasted JD text.
+
+    For LinkedIn, company careers pages, friend referrals, and anything
+    not covered by a polled ATS source. The row lands with
+    `source = NULL` and `status = 'new'` so the existing score / triage
+    / run flow picks it up like any other job.
+    """
+    company_s = company.strip()
+    title_s = title.strip()
+    url_s = url.strip()
+    jd_text_s = jd_text.strip()
+    if not (company_s and title_s and url_s and jd_text_s):
+        raise HTTPException(
+            status_code=400,
+            detail="company, title, url, and jd_text are all required",
+        )
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO job
+                (source, company, title, location, url, apply_url, jd_text, status)
+            VALUES (NULL, ?, ?, ?, ?, ?, ?, 'new')
+            """,
+            (
+                company_s,
+                title_s,
+                (location.strip() or None),
+                url_s,
+                (apply_url.strip() or None),
+                jd_text_s,
+            ),
+        )
+    except sqlite3.IntegrityError as e:
+        raise HTTPException(
+            status_code=409,
+            detail=f"a job with url {url_s!r} already exists in the inbox",
+        ) from e
+    job_id = cur.lastrowid
+    return HTMLResponse(
+        f'<span id="add-job-status" class="text-xs text-success">'
+        f'job #{job_id} added. Click "Score new jobs" to score it.</span>'
+    )
+
+
 VALID_TRANSITIONS: set[str] = {"skipped", "rejected", "scored"}
 
 

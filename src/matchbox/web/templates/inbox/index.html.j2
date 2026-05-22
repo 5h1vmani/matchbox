@@ -52,6 +52,34 @@
   <span id="score-status" class="text-xs text-text-muted ml-2"></span>
 </section>
 
+<section class="mb-6 border border-border bg-surface rounded p-4">
+  <details>
+    <summary class="cursor-pointer text-sm font-medium">Add a job by hand</summary>
+    <p class="text-xs text-text-muted mt-2 mb-3">
+      For LinkedIn, company careers pages, referrals, or anywhere else
+      Matchbox does not poll. Paste the URL and the full JD text. The
+      job lands as <code>new</code>; click <em>Score new jobs</em> above
+      to score it, then triage and tailor like any other.
+    </p>
+    <form
+      class="grid grid-cols-2 gap-2 text-sm"
+      hx-post="/inbox/jobs"
+      hx-target="#add-job-status"
+      hx-swap="outerHTML"
+      hx-on::after-request="if (event.detail.successful) this.reset()"
+    >
+      <input class="border border-border rounded px-2 py-1" name="company" placeholder="Company" required />
+      <input class="border border-border rounded px-2 py-1" name="title" placeholder="Job title" required />
+      <input class="border border-border rounded px-2 py-1 col-span-2" name="url" placeholder="JD URL (LinkedIn, careers page, anywhere)" required />
+      <input class="border border-border rounded px-2 py-1" name="apply_url" placeholder="Apply URL (optional)" />
+      <input class="border border-border rounded px-2 py-1" name="location" placeholder="Location (optional)" />
+      <textarea class="border border-border rounded px-2 py-1 col-span-2" name="jd_text" rows="6" placeholder="Paste the full job description here" required></textarea>
+      <button class="bg-accent text-white rounded px-3 py-1 text-sm col-span-2">Add to inbox</button>
+      <span id="add-job-status" class="col-span-2 text-xs text-text-muted"></span>
+    </form>
+  </details>
+</section>
+
 <form
   hx-post="/runs"
   hx-target="#run-started"
