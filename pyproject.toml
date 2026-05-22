@@ -46,7 +46,7 @@ Issues = "https://github.com/5h1vmani/matchbox/issues"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.2",
+    "pytest>=9.0.3",
     "pytest-asyncio>=0.23",
     "mypy>=1.10",
     "ruff>=0.4",
