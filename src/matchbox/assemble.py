@@ -93,6 +93,7 @@ def _load_components(
             text=r["text"],
             experience_id=r["experience_id"],
             has_metric=bool(r["has_metric"]),
+            end_date=r["end_date"],
         )
         for r in rows
     ]
