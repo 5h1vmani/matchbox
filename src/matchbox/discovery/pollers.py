@@ -34,7 +34,14 @@ def _strip_html(html: str | None) -> str:
 
 def _get_json(client: httpx.Client, url: str, ats_type: AtsType, slug: str) -> Any:
     try:
-        r = client.get(url, timeout=TIMEOUT, headers={"User-Agent": USER_AGENT})
+        # Follow redirects: vendors like Recruitee 302 the root slug to a
+        # demo board, and other vendors occasionally move endpoints.
+        r = client.get(
+            url,
+            timeout=TIMEOUT,
+            headers={"User-Agent": USER_AGENT},
+            follow_redirects=True,
+        )
     except httpx.RequestError as e:
         raise PollerError(ats_type, slug, f"network error: {e}") from e
     if r.status_code == 404:
@@ -153,10 +160,15 @@ def poll_ashby(slug: str, company: str, client: httpx.Client) -> list[JobRecord]
 
 
 # ─── Workable ─────────────────────────────────────────────────────────
-# https://apply.workable.com/api/v3/accounts/{slug}/jobs
-# Public widget endpoint. POST form; we use GET (returns same data).
-# Note: the modern `apply.workable.com` API is the recommended one;
-# older `{slug}.workable.com/spi/v3/jobs` still works but deprecated.
+# Deferred from v1: Workable's public no-auth jobs API was removed.
+# The endpoint we originally targeted, apply.workable.com/api/v3/
+# accounts/{slug}/jobs, now returns 404 for every public slug we
+# tried in the live-fire pass on 2026-05-22. The widget endpoint
+# the public job board uses requires an account-specific token.
+# The poll_workable function is preserved (and exercised by mocked
+# tests) so we can re-enable it when Workable surfaces a public no-
+# auth endpoint or we add per-source auth token support. Until then
+# it is intentionally absent from the POLLERS dispatch.
 
 
 def poll_workable(slug: str, company: str, client: httpx.Client) -> list[JobRecord]:
@@ -285,10 +297,13 @@ def poll_recruitee(slug: str, company: str, client: httpx.Client) -> list[JobRec
 
 
 POLLERS = {
+    # Live-fire verified 2026-05-22 against real public slugs.
+    # See docs/supported-ats.md for the verified-slug list.
     "greenhouse": poll_greenhouse,
     "lever": poll_lever,
     "ashby": poll_ashby,
-    "workable": poll_workable,
+    # Workable deferred: vendor removed the public no-auth API. See the
+    # comment block above poll_workable for the re-enable conditions.
     "smartrecruiters": poll_smartrecruiters,
     "recruitee": poll_recruitee,
 }

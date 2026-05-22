@@ -178,15 +178,20 @@ def test_poller_unexpected_shape() -> None:
     assert "shape" in str(exc.value)
 
 
-def test_dispatch_includes_all_six() -> None:
+def test_dispatch_includes_live_verified_ats() -> None:
+    """Five ATS types are live-verified and active. Workable is deferred
+    (the vendor removed the public no-auth API); its poller still exists
+    and is unit-tested but it is not in the dispatch."""
     assert set(pollers.POLLERS) == {
         "greenhouse",
         "lever",
         "ashby",
-        "workable",
         "smartrecruiters",
         "recruitee",
     }
+    # The Workable poller function itself is still importable so the
+    # tests (and a future re-enable) keep working.
+    assert callable(pollers.poll_workable)
 
 
 # ─── runner ───────────────────────────────────────────────────────────
