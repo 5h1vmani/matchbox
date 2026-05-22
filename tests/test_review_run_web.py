@@ -104,13 +104,47 @@ def test_card_poll_returns_just_one_card(client: TestClient, tmp_path: Path) -> 
     assert f"job-card-{job_id}" in r.text
 
 
-def test_schema_version_mismatch_is_409(client: TestClient, tmp_path: Path) -> None:
+def test_schema_version_mismatch_renders_banner(client: TestClient, tmp_path: Path) -> None:
+    """A wrong schema_version is surfaced as a banner; the page still
+    renders so the user can see queued state and act."""
     run_id, _ = _seed_run_and_job(tmp_path)
     _write_status(
         tmp_path, run_id, {"schema_version": 99, "run_id": run_id, "status": "done", "jobs": []}
     )
     r = client.get(f"/review-run/{run_id}")
-    assert r.status_code == 409
+    assert r.status_code == 200
+    assert "schema_version mismatch" in r.text
+    assert "schema problems" in r.text
+
+
+def test_other_schema_violations_surface_as_banner(client: TestClient, tmp_path: Path) -> None:
+    """Field-level errors are also surfaced; page still renders."""
+    run_id, _ = _seed_run_and_job(tmp_path)
+    _write_status(
+        tmp_path,
+        run_id,
+        {
+            "schema_version": 1,
+            "run_id": run_id,
+            "status": "not-a-real-status",  # not in the enum
+            "jobs": [],
+        },
+    )
+    r = client.get(f"/review-run/{run_id}")
+    assert r.status_code == 200
+    assert "schema problems" in r.text
+    assert "status" in r.text
+
+
+def test_status_mid_write_does_not_break_the_page(client: TestClient, tmp_path: Path) -> None:
+    """A truncated status.json (mid-write) renders with a soft placeholder."""
+    run_id, _ = _seed_run_and_job(tmp_path)
+    p = tmp_path / "runs" / run_id
+    p.mkdir(parents=True, exist_ok=True)
+    (p / "status.json").write_text('{"schema_version": 1, "run_id":')  # truncated
+    r = client.get(f"/review-run/{run_id}")
+    assert r.status_code == 200
+    assert "mid-write" in r.text or "malformed" in r.text
 
 
 def test_mark_applied_records_application(client: TestClient, tmp_path: Path) -> None:

@@ -37,30 +37,40 @@ STATUS_SCHEMA = json.loads(
 _STATUS_VALIDATOR = Draft202012Validator(STATUS_SCHEMA)
 
 
-def _load_status(run_id: str) -> dict[str, Any] | None:
+def _load_status(run_id: str) -> tuple[dict[str, Any] | None, list[str]]:
+    """Return (payload | None, validation_errors).
+
+    A mid-write JSONDecodeError yields a synthetic error placeholder so
+    the next poll catches the finished file. A schema_version mismatch
+    yields a single error and a None payload (no point parsing further).
+    Other schema violations are surfaced as a banner — we still render
+    the page so the user can see partial progress.
+    """
     path = RUNS_DIR / run_id / "status.json"
     if not path.exists():
-        return None
+        return None, []
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
-        # File is mid-write; surface as None and let the next poll catch up.
-        return {
+        placeholder = {
             "schema_version": 1,
             "run_id": run_id,
             "status": "error",
-            "error": f"status.json parse: {e}",
+            "error": f"status.json is mid-write or malformed: {e}",
             "jobs": [],
         }
-    # Validate but tolerate — show partial progress even if the brain
-    # hasn't filled every field yet. A schema_version mismatch is fatal.
+        return placeholder, []
     if payload.get("schema_version") != 1:
-        raise HTTPException(
-            status_code=409,
-            detail=f"status.json schema_version mismatch: {payload.get('schema_version')}",
-        )
+        return None, [
+            f"status.json schema_version mismatch: got "
+            f"{payload.get('schema_version')!r}, expected 1"
+        ]
+    errors = sorted(_STATUS_VALIDATOR.iter_errors(payload), key=lambda e: list(e.absolute_path))
+    error_messages = [
+        f"{'.'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}" for e in errors
+    ]
     result: dict[str, Any] = payload
-    return result
+    return result, error_messages
 
 
 def _list_run_jobs(conn: sqlite3.Connection, run_id: str) -> list[dict[str, Any]]:
@@ -114,7 +124,7 @@ def review_run_index(request: Request, run_id: str, conn: ConnDep) -> HTMLRespon
     if run is None:
         raise HTTPException(status_code=404, detail=f"no such run: {run_id}")
     queued = _list_run_jobs(conn, run_id)
-    status = _load_status(run_id)
+    status, status_errors = _load_status(run_id)
     status_jobs = {j["job_id"]: j for j in (status or {}).get("jobs", [])}
     jobs = [
         {
@@ -129,6 +139,7 @@ def review_run_index(request: Request, run_id: str, conn: ConnDep) -> HTMLRespon
         {
             "run": dict(run),
             "status": status,
+            "status_errors": status_errors,
             "jobs": jobs,
         },
     )
@@ -142,7 +153,7 @@ def job_card(request: Request, run_id: str, job_id: int, conn: ConnDep) -> HTMLR
     queued_one = next((q for q in queued if q["job_id"] == job_id), None)
     if queued_one is None:
         raise HTTPException(status_code=404, detail=f"no such (run, job): ({run_id}, {job_id})")
-    status = _load_status(run_id)
+    status, _ = _load_status(run_id)
     status_job = next((j for j in (status or {}).get("jobs", []) if j["job_id"] == job_id), None)
     job = {
         **_merge_job_state(queued_one, status_job),
