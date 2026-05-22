@@ -102,7 +102,9 @@ def test_start_run_writes_work_queue(client: TestClient, tmp_path: Path) -> None
         },
     )
     assert r.status_code == 200
-    assert "queued" in r.text.lower()
+    assert "queued" in r.text.lower() or "is ready" in r.text.lower()
+    # Copy button is wired to the per-run prompt block.
+    assert "data-copy=" in r.text
 
     run_id_match = re.search(r"Run (\d{4}-\d{2}-\d{2}-\d{3})", r.text)
     assert run_id_match is not None

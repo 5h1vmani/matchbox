@@ -39,6 +39,8 @@ def test_onboarding_index_renders(client_in_tmp: TestClient) -> None:
     assert r.status_code == 200
     assert "Onboarding" in r.text
     assert "ingest my files" in r.text
+    # Copy button is wired to the prompt block.
+    assert 'data-copy="#brain-prompt-ingest"' in r.text
 
 
 def test_upload_file_stages_it(client_in_tmp: TestClient, tmp_path: Path) -> None:

@@ -46,6 +46,26 @@
     .chip button { color: #a8a29e; }
     .chip button:hover { color: #b91c1c; }
   </style>
+  <script>
+    // Copy-to-clipboard: any element with data-copy="<selector>" copies
+    // the textContent of the target on click and briefly shows feedback.
+    document.addEventListener("click", function(e) {
+      var btn = e.target.closest("[data-copy]");
+      if (!btn) return;
+      var sel = btn.getAttribute("data-copy");
+      var src = document.querySelector(sel);
+      if (!src || !navigator.clipboard) return;
+      var text = (src.textContent || "").trim();
+      navigator.clipboard.writeText(text).then(function() {
+        var prev = btn.getAttribute("data-copy-original") || btn.textContent;
+        btn.setAttribute("data-copy-original", prev);
+        btn.textContent = "Copied";
+        setTimeout(function() { btn.textContent = prev; }, 1200);
+      }).catch(function() {
+        btn.textContent = "Copy failed";
+      });
+    });
+  </script>
 </head>
 <body class="bg-bg text-text">
   <header class="border-b border-border bg-surface">

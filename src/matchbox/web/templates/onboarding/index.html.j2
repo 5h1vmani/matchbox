@@ -47,7 +47,14 @@
   <p class="text-sm text-text-muted mb-3">
     Open a terminal in this repo and start Claude Code. Paste the prompt below.
   </p>
-  <pre class="bg-bg border border-border rounded text-xs p-3 overflow-auto select-all">ingest my files</pre>
+  <div class="relative">
+    <pre id="brain-prompt-ingest" class="bg-bg border border-border rounded text-xs p-3 pr-20 overflow-auto select-all">ingest my files</pre>
+    <button
+      type="button"
+      class="absolute top-1 right-1 text-xs text-text-muted border border-border rounded px-2 py-0.5 bg-surface hover:text-text"
+      data-copy="#brain-prompt-ingest"
+    >Copy</button>
+  </div>
   <p class="text-xs text-text-muted mt-2">
     Claude Code will read your files, pull out experiences and bullets and skills,
     and write them to your library. When it finishes, open
