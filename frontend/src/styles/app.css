@@ -1,0 +1,7 @@
+/* App layer — loaded after the vendor design CSS.
+   v1 ships light-only; dark mode was not designed this pass (handoff §15).
+   The token file declares `color-scheme: light dark`, so lock it to light
+   here rather than editing the verbatim vendor file. */
+:root {
+  color-scheme: light;
+}

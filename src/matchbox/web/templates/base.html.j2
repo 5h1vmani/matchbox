@@ -11,39 +11,61 @@
       theme: {
         extend: {
           colors: {
-            bg: "#fafaf9",
-            surface: "#ffffff",
-            border: "#e7e5e4",
-            text: "#1c1917",
-            "text-muted": "#78716c",
-            accent: "#3c6e9c",
-            success: "#15803d",
-            warning: "#a16207",
-            danger: "#b91c1c",
+            bg:           "#ffffff",
+            surface:      "#ffffff",
+            border:       "#e4e4e7",
+            text:         "#09090b",
+            "text-muted": "#696970",
+            label:        "#52525b",
+            accent:       "#52525b",
+            success:      "#15803d",
+            warning:      "#a16207",
+            danger:       "#b91c1c",
           },
           fontFamily: {
-            sans: [
-              "ui-sans-serif",
-              "system-ui",
-              "-apple-system",
-              "Segoe UI",
-              "Inter",
-              "sans-serif",
-            ],
+            sans: ["IBM Plex Sans", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+            mono: ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "monospace"],
           },
         },
       },
     };
   </script>
   <style>
-    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif; }
+    @font-face {
+      font-family: "IBM Plex Sans";
+      font-weight: 400;
+      font-style: normal;
+      src: url("/static/fonts/IBMPlexSans-Regular.ttf") format("truetype");
+    }
+    @font-face {
+      font-family: "IBM Plex Sans";
+      font-weight: 600;
+      font-style: normal;
+      src: url("/static/fonts/IBMPlexSans-SemiBold.ttf") format("truetype");
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      font-weight: 400;
+      font-style: normal;
+      src: url("/static/fonts/IBMPlexMono-Regular.ttf") format("truetype");
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      font-weight: 600;
+      font-style: normal;
+      src: url("/static/fonts/IBMPlexMono-SemiBold.ttf") format("truetype");
+    }
+    body {
+      font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      color: #3f3f46;
+    }
     .chip {
       display: inline-flex; align-items: center; gap: 0.25rem;
       padding: 0.125rem 0.5rem; border-radius: 9999px;
-      background: #f5f5f4; color: #57534e; font-size: 0.75rem;
-      border: 1px solid #e7e5e4;
+      background: #f4f4f5; color: #52525b; font-size: 0.75rem;
+      border: 1px solid #e4e4e7;
     }
-    .chip button { color: #a8a29e; }
+    .chip button { color: #a1a1aa; }
     .chip button:hover { color: #b91c1c; }
   </style>
   <script>
@@ -70,8 +92,9 @@
 <body class="bg-bg text-text">
   <header class="border-b border-border bg-surface">
     <div class="mx-auto max-w-5xl px-4 py-3 flex items-center gap-6">
-      <a href="/library" class="font-semibold">Matchbox</a>
+      <a href="/library" class="font-semibold tracking-tight">Matchbox</a>
       <nav class="text-sm text-text-muted flex gap-4">
+        <a href="/tracker" class="hover:text-text">Applications</a>
         <a href="/inbox" class="hover:text-text">Inbox</a>
         <a href="/library" class="hover:text-text">Library</a>
         <a href="/review" class="hover:text-text">Review</a>

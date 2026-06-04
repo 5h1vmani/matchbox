@@ -33,6 +33,21 @@ def db_path(profile: str | None = None) -> Path:
     return PROJECT_ROOT / "people" / slug / "matchbox.db"
 
 
+def list_profiles() -> list[str]:
+    """Discover profiles: subdirs of `people/` that hold a `matchbox.db`.
+
+    Names starting with `_` are reserved (e.g. a future shared discovery DB).
+    """
+    base = PROJECT_ROOT / "people"
+    if not base.exists():
+        return []
+    return sorted(
+        child.name
+        for child in base.iterdir()
+        if child.is_dir() and not child.name.startswith("_") and (child / "matchbox.db").exists()
+    )
+
+
 def connect(path: Path | None = None) -> sqlite3.Connection:
     """Open a connection with WAL, foreign keys, and Row results."""
     target = path or db_path()

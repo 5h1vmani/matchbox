@@ -8,12 +8,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from matchbox.web.deps import ConnDep
 from matchbox.web.routes import (
+    api,
+    applications,
     inbox,
     library,
     onboarding,
@@ -38,6 +40,8 @@ def create_app() -> FastAPI:
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+    app.include_router(api.router)
+    app.include_router(applications.router)
     app.include_router(inbox.router)
     app.include_router(library.router)
     app.include_router(onboarding.router)
@@ -46,6 +50,18 @@ def create_app() -> FastAPI:
     app.include_router(review_run.router)
     app.include_router(sources.router)
     app.include_router(targets.router)
+
+    spa_index = STATIC_DIR / "app" / "index.html"
+
+    @app.get("/tracker", include_in_schema=False)
+    def tracker() -> FileResponse:
+        """Serve the React applications-tracker SPA (built from frontend/)."""
+        if not spa_index.exists():
+            raise HTTPException(
+                status_code=503,
+                detail="tracker UI not built (run: cd frontend && npm run build)",
+            )
+        return FileResponse(str(spa_index))
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
