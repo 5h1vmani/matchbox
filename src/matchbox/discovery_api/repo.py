@@ -14,9 +14,12 @@ import sqlite3
 from datetime import date
 from typing import Any
 
-from matchbox.core.db import transaction
+from matchbox.core.db import PROJECT_ROOT, transaction
 from matchbox.discovery_api import rules
+from matchbox.matching.coverage import summarize_coverage
 from matchbox.tracker.rules import mono_for
+
+_RUNS_DIR = PROJECT_ROOT / "runs"
 
 # Scored jobs only, with the ATS source for the display label. Salary columns
 # (added in 007_sota.sql) are serialized when the ad reported them; coverage is
@@ -92,6 +95,27 @@ def serialize(
     }
 
 
+def _coverage_for_job(conn: sqlite3.Connection, job_id: int) -> dict[str, int] | None:
+    """`{covered, total}` from the most recent tailoring run's coverage.json for
+    this job, or None when no run has produced one yet. Honest: the bar appears
+    only once the requirements were actually matched against the verified
+    library -- never inferred."""
+    row = conn.execute(
+        "SELECT run_id FROM run_job WHERE job_id = ? ORDER BY run_id DESC LIMIT 1",
+        (job_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    path = _RUNS_DIR / row["run_id"] / "output" / str(job_id) / "coverage.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return summarize_coverage(data)
+
+
 def _skipped_today(skipped_on: str | None, today: date) -> bool:
     return bool(skipped_on) and (skipped_on or "")[:10] == today.isoformat()
 
@@ -121,7 +145,9 @@ def load_roles(conn: sqlite3.Connection, today: date | None = None) -> list[dict
     wa = _work_auth(conn)
     rows = conn.execute(_ROLE_SELECT).fetchall()
     return [
-        serialize(r, today, jd_preview=True, work_auth=wa)
+        serialize(
+            r, today, jd_preview=True, work_auth=wa, coverage=_coverage_for_job(conn, r["id"])
+        )
         for r in rows
         if not _skipped_today(r["skipped_on"], today)
     ]
@@ -174,7 +200,11 @@ def raw(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:
 
 def load_one(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] | None:
     row = raw(conn, job_id)
-    return serialize(row, work_auth=_work_auth(conn)) if row else None
+    if row is None:
+        return None
+    return serialize(
+        row, work_auth=_work_auth(conn), coverage=_coverage_for_job(conn, job_id)
+    )
 
 
 def job_facts(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:

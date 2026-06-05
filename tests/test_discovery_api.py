@@ -159,6 +159,39 @@ def test_serialize_shape_and_only_scored_enter(conn):
     assert full is not None and full["jd"] == ["Line one.", "Line two."]
 
 
+def test_serialize_salary_and_coverage_from_run_artifact(conn, tmp_path, monkeypatch):
+    # Report a salary on job 1, and produce a coverage.json from a tailoring run.
+    conn.execute(
+        "UPDATE job SET salary_min=150000, salary_max=185000, salary_currency='USD', "
+        "salary_period='year' WHERE id=1"
+    )
+    conn.execute("INSERT INTO run (id, status) VALUES ('2026-06-05-001', 'done')")
+    conn.execute("INSERT INTO run_job (run_id, job_id) VALUES ('2026-06-05-001', 1)")
+    out_dir = tmp_path / "runs" / "2026-06-05-001" / "output" / "1"
+    out_dir.mkdir(parents=True)
+    (out_dir / "coverage.json").write_text(
+        json.dumps(
+            {
+                "semantic": {
+                    "must_haves": [
+                        {"text": "a", "band": "covered"},
+                        {"text": "b", "band": "partial"},
+                        {"text": "c", "band": "uncovered"},
+                    ]
+                }
+            }
+        )
+    )
+    monkeypatch.setattr(repo, "_RUNS_DIR", tmp_path / "runs")
+
+    role = repo.load_one(conn, 1)
+    assert role is not None
+    assert role["salary"] == "$150–185k"
+    assert role["coverage"] == {"covered": 1, "total": 3}
+    # A job with no run still serializes coverage as None (honest, not zeroed).
+    assert repo.load_one(conn, 2)["coverage"] is None
+
+
 def test_ineligible_role_serializes_as_set_aside(conn):
     roles = repo.load_roles(conn)
     r2 = next(r for r in roles if r["id"] == "2")

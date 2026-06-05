@@ -16,9 +16,10 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from matchbox.matching.select import Requirement
+if TYPE_CHECKING:
+    from matchbox.matching.select import Requirement
 
 _ALIASES_PATH = Path(__file__).resolve().parents[3] / "shared" / "keyword-aliases.json"
 
