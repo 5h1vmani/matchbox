@@ -73,6 +73,7 @@ def test_ingest_populates_unverified_rows(empty_db: sqlite3.Connection) -> None:
         "projects": 1,
         "skills": 2,
         "summaries": 1,
+        "answers": 0,
         "tags": 4,
     }
 

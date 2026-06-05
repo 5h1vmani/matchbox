@@ -16,6 +16,7 @@ from matchbox.web.deps import ConnDep
 from matchbox.web.routes import (
     agent_tasks,
     ai,
+    answers,
     api,
     artifacts,
     discovery,
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
 
     app.include_router(agent_tasks.router)
     app.include_router(ai.router)
+    app.include_router(answers.router)
     app.include_router(api.router)
     app.include_router(artifacts.router)
     app.include_router(discovery.router)
