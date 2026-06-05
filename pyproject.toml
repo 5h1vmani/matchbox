@@ -103,6 +103,7 @@ skip = [
 # - NEET/neet: Indian education/visa term (NEET-UG/PG, "NEET-eligible")
 # - alot/thru: occasionally used intentionally in informal copy
 # - master/strat/nam: false positives in tech contexts
-ignore-words-list = "alot,thru,master,strat,nam,neet"
+# - nd: design-doc placeholder for "N days" (e.g. "applied 3d ago", "Nd overdue")
+ignore-words-list = "alot,thru,master,strat,nam,neet,nd"
 # Don't auto-fix; flag and let the human decide.
 check-filenames = true

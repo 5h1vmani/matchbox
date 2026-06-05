@@ -57,7 +57,9 @@ repos:
     hooks:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
-        exclude: package.lock.json|^\.secrets\.baseline$
+        # designs/ holds the design team's verbatim prototype HTML; its only
+        # high-entropy strings are public CDN SRI integrity hashes, not secrets.
+        exclude: package.lock.json|^\.secrets\.baseline$|^designs/
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.21.2
