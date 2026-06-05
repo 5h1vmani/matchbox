@@ -14,13 +14,22 @@ from __future__ import annotations
 import logging
 import sqlite3
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any, cast
 
 import httpx
 
 from matchbox.core.db import transaction
+from matchbox.discovery.aggregators import (
+    AggregatorError,
+    _looks_remote,
+    poll_adzuna,
+    poll_himalayas,
+    poll_remotive,
+)
 from matchbox.discovery.base import AtsType, JobRecord, PollerError
 from matchbox.discovery.pollers import POLLERS
 
@@ -57,18 +66,34 @@ def _list_enabled_sources(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
-def _upsert_jobs(conn: sqlite3.Connection, source_id: int, jobs: list[JobRecord]) -> int:
-    """INSERT OR IGNORE by url. Returns number of new rows inserted."""
+def _upsert_jobs(conn: sqlite3.Connection, source_id: int | None, jobs: list[JobRecord]) -> int:
+    """INSERT OR IGNORE by url. Returns number of new rows inserted.
+
+    `source_id` is None for aggregator-sourced jobs (they are not rows in
+    `ats_source`). country/remote come straight off the JobRecord so the
+    inbox can filter on them.
+    """
+    if not jobs:
+        return 0
+    # Drop re-scraped postings the user already dismissed in discovery, so a
+    # dead end never returns (dedupe: match on url, else company+title).
+    from matchbox.discovery_api.repo import is_dismissed_duplicate
+
+    jobs = [
+        j
+        for j in jobs
+        if not is_dismissed_duplicate(conn, url=j.url, company=j.company, title=j.title)
+    ]
     if not jobs:
         return 0
     cur = conn.executemany(
         """
         INSERT OR IGNORE INTO job (
             source, company, title, location, url, apply_url,
-            jd_text, posted_at, fetched_at, status
+            jd_text, posted_at, fetched_at, status, country, remote
         ) VALUES (
             :source, :company, :title, :location, :url, :apply_url,
-            :jd_text, :posted_at, :fetched_at, 'new'
+            :jd_text, :posted_at, :fetched_at, 'new', :country, :remote
         )
         """,
         [
@@ -82,6 +107,10 @@ def _upsert_jobs(conn: sqlite3.Connection, source_id: int, jobs: list[JobRecord]
                 "jd_text": j.jd_text,
                 "posted_at": j.posted_at,
                 "fetched_at": _now_iso(),
+                "country": j.country,
+                # ATS pollers leave remote=False; derive it from the JD text so
+                # an ATS remote role is filterable like an aggregator one.
+                "remote": 1 if (j.remote or _looks_remote(j.title, j.location, j.jd_text)) else 0,
             }
             for j in jobs
         ],
@@ -198,6 +227,84 @@ def scan_all(
         results: list[SourceResult] = []
         for src in sources:
             results.append(scan_source(conn, src, client=client, backoff=backoff, sleep=sleep))
+        return results
+    finally:
+        if owned:
+            client.close()
+
+
+# ─── aggregators (query/region sources, stored with source = NULL) ─────
+
+
+@dataclass(slots=True)
+class AggregatorResult:
+    name: str
+    ok: bool
+    inserted: int
+    fetched: int
+    error: str | None
+
+
+def _run_aggregator(
+    conn: sqlite3.Connection,
+    name: str,
+    fetch: Callable[[], list[JobRecord]],
+) -> AggregatorResult:
+    try:
+        jobs = fetch()
+    except AggregatorError as e:
+        return AggregatorResult(name=name, ok=False, inserted=0, fetched=0, error=str(e.message))
+    with transaction(conn):
+        inserted = _upsert_jobs(conn, None, jobs)
+    return AggregatorResult(name=name, ok=True, inserted=inserted, fetched=len(jobs), error=None)
+
+
+def scan_aggregators(
+    conn: sqlite3.Connection,
+    *,
+    client: httpx.Client | None = None,
+    himalayas: bool = True,
+    remotive: bool = True,
+    adzuna: dict[str, Any] | None = None,
+) -> list[AggregatorResult]:
+    """Scan the no-auth remote aggregators (Himalayas, Remotive) and, when an
+    Adzuna BYO-key config is supplied, Adzuna too. Aggregator jobs store with
+    source = NULL (not ats_source rows) and carry country/remote.
+
+    `adzuna` config shape:
+        {"app_id": "...", "app_key": "...",
+         "queries": [{"country": "in", "what": "...", "where": "..."}]}
+    One failing source does not poison the others.
+    """
+    owned = client is None
+    if client is None:
+        client = httpx.Client()
+    results: list[AggregatorResult] = []
+    try:
+        if himalayas:
+            results.append(
+                _run_aggregator(conn, "himalayas", lambda: poll_himalayas(client=client))
+            )
+        if remotive:
+            results.append(_run_aggregator(conn, "remotive", lambda: poll_remotive(client=client)))
+        if adzuna and adzuna.get("app_id") and adzuna.get("app_key"):
+            app_id = str(adzuna["app_id"])
+            app_key = str(adzuna["app_key"])
+            for q in adzuna.get("queries") or [{"country": "in"}]:
+                country = str(q.get("country", "in"))
+                what = str(q.get("what", ""))
+                where = str(q.get("where", ""))
+                label = f"adzuna:{country}" + (f":{what}" if what else "")
+                fetch = partial(
+                    poll_adzuna,
+                    app_id=app_id,
+                    app_key=app_key,
+                    client=client,
+                    country=country,
+                    what=what,
+                    where=where,
+                )
+                results.append(_run_aggregator(conn, label, fetch))
         return results
     finally:
         if owned:

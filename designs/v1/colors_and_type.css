@@ -1,0 +1,178 @@
+/* ============================================================
+   OAT DESIGN SYSTEM — Foundations
+   Colors + Typography + Spacing tokens
+   Extracted from the live Oat library (knadh/oat, oat.ink)
+   Oat is semantic & classless-first: tags are styled by context.
+   Light + dark are handled with CSS light-dark(); set
+   color-scheme on :root and the browser picks the right value.
+   ============================================================ */
+
+:root {
+  color-scheme: light dark;
+
+  /* ---- NEUTRAL SCALE (Zinc) ------------------------------- */
+  --zinc-50:  #fafafa;
+  --zinc-100: #f4f4f5;
+  --zinc-200: #e4e4e7;
+  --zinc-300: #d4d4d8;
+  --zinc-400: #a1a1aa;
+  --zinc-500: #71717a;
+  --zinc-600: #52525b;
+  --zinc-700: #3f3f46;
+  --zinc-800: #27272a;
+  --zinc-900: #18181b;
+  --zinc-950: #09090b;
+
+  /* ---- OAT BRAND ACCENT (warm taupe-brown) ---------------- */
+  /* The single warm hue is Oat's signature against cool zinc. */
+  --oat-700: #473a3a;   /* hover / pressed */
+  --oat-600: #574747;   /* PRIMARY */
+  --oat-500: #6b5757;
+  --oat-300: #b6a6a6;
+  --oat-100: #ede8e8;
+
+  /* ---- SEMANTIC SURFACES & TEXT (auto light/dark) --------- */
+  --background:        light-dark(#fff,     #09090b);
+  --foreground:        light-dark(#09090b,  #fafafa);
+  --muted:             light-dark(#f4f4f5,  #27272a);
+  --muted-foreground:  light-dark(#71717a,  #a1a1aa);
+  --faint-foreground:  light-dark(#a1a1aa,  #71717a);
+  --card:              light-dark(#fff,     #18181b);
+  --card-foreground:   light-dark(#09090b,  #fafafa);
+
+  --primary:            light-dark(#574747, #fafafa);
+  --primary-foreground: light-dark(#fafafa, #18181b);
+  --primary-hover:      light-dark(#473a3a, #e4e4e7);
+
+  --secondary:            light-dark(#f4f4f5, #27272a);
+  --secondary-foreground: light-dark(#574747, #fafafa);
+  --accent:               light-dark(#f4f4f5, #27272a);
+
+  --border: light-dark(#d4d4d8, #52525b);
+  --input:  light-dark(#d4d4d8, #52525b);
+  --ring:   light-dark(#574747, #d4d4d8);
+
+  /* ---- SEMANTIC STATUS COLORS (used sparingly) ------------ */
+  --success: light-dark(#008032, #6cc070);
+  --warning: light-dark(#a65b00, #f0a030);
+  --danger:  light-dark(#c0182a, #f0626f);
+
+  /* ============================================================
+     TYPOGRAPHY
+     Matchbox brand layer: Hanken Grotesk (humanist grotesk, warm)
+     for UI, JetBrains Mono for data/numerals. Both OFL / self-host.
+     Load the webfonts in each page; the system stacks are fallbacks.
+     (Upstream Oat is pure system-ui; this is the Matchbox deviation.)
+     ============================================================ */
+  --font-sans: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+  /* Base */
+  --text-base: 1rem;          /* 16px */
+  --leading-base: 1.5;        /* 24px */
+  --weight-normal: 400;
+  --weight-medium: 500;       /* buttons, labels, table headers */
+  --weight-semibold: 600;     /* headings, strong */
+
+  /* Type scale (~1.25 modular, clamped responsive in the lib) */
+  --text-sm:  0.875rem;       /* 14px — buttons, inputs, captions */
+  --text-xs:  0.75rem;        /* 12px — badges, fine print */
+  --text-h3:  1.389rem;       /* ~22px */
+  --text-h2:  1.762rem;       /* ~28px */
+  --text-h1:  2.135rem;       /* ~34px */
+  --text-display: 2.75rem;    /* hero */
+
+  /* ============================================================
+     SPACING (rem scale)
+     ============================================================ */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* ============================================================
+     RADII / SHADOW / MOTION
+     ============================================================ */
+  --radius-sm: 2px;           /* inline code */
+  --radius:    6px;           /* buttons, cards, inputs — the default */
+  --radius-pill: 9999px;      /* badges, progress, avatars */
+
+  /* Shadows are deliberately barely-there. */
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,.05);
+  --shadow:    0 1px 3px 0 rgba(0,0,0,.07), 0 1px 2px -1px rgba(0,0,0,.07);
+  --shadow-lg: 0 10px 24px -6px rgba(0,0,0,.12);
+
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --duration: .12s;
+  --transition: background-color var(--duration) var(--ease),
+                color var(--duration) var(--ease),
+                border-color var(--duration) var(--ease),
+                opacity var(--duration) var(--ease),
+                transform var(--duration) var(--ease);
+
+  --max-width: 1080px;        /* default content measure */
+  --header-height: 4rem;
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT STYLES
+   Mirrors how Oat styles bare tags out of the box (classless).
+   Drop this file in and write plain HTML.
+   ============================================================ */
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-base);
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 { font-weight: var(--weight-semibold); line-height: 1.25; text-wrap: balance; }
+h1 { font-size: var(--text-h1); margin: var(--space-10) 0 var(--space-6); }
+h2 { font-size: var(--text-h2); margin: var(--space-8) 0 var(--space-5); }
+h3 { font-size: var(--text-h3); margin: var(--space-6) 0 var(--space-4); }
+p  { margin: 0 0 var(--space-4); text-wrap: pretty; }
+
+a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+a:hover { color: var(--primary-hover); }
+
+strong { font-weight: var(--weight-semibold); }
+small  { font-size: var(--text-sm); }
+
+code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+}
+pre {
+  font-family: var(--font-mono);
+  background: var(--muted);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  overflow: auto;
+}
+pre code { background: none; padding: 0; }
+
+blockquote {
+  border-left: 4px solid var(--border);
+  padding-left: var(--space-4);
+  margin: var(--space-4) 0;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-8) 0; }
+
+.text-light  { color: var(--muted-foreground); }
+.text-lighter { color: var(--faint-foreground); }

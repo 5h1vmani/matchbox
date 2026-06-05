@@ -57,12 +57,44 @@ def test_role_title_partial_overlap() -> None:
             "company": "X",
             "location": None,
         },
-        target=_target(role_families=["ml-platform-engineer"]),
+        target=_target(role_families=["forward deployed architect"]),
         user_tech_tokens=set(),
     )
     role = next(d for d in result.dimensions if d.name == "role_title")
-    # one token in common: "engineer"
+    # "forward" + "deployed" overlap; "architect" does not; "engineer" is generic.
     assert 0.0 < role.score < 1.0
+
+
+def test_role_title_ignores_generic_engineer() -> None:
+    # A coding-IC title must NOT match an AI role family on the word "engineer".
+    result = score_job(
+        job={
+            "title": "Software Engineer, ML Infrastructure",
+            "jd_text": "",
+            "company": "X",
+            "location": None,
+        },
+        target=_target(role_families=["AI solutions architect"]),
+        user_tech_tokens=set(),
+    )
+    role = next(d for d in result.dimensions if d.name == "role_title")
+    assert role.score == 0.0
+
+
+def test_skills_overlap_ignores_stopwords() -> None:
+    # Filler tokens leaked from multi-word skill names must not count as hits.
+    result = score_job(
+        job={
+            "title": "X",
+            "jd_text": "We build software as a service and we ship.",
+            "company": "X",
+            "location": None,
+        },
+        target=_target(),
+        user_tech_tokens={"and", "as", "we", "python"},
+    )
+    skills = next(d for d in result.dimensions if d.name == "skills_overlap")
+    assert skills.score == 0.0  # and/as/we filtered; python not in the JD
 
 
 def test_skills_overlap_counts_tech_hits() -> None:
@@ -77,8 +109,8 @@ def test_skills_overlap_counts_tech_hits() -> None:
         user_tech_tokens={"python", "sql", "kubernetes", "rust"},
     )
     skills = next(d for d in result.dimensions if d.name == "skills_overlap")
-    # 3 hits / max(3, min(4, 8)) = 3/4 = 0.75
-    assert skills.score == 0.75
+    # 3 hits / skills_target_hits (5) = 0.6
+    assert skills.score == 0.6
     assert "python" in skills.reason
 
 
@@ -196,9 +228,10 @@ def test_total_is_weighted_sum() -> None:
         ),
         user_tech_tokens={"python", "sql"},
     )
-    # role_title=1.0 · 0.3 + skills=0.667 · 0.3 + company=1.0 · 0.15 +
-    # location=1.0 · 0.15 + flags=1.0 · 0.1 ≈ 0.90
-    assert result.total >= 0.85
+    # No embedder here, so semantic_fit is omitted and the five lexical
+    # weights (sum 0.65) are renormalized. role=1.0, skills=2/5=0.4,
+    # company=1.0, location=1.0, flags=1.0 -> 0.53 / 0.65 ~= 0.82.
+    assert result.total >= 0.80
     assert result.total <= 1.0
 
 
@@ -284,3 +317,38 @@ def test_score_all_new_with_skills_in_library(tmp_db: sqlite3.Connection) -> Non
     skills = next(d for d in breakdown["dimensions"] if d["name"] == "skills_overlap")
     assert skills["score"] > 0.0
     assert "python" in skills["reason"]
+
+
+# ─── v0.4: semantic dimension + calibration ───────────────────────────
+
+
+def test_semantic_fit_added_when_provided() -> None:
+    result = score_job(
+        job={"title": "Eng", "jd_text": "Python.", "company": "X", "location": None},
+        target=_target(),
+        user_tech_tokens={"python"},
+        semantic_fit=0.8,
+    )
+    assert "semantic_fit" in {d.name for d in result.dimensions}
+    sf = next(d for d in result.dimensions if d.name == "semantic_fit")
+    assert sf.score == 0.8
+
+
+def test_semantic_fit_omitted_without_embedder() -> None:
+    result = score_job(
+        job={"title": "Eng", "jd_text": "Python.", "company": "X", "location": None},
+        target=_target(),
+        user_tech_tokens={"python"},
+    )
+    assert "semantic_fit" not in {d.name for d in result.dimensions}
+    assert 0.0 <= result.total <= 1.0
+
+
+def test_calibrate_bands_ranks_by_percentile() -> None:
+    from matchbox.scoring.rubric import calibrate_bands
+
+    totals = [0.1, 0.2, 0.3, 0.5, 0.6, 0.75, 0.8, 0.9, 0.95, 0.99]
+    bands = calibrate_bands(totals)
+    assert len(bands) == len(totals)
+    assert bands[totals.index(max(totals))] == "strong"
+    assert bands[totals.index(min(totals))] == "skip"

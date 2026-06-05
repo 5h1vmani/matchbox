@@ -16,11 +16,73 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from matchbox.core.text import tokenize as _tokens_list
+from matchbox.matching.embed import Embedder, cached_encode, cosine
 
 RUBRIC_PATH = Path(__file__).resolve().parents[3] / "shared" / "rubric.json"
 
 REMOTE_TOKENS = {"remote", "anywhere", "distributed", "work-from-home", "wfh"}
+
+# Filler tokens that must never count as a skill hit. The shared tokenizer
+# does not strip stopwords, so multi-word skill names ("Directing AI coding
+# agents") would otherwise leak "and"/"to" into the skill set.
+_STOPWORDS = {
+    "a",
+    "an",
+    "as",
+    "at",
+    "by",
+    "in",
+    "of",
+    "on",
+    "or",
+    "to",
+    "is",
+    "it",
+    "and",
+    "the",
+    "for",
+    "with",
+    "you",
+    "your",
+    "our",
+    "are",
+    "from",
+    "this",
+    "that",
+    "into",
+    "per",
+    "via",
+    "use",
+    "using",
+    "etc",
+    "we",
+    "be",
+    "all",
+}
+
+# Role words too generic to imply a title match on their own (a lone
+# "engineer" must not make a coding-IC role look like an AI-role fit).
+_GENERIC_ROLE_WORDS = {
+    "engineer",
+    "engineering",
+    "developer",
+    "senior",
+    "staff",
+    "principal",
+    "lead",
+    "manager",
+    "director",
+    "specialist",
+    "associate",
+    "of",
+    "and",
+    "the",
+    "sr",
+    "jr",
+}
 
 
 @dataclass(slots=True)
@@ -58,6 +120,7 @@ def load_rubric() -> dict[str, Any]:
 
 
 _RUBRIC = load_rubric()
+_SKILLS_TARGET_HITS = max(1, int(_RUBRIC.get("skills_target_hits", 5)))
 
 
 def _weights() -> dict[str, float]:
@@ -91,10 +154,12 @@ def _role_title_score(job_title: str, role_families: list[str]) -> DimensionScor
     best_overlap = 0.0
     best_family = ""
     for fam in role_families:
-        fam_tokens = _tokens(fam)
-        if not fam_tokens:
+        # Match on the family's *meaningful* tokens only; a shared generic
+        # word like "engineer" must not produce a title match by itself.
+        fam_meaningful = _tokens(fam) - _GENERIC_ROLE_WORDS
+        if not fam_meaningful:
             continue
-        overlap = len(title_tokens & fam_tokens) / len(fam_tokens)
+        overlap = len(title_tokens & fam_meaningful) / len(fam_meaningful)
         if overlap > best_overlap:
             best_overlap = overlap
             best_family = fam
@@ -105,7 +170,7 @@ def _role_title_score(job_title: str, role_families: list[str]) -> DimensionScor
         reason=(
             f"matched {best_overlap:.0%} of '{best_family}'"
             if best_family
-            else "no overlap with target role_families"
+            else "no meaningful overlap with target role_families"
         ),
     )
 
@@ -120,8 +185,13 @@ def _skills_overlap_score(jd_text: str, user_tech_tokens: set[str]) -> Dimension
             reason="no library skills/tech yet (neutral)",
         )
     jd_tokens = _tokens(jd_text)
-    hits = sorted(user_tech_tokens & jd_tokens)
-    score = min(len(hits) / max(3, min(len(user_tech_tokens), 8)), 1.0)
+    # Drop stopwords and 1-2 char tokens so filler pulled out of multi-word
+    # skill names ("and", "as", "to") cannot count as a skill hit.
+    hits = sorted(t for t in (user_tech_tokens & jd_tokens) if len(t) > 2 and t not in _STOPWORDS)
+    # Explicit-skill recall, normalized by a tunable target hit count.
+    # (Replaces the old max(3, min(n, 8)) denominator, which silently
+    # capped users with few skills below 1.0.)
+    score = min(len(hits) / _SKILLS_TARGET_HITS, 1.0)
     if not hits:
         return DimensionScore(
             name="skills_overlap",
@@ -135,6 +205,22 @@ def _skills_overlap_score(jd_text: str, user_tech_tokens: set[str]) -> Dimension
         score=score,
         weight=weight,
         reason=f"{len(hits)} skill hit{'s' if len(hits) != 1 else ''}: {listed}",
+    )
+
+
+def _semantic_fit_score(cosine_sim: float) -> DimensionScore:
+    """Dense-embedding fit: cosine(profile centroid, JD embedding).
+
+    Computed locally with bge-small, zero tokens. Clamped to [0, 1]; the
+    absolute meaning of the number comes from the batch calibration in
+    `calibrate_bands`, not from the raw cosine.
+    """
+    weight = _weights().get("semantic_fit", 0.35)
+    return DimensionScore(
+        name="semantic_fit",
+        score=max(0.0, min(cosine_sim, 1.0)),
+        weight=weight,
+        reason=f"profile-JD embedding similarity {cosine_sim:.2f}",
     )
 
 
@@ -269,47 +355,123 @@ def score_job(
     job: dict[str, Any],
     target: dict[str, list[str]],
     user_tech_tokens: set[str],
+    semantic_fit: float | None = None,
 ) -> JobScore:
-    """Score one job. Pure function. No DB writes."""
-    dimensions = [
-        _role_title_score(job["title"], target["role_families"]),
-        _skills_overlap_score(job["jd_text"] or "", user_tech_tokens),
-        _company_tier_score(job["company"], target["dream_companies"], target["exclusions"]),
-        _location_remote_score(job.get("location"), target["locations"]),
-        _red_flags_score(job["jd_text"] or "", job["title"], job["company"], target["exclusions"]),
-    ]
-    total = sum(d.score * d.weight for d in dimensions)
+    """Score one job. Pure function. No DB writes.
+
+    `semantic_fit` is the precomputed cosine between the profile centroid
+    and the JD embedding (see `score_all_new`). When None (no embedder,
+    e.g. unit tests), the dimension is omitted and the remaining weights
+    are renormalized so the total still lands in [0, 1].
+    """
+    dimensions: list[DimensionScore] = []
+    if semantic_fit is not None:
+        dimensions.append(_semantic_fit_score(semantic_fit))
+    dimensions.extend(
+        [
+            _role_title_score(job["title"], target["role_families"]),
+            _skills_overlap_score(job["jd_text"] or "", user_tech_tokens),
+            _company_tier_score(job["company"], target["dream_companies"], target["exclusions"]),
+            _location_remote_score(job.get("location"), target["locations"]),
+            _red_flags_score(
+                job["jd_text"] or "", job["title"], job["company"], target["exclusions"]
+            ),
+        ]
+    )
+    weight_sum = sum(d.weight for d in dimensions)
+    total = sum(d.score * d.weight for d in dimensions) / weight_sum if weight_sum else 0.0
     return JobScore(total=total, dimensions=dimensions)
 
 
-def score_all_new(conn: sqlite3.Connection) -> int:
-    """Score every job with status='new'. Flip status to 'scored'. Returns count."""
+def _profile_centroid(conn: sqlite3.Connection, embedder: Embedder) -> np.ndarray | None:
+    """Mean of the L2-normalized embeddings of the user's bullets and
+    skills. The single vector that represents "who this candidate is",
+    compared against each JD embedding for the semantic_fit signal."""
+    items: list[tuple[str, int, str]] = []
+    for r in conn.execute("SELECT id, text FROM bullet"):
+        items.append(("bullet", int(r["id"]), str(r["text"])))
+    for r in conn.execute("SELECT id, name FROM skill"):
+        items.append(("skill", int(r["id"]), str(r["name"])))
+    if not items:
+        return None
+    vecs = cached_encode(conn, embedder, items)
+    normed = [v / max(float(np.linalg.norm(v)), 1e-12) for v in vecs.values()]
+    if not normed:
+        return None
+    centroid: np.ndarray = np.vstack(normed).mean(axis=0)
+    return centroid
+
+
+def calibrate_bands(totals: list[float]) -> list[str]:
+    """Map raw totals to interpretable bands. Percentile-based across the
+    batch (adaptive to the user's market) when there are enough jobs;
+    fixed thresholds otherwise. No labels required."""
+    cfg = _RUBRIC.get("calibration", {})
+    bands: list[str] = cfg.get("bands", ["skip", "weak", "stretch", "strong"])
+    if not totals:
+        return []
+    if len(totals) >= 5:
+        cutoffs = [
+            float(q)
+            for q in np.quantile(np.array(totals), cfg.get("quantile_cutoffs", [0.4, 0.7, 0.9]))
+        ]
+    else:
+        cutoffs = [0.3, 0.5, 0.7]
+    return [bands[min(sum(1 for c in cutoffs if t >= c), len(bands) - 1)] for t in totals]
+
+
+def _compute_and_store(
+    conn: sqlite3.Connection,
+    rows: list[sqlite3.Row],
+    embedder: Embedder | None,
+    *,
+    status_clause: str,
+) -> int:
     target = _load_target(conn)
     tokens = _user_tech_tokens(conn)
+    centroid = _profile_centroid(conn, embedder) if embedder is not None else None
+
+    scored: list[tuple[int, JobScore]] = []
+    for r in rows:
+        job = dict(r)
+        semantic_fit: float | None = None
+        if embedder is not None and centroid is not None and job.get("jd_text"):
+            jd_vec = embedder.encode([job["jd_text"]])[0]
+            semantic_fit = cosine(centroid, jd_vec)
+        scored.append(
+            (
+                int(job["id"]),
+                score_job(
+                    job=job, target=target, user_tech_tokens=tokens, semantic_fit=semantic_fit
+                ),
+            )
+        )
+
+    bands = calibrate_bands([s.total for _, s in scored])
+    for (jid, result), band in zip(scored, bands, strict=True):
+        breakdown = result.to_breakdown_dict()
+        breakdown["band"] = band
+        conn.execute(
+            f"UPDATE job SET score = ?, score_breakdown_json = ?, status = {status_clause} WHERE id = ?",
+            (result.total, json.dumps(breakdown), jid),
+        )
+    return len(scored)
+
+
+def score_all_new(conn: sqlite3.Connection, embedder: Embedder | None = None) -> int:
+    """Score every job with status='new'; flip status to 'scored'. Returns count.
+
+    Pass an `embedder` to enable the semantic_fit dimension (the web app
+    does; unit tests omit it to stay off the model download path)."""
     rows = conn.execute(
         "SELECT id, company, title, location, jd_text FROM job WHERE status = 'new'"
     ).fetchall()
-    n = 0
-    for r in rows:
-        job = dict(r)
-        result = score_job(job=job, target=target, user_tech_tokens=tokens)
-        conn.execute(
-            """
-            UPDATE job SET score = ?, score_breakdown_json = ?, status = 'scored'
-             WHERE id = ?
-            """,
-            (result.total, json.dumps(result.to_breakdown_dict()), job["id"]),
-        )
-        n += 1
-    return n
+    return _compute_and_store(conn, rows, embedder, status_clause="'scored'")
 
 
-def rescore_all(conn: sqlite3.Connection) -> int:
-    """Recompute scores for every job that has not been tailored/applied yet.
-    Status moves to 'scored'; any 'new' rows also get a score in the same pass.
-    Tailored/applied jobs are intentionally left alone."""
-    target = _load_target(conn)
-    tokens = _user_tech_tokens(conn)
+def rescore_all(conn: sqlite3.Connection, embedder: Embedder | None = None) -> int:
+    """Recompute scores for every job not yet tailored/applied. 'new' rows
+    move to 'scored'; tailored/applied jobs are left alone."""
     rows = conn.execute(
         """
         SELECT id, company, title, location, jd_text
@@ -317,18 +479,6 @@ def rescore_all(conn: sqlite3.Connection) -> int:
          WHERE status IN ('new', 'scored', 'selected', 'rejected', 'skipped')
         """
     ).fetchall()
-    n = 0
-    for r in rows:
-        job = dict(r)
-        result = score_job(job=job, target=target, user_tech_tokens=tokens)
-        conn.execute(
-            """
-            UPDATE job
-               SET score = ?, score_breakdown_json = ?,
-                   status = CASE WHEN status = 'new' THEN 'scored' ELSE status END
-             WHERE id = ?
-            """,
-            (result.total, json.dumps(result.to_breakdown_dict()), job["id"]),
-        )
-        n += 1
-    return n
+    return _compute_and_store(
+        conn, rows, embedder, status_clause="CASE WHEN status = 'new' THEN 'scored' ELSE status END"
+    )

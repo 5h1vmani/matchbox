@@ -54,6 +54,11 @@ RUNS_DIR = PROJECT_ROOT / "runs"
 TEMPLATE_DIR = PROJECT_ROOT / "src" / "matchbox" / "templates" / "typst"
 CV_TEMPLATE = TEMPLATE_DIR / "cv.typ"
 COVER_TEMPLATE = TEMPLATE_DIR / "cover.typ"
+# Fonts are bundled in-repo and passed to Typst via --font-path, so renders do
+# not depend on system-installed fonts. The old template named fonts that were
+# never installed (Source Serif Pro, Inter), so every render silently fell back
+# to a Typst default. Bundling makes typography deterministic and portable.
+FONTS_DIR = PROJECT_ROOT / "shared" / "fonts"
 DEFAULT_K = 12  # max bullets across all roles
 
 
@@ -346,37 +351,16 @@ def _ensure_typst() -> str:
 
 
 def _render_pdf(cv_json_path: Path, out_path: Path, palette: str, font: str) -> None:
-    """Render the Typst CV.
+    """Render the CV from cv.json to PDF.
 
-    Typst restricts file reads to `--root`. We copy the template alongside
-    cv.json into the output dir and set --root to that dir, so both files
-    are reachable and the render is fully self-contained (re-runnable
-    from the artifact dir alone).
+    Uses the in-repo HTML/CSS template plus weasyprint (pure Python, no
+    browser): the v0.1 layout, and pdftotext reads it in correct order. The
+    populated HTML is written beside cv.json so the artifact dir stays
+    self-contained and re-renderable.
     """
-    typst = _ensure_typst()
-    root_dir = cv_json_path.parent
-    local_template = root_dir / "cv.typ"
-    shutil.copy2(CV_TEMPLATE, local_template)
+    from matchbox.render_html import render_cv_pdf
 
-    cmd = [
-        typst,
-        "compile",
-        str(local_template),
-        str(out_path),
-        "--root",
-        str(root_dir),
-        "--input",
-        f"data={cv_json_path.name}",
-        "--input",
-        f"palette={palette}",
-        "--input",
-        f"font={font}",
-    ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"typst compile failed (rc={proc.returncode}):\n{proc.stderr or proc.stdout}"
-        )
+    render_cv_pdf(cv_json_path, out_path, palette=palette, font=font)
 
 
 def _extract_pdf_text(pdf_path: Path) -> str:
@@ -778,6 +762,8 @@ def _render_cover_pdf(
         str(out_path),
         "--root",
         str(root_dir),
+        "--font-path",
+        str(FONTS_DIR),
         "--input",
         f"data={cover_txt_path.name}",
         "--input",

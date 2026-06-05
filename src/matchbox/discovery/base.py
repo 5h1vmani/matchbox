@@ -36,6 +36,11 @@ class JobRecord:
     apply_url: str | None
     jd_text: str  # cleaned (no HTML tags) JD body
     posted_at: str | None  # ISO 8601 if the source provides it
+    # Optional, country-agnostic fields (see product-thesis "Discovery
+    # architecture"): aggregator sources tag region + remote. ATS pollers
+    # leave these at their defaults, so existing pollers/tests are unaffected.
+    country: str | None = None  # ISO-ish country code/name the source reports
+    remote: bool = False  # True when the role is remote
 
 
 class PollerError(Exception):

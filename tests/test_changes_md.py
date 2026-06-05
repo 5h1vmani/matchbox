@@ -155,8 +155,8 @@ def test_changes_md_keyword_misses_link_to_candidate_bullets(
                     "requirements": [
                         {
                             "type": "must-have",
-                            "text": "Operate Kubernetes clusters",
-                            "keywords": ["k8s"],
+                            "text": "Operate Kubernetes clusters with Helm",
+                            "keywords": ["helm"],
                             "variants": [],
                         }
                     ],
@@ -171,7 +171,7 @@ def test_changes_md_keyword_misses_link_to_candidate_bullets(
                 "Operated Kubernetes clusters.",
                 "Built ETL pipelines.",
                 "Wrote PHP utilities.",
-                "Operate Kubernetes clusters kubernetes k8s",
+                "Operate Kubernetes clusters with Helm helm",
             ]
             for w in tokenize(t)
         )

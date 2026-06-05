@@ -1,0 +1,185 @@
+{
+  "corpus_version": 1,
+  "_comment": "Small synthetic, PII-free golden corpus for the eval harness. The candidate is a fictional backend/data engineer. Scoring cases are JDs labeled with a graded relevance (0 irrelevant, 1 adjacent, 2 strong) RELATIVE TO THIS CANDIDATE. Selection cases pair a requirement set with the 0-based indices of the candidate bullets that should cover each must-have. Labels are hand-set so a correct algorithm (lexical + semantic + selection) ranks and covers well; they double as regression anchors. Vocabulary in the relevant JDs deliberately overlaps the candidate's bullets/skills so the bag-of-words FakeEmbedder and a real bge embedder agree on the ordering.",
+  "candidate": {
+    "profile": {
+      "full_name": "Alex Carter",
+      "headline": "Backend and data platform engineer"
+    },
+    "target": {
+      "role_families": ["backend-engineer", "data-platform-engineer"],
+      "dream_companies": ["Stripe"],
+      "locations": ["remote"],
+      "exclusions": ["gambling", "defense"]
+    },
+    "skills": [
+      "Python",
+      "PostgreSQL",
+      "Kubernetes",
+      "AWS",
+      "Airflow",
+      "SQL",
+      "Docker",
+      "Terraform"
+    ],
+    "bullets": [
+      {
+        "text": "Built ETL pipelines in Python that processed 30 million rows per day.",
+        "has_metric": true
+      },
+      {
+        "text": "Operated Kubernetes clusters across three AWS regions for the data platform.",
+        "has_metric": false
+      },
+      {
+        "text": "Designed PostgreSQL schemas and tuned slow analytical queries.",
+        "has_metric": false
+      },
+      {
+        "text": "Authored Terraform modules to provision the data warehouse infrastructure.",
+        "has_metric": false
+      },
+      {
+        "text": "Orchestrated nightly Airflow DAGs feeding the analytics warehouse.",
+        "has_metric": false
+      },
+      {
+        "text": "Mentored two junior engineers on backend service design.",
+        "has_metric": true
+      },
+      {
+        "text": "Reduced API latency by 40 percent by adding Redis caching.",
+        "has_metric": true
+      }
+    ]
+  },
+  "scoring_cases": [
+    {
+      "id": "backend-data-strong",
+      "relevance": 2,
+      "job": {
+        "company": "Stripe",
+        "title": "Backend Data Platform Engineer",
+        "location": "Remote",
+        "jd_text": "We are hiring a backend engineer for our data platform. You will build ETL pipelines in Python, operate Kubernetes clusters on AWS, and design PostgreSQL schemas. Airflow orchestration and Terraform experience are a plus."
+      }
+    },
+    {
+      "id": "python-data-engineer-strong",
+      "relevance": 2,
+      "job": {
+        "company": "DataWorks",
+        "title": "Data Engineer",
+        "location": "Remote",
+        "jd_text": "Build and operate ETL pipelines in Python feeding a PostgreSQL warehouse. Schedule Airflow DAGs and deploy on Kubernetes. SQL fluency required."
+      }
+    },
+    {
+      "id": "platform-engineer-adjacent",
+      "relevance": 1,
+      "job": {
+        "company": "CloudOps",
+        "title": "Platform Engineer",
+        "location": "Remote",
+        "jd_text": "Operate Kubernetes and write Terraform to manage AWS infrastructure. Some Python scripting. This is an infrastructure-leaning role, less data work."
+      }
+    },
+    {
+      "id": "junior-php-irrelevant",
+      "relevance": 0,
+      "job": {
+        "company": "WebShop",
+        "title": "Junior PHP Developer",
+        "location": "On-site Austin",
+        "jd_text": "Maintain a legacy PHP and WordPress storefront. Write some MySQL and jQuery. Front-of-house e-commerce work."
+      }
+    },
+    {
+      "id": "frontend-designer-irrelevant",
+      "relevance": 0,
+      "job": {
+        "company": "Pixel",
+        "title": "Frontend Designer",
+        "location": "On-site New York",
+        "jd_text": "Design and build delightful React interfaces. Strong Figma, CSS, and visual design skills. No backend work."
+      }
+    },
+    {
+      "id": "sales-rep-irrelevant",
+      "relevance": 0,
+      "job": {
+        "company": "SellCo",
+        "title": "Account Executive",
+        "location": "On-site Chicago",
+        "jd_text": "Drive new business, manage a sales pipeline in Salesforce, and hit quota. Excellent communication and negotiation skills."
+      }
+    },
+    {
+      "id": "gambling-backend-excluded",
+      "relevance": 0,
+      "job": {
+        "company": "BetHouse",
+        "title": "Backend Engineer",
+        "location": "Remote",
+        "jd_text": "Build Python backend services for our online gambling platform with PostgreSQL and Kubernetes. High-traffic betting systems."
+      }
+    }
+  ],
+  "selection_cases": [
+    {
+      "id": "data-platform-musthaves",
+      "requirements": [
+        {
+          "type": "must-have",
+          "text": "Build and operate ETL data pipelines in Python.",
+          "keywords": ["etl", "pipelines", "python"],
+          "variants": []
+        },
+        {
+          "type": "must-have",
+          "text": "Operate Kubernetes clusters in production.",
+          "keywords": ["kubernetes"],
+          "variants": ["k8s"]
+        },
+        {
+          "type": "must-have",
+          "text": "Design and tune PostgreSQL databases.",
+          "keywords": ["postgresql"],
+          "variants": ["postgres"]
+        },
+        {
+          "type": "responsibility",
+          "text": "Mentor junior engineers.",
+          "keywords": ["mentor"],
+          "variants": []
+        }
+      ],
+      "expected_cover_bullets": {
+        "0": [0],
+        "1": [1],
+        "2": [2]
+      }
+    },
+    {
+      "id": "infra-musthaves",
+      "requirements": [
+        {
+          "type": "must-have",
+          "text": "Write Terraform to provision infrastructure.",
+          "keywords": ["terraform"],
+          "variants": []
+        },
+        {
+          "type": "must-have",
+          "text": "Schedule and orchestrate Airflow data workflows.",
+          "keywords": ["airflow"],
+          "variants": []
+        }
+      ],
+      "expected_cover_bullets": {
+        "0": [3],
+        "1": [4]
+      }
+    }
+  ]
+}

@@ -31,6 +31,13 @@
       contains
       <input name="q" value="{{ filter_q or '' }}" class="border border-border rounded px-1 py-0.5" placeholder="company or title" />
     </label>
+    <label class="flex items-center gap-1">
+      <input type="checkbox" name="remote" value="true" {% if filter_remote %}checked{% endif %} /> remote only
+    </label>
+    <label>
+      country
+      <input name="country" value="{{ filter_country or '' }}" class="w-12 border border-border rounded px-1 py-0.5" placeholder="in" />
+    </label>
     <button class="text-text-muted underline">apply</button>
     <a href="/inbox" class="text-text-muted underline">reset</a>
   </form>

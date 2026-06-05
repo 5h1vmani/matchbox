@@ -1,0 +1,156 @@
+/* Matchbox — shared interactive parts: quick-action menu, pipeline views. */
+const { useState: usePS, useRef: usePR, useEffect: usePE } = React;
+
+function useOutside(ref, onClose) {
+  usePE(() => {
+    function h(e) { if (ref.current && !ref.current.contains(e.target)) onClose(); }
+    document.addEventListener("mousedown", h);
+    document.addEventListener("keydown", (e) => e.key === "Escape" && onClose());
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+}
+
+/* The quick-action popover — advance, log response, remind, note, close.
+   Same menu used on list rows, board cards, today rows. */
+function QuickMenu({ app, actions, flash, onOpen, onClose, up }) {
+  const ref = usePR(null);
+  useOutside(ref, onClose);
+  const i = window.FLOW.indexOf(app.stage);
+  const nextStage = i >= 0 && i < window.FLOW.length - 1 ? window.FLOW[i + 1] : null;
+
+  const act = (fn, msg, undo) => { fn(); if (msg) flash(msg, undo); onClose(); };
+
+  return (
+    <div className={window.cx("menu", up && "up")} ref={ref} onClick={(e) => e.stopPropagation()}>
+      {nextStage && (
+        <button className="mitem" onClick={() => act(() => actions.advanceStage(app.id), "Moved to " + window.stageLabel(nextStage).toLowerCase())}>
+          <Icon name="arrow-right" size={15} /> Move to {window.stageLabel(nextStage).toLowerCase()}
+        </button>
+      )}
+      <div className="menu__sec">Log a response</div>
+      <button className="mitem" onClick={() => act(() => actions.logResponse(app.id, "reply"), "Logged a reply from " + app.company)}>
+        <Icon name="mail-check" size={15} /> Heard back
+      </button>
+      <button className="mitem" onClick={() => act(() => actions.logResponse(app.id, "rejected"), app.company + " marked closed")}>
+        <Icon name="x-circle" size={15} /> Rejected
+      </button>
+      <button className="mitem" onClick={() => act(() => actions.logResponse(app.id, "ghosted"), "Marked as no response")}>
+        <Icon name="ghost" size={15} /> No response
+      </button>
+      <div className="menu__div" />
+      <div className="menu__sec">Remind me</div>
+      <button className="mitem" onClick={() => act(() => actions.remind(app.id, 0), "Reminder set for today")}>
+        <Icon name="bell" size={15} /> Today
+      </button>
+      <button className="mitem" onClick={() => act(() => actions.remind(app.id, 3), "Reminder set for in 3 days")}>
+        <Icon name="bell" size={15} /> In 3 days <span className="k">3d</span>
+      </button>
+      <button className="mitem" onClick={() => act(() => actions.remind(app.id, 7), "Reminder set for next week")}>
+        <Icon name="bell" size={15} /> Next week <span className="k">7d</span>
+      </button>
+      <div className="menu__div" />
+      <button className="mitem" onClick={() => { onClose(); onOpen(app, "note"); }}>
+        <Icon name="sticky-note" size={15} /> Add a note
+      </button>
+      <button className="mitem" onClick={() => { onClose(); onOpen(app); }}>
+        <Icon name="panel-right-open" size={15} /> Open details
+      </button>
+    </div>
+  );
+}
+
+/* A button that toggles a QuickMenu. */
+function QuickButton({ app, actions, flash, onOpen, up, className }) {
+  const [open, setOpen] = usePS(false);
+  return (
+    <span className="menu-wrap">
+      <button className={window.cx("iconbtn", className)} title="Quick actions"
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}>
+        <Icon name="more-horizontal" size={17} />
+      </button>
+      {open && <QuickMenu app={app} actions={actions} flash={flash} onOpen={onOpen} onClose={() => setOpen(false)} up={up} />}
+    </span>
+  );
+}
+
+function StarBtn({ app, actions, size = 15 }) {
+  return (
+    <button className={window.cx("iconbtn", app.starred && "on")} title={app.starred ? "Unstar" : "Star"}
+      onClick={(e) => { e.stopPropagation(); actions.toggleStar(app.id); }}>
+      <span className={window.cx("star", app.starred && "on")}>
+        <Icon name="star" size={size} style={app.starred ? { fill: "#c79a3b" } : {}} />
+      </span>
+    </button>
+  );
+}
+
+/* ---- Pipeline: chips (compact filter row) ---- */
+function PipeChips({ counts, total, active, onPick }) {
+  return (
+    <div className="pipe-chips">
+      <button className={window.cx("stagechip", active === "all" && "active")} onClick={() => onPick("all")}>
+        All <span className="c mono">{total}</span>
+      </button>
+      {window.STAGES.map((s) => (
+        <button key={s.id} className={window.cx("stagechip", active === s.id && "active")} onClick={() => onPick(s.id)}>
+          <StageDot stage={s.id} /> {s.label} <span className="c mono">{counts[s.id] || 0}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ---- Pipeline: proportional segmented bar + legend (ledger) ---- */
+function PipeBar({ counts, total, active, onPick }) {
+  const stages = window.STAGES;
+  return (
+    <div className="pipebar">
+      <div className="pipebar__track">
+        {stages.map((s) => {
+          const n = counts[s.id] || 0;
+          if (!n) return null;
+          return (
+            <div key={s.id} className="pipebar__seg" title={s.label + ": " + n}
+              onClick={() => onPick(active === s.id ? "all" : s.id)}
+              style={{ flex: n, background: s.tone, opacity: active === "all" || active === s.id ? 1 : 0.32 }} />
+          );
+        })}
+      </div>
+      <div className="pipebar__legend">
+        <button className={window.cx("pipebar__key", active === "all" && "active")} onClick={() => onPick("all")}>
+          <span className="c">{total}</span> <span className="k">in pipeline</span>
+        </button>
+        {stages.map((s) => (
+          <button key={s.id} className={window.cx("pipebar__key", active === s.id && "active")} onClick={() => onPick(active === s.id ? "all" : s.id)}>
+            <StageDot stage={s.id} /> <span className="k">{s.label}</span> <span className="c">{counts[s.id] || 0}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---- Pipeline: funnel bars (focus) ---- */
+function Funnel({ counts, active, onPick }) {
+  const stages = window.STAGES;
+  const max = Math.max(1, ...stages.map((s) => counts[s.id] || 0));
+  return (
+    <div className="funnel">
+      {stages.map((s) => {
+        const n = counts[s.id] || 0;
+        const pct = Math.round((n / max) * 100);
+        return (
+          <div key={s.id} className={window.cx("frow", active === s.id && "active")} onClick={() => onPick(active === s.id ? "all" : s.id)}>
+            <div className="fl"><StageDot stage={s.id} /> {s.label}</div>
+            <div className="fbar-wrap">
+              <div className="fbar" style={{ width: Math.max(pct, n ? 6 : 0) + "%", background: s.tone, opacity: active === "all" || active === s.id ? 1 : 0.4 }} />
+            </div>
+            <div className="fc">{n}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+Object.assign(window, { QuickMenu, QuickButton, StarBtn, PipeChips, PipeBar, Funnel, useOutside });

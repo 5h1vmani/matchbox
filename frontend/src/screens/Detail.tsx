@@ -7,6 +7,7 @@ import { cx, dueInfo, eventIcon } from "../lib/derive";
 import { Icon } from "../ui/icon";
 import { Badge, MonoLogo, StageStepper } from "../ui/atoms";
 import { QuickButton, StarBtn } from "../ui/parts";
+import { useDialog } from "../lib/useDialog";
 
 function whenText(daysAgo: number): string {
   if (daysAgo <= 0) return "Today";
@@ -41,6 +42,7 @@ interface Cta {
 export function Detail({ app, actions, flash, onClose, focusNote }: DetailProps) {
   const [note, setNote] = useState("");
   const noteRef = useRef<HTMLTextAreaElement>(null);
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
   useEffect(() => { if (focusNote && noteRef.current) noteRef.current.focus(); }, [focusNote]);
 
   const a = app.nextAction;
@@ -66,7 +68,7 @@ export function Detail({ app, actions, flash, onClose, focusNote }: DetailProps)
 
   return (
     <div className="scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="drawer" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="drawer" ref={dialogRef} role="dialog" aria-modal="true" aria-label={app.company} tabIndex={-1} onMouseDown={(e) => e.stopPropagation()}>
         <div className="drawer__top">
           <button className="iconbtn" onClick={onClose} title="Close"><Icon name="x" size={18} /></button>
           <span className="sp" />

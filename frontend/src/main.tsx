@@ -11,19 +11,25 @@ import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/600.css";
 
-// Design-team tokens + component styles, copied verbatim from designs/v1.
+// Design-team tokens + component styles, copied verbatim from designs/v1[.1].
 import "./styles/colors_and_type.css";
 import "./styles/mb.css";
+// Discovery surfaces' component styles (verbatim from designs/v1.1).
+import "./styles/discovery.css";
 // App layer (loaded last): locks light scheme for v1 (dark was not designed).
 import "./styles/app.css";
 
-import { App } from "./App";
+import { Shell } from "./Shell";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("missing #root");
 
+// One unified shell (Track + Discover + a Workspace group), internally routed.
+// FastAPI serves this index.html at /, /tracker, and /discover[/*]; the shell
+// picks the initial screen from the path. `?sample` puts Discover in fixture
+// mode (for screenshots / offline).
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <Shell />
   </StrictMode>,
 );

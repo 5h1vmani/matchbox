@@ -195,7 +195,7 @@ export function Tracker({ apps, actions, flash, onOpen, dir, view, setView, filt
             <button className={cx(view === "list" && "active")} onClick={() => setView("list")}><Icon name="list" size={15} /> List</button>
             <button className={cx(view === "board" && "active")} onClick={() => setView("board")}><Icon name="columns-3" size={15} /> Board</button>
           </div>
-          <button className="btn" onClick={() => flash("New application form would open here")}><Icon name="plus" size={16} /> Add</button>
+          <button className="btn" onClick={() => { window.location.href = "/discover"; }}><Icon name="plus" size={16} /> Add</button>
         </div>
       </div>
 

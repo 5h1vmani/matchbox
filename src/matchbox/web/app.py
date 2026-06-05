@@ -9,13 +9,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from matchbox.web.deps import ConnDep
 from matchbox.web.routes import (
     api,
-    applications,
+    discovery,
     inbox,
     library,
     onboarding,
@@ -41,7 +41,7 @@ def create_app() -> FastAPI:
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     app.include_router(api.router)
-    app.include_router(applications.router)
+    app.include_router(discovery.router)
     app.include_router(inbox.router)
     app.include_router(library.router)
     app.include_router(onboarding.router)
@@ -53,25 +53,36 @@ def create_app() -> FastAPI:
 
     spa_index = STATIC_DIR / "app" / "index.html"
 
-    @app.get("/tracker", include_in_schema=False)
-    def tracker() -> FileResponse:
-        """Serve the React applications-tracker SPA (built from frontend/)."""
+    def _spa() -> FileResponse:
+        """Serve the built single-page app (the shell switches on the URL path)."""
         if not spa_index.exists():
             raise HTTPException(
                 status_code=503,
-                detail="tracker UI not built (run: cd frontend && npm run build)",
+                detail="SPA not built (run: cd frontend && npm run build)",
             )
         return FileResponse(str(spa_index))
+
+    @app.get("/tracker", include_in_schema=False)
+    def tracker() -> FileResponse:
+        """Serve the React applications-tracker SPA (built from frontend/)."""
+        return _spa()
+
+    @app.get("/discover", include_in_schema=False)
+    @app.get("/discover/{rest:path}", include_in_schema=False)
+    def discover(rest: str = "") -> FileResponse:
+        """Serve the React Discovery SPA (same bundle; main.tsx renders the
+        Discovery shell for /discover paths)."""
+        return _spa()
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
     @app.get("/", include_in_schema=False)
-    def root(conn: ConnDep) -> RedirectResponse:
-        """If we have any library state, go to /library. Else /onboarding."""
+    def root(conn: ConnDep) -> Response:
+        """Home: the unified React dashboard once onboarded, else onboarding."""
         if onboarding.profile_exists(conn):
-            return RedirectResponse(url="/library", status_code=302)
+            return _spa()
         return RedirectResponse(url="/onboarding", status_code=302)
 
     return app

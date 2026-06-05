@@ -39,12 +39,15 @@ def test_root_redirects_to_onboarding_when_empty(client: TestClient) -> None:
     assert r.headers["location"] == "/onboarding"
 
 
-def test_root_redirects_to_library_when_profile_exists(client: TestClient) -> None:
-    # Once any experience exists, the root sends the user to the library.
+def test_root_serves_spa_when_profile_exists(client: TestClient) -> None:
+    # Once onboarded, root serves the unified React SPA (Track + Discover +
+    # Workspace) — no longer the old Jinja-library redirect. A 503 is only
+    # possible when the frontend bundle is absent (e.g. CI without a build).
     client.post("/library/experiences", data={"company": "Modal", "role": "FDE"})
     r = client.get("/", follow_redirects=False)
-    assert r.status_code == 302
-    assert r.headers["location"] == "/library"
+    assert r.status_code in (200, 503)
+    if r.status_code == 200:
+        assert "text/html" in r.headers["content-type"]
 
 
 def test_create_experience_then_bullet(client: TestClient) -> None:

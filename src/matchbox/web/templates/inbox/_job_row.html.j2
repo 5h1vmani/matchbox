@@ -9,6 +9,12 @@
   <td class="px-2 py-1 text-xs font-mono">
     {% if job.score is not none %}
       {{ "%.2f"|format(job.score) }}
+      {% if job.breakdown and job.breakdown.band %}
+        <div class="mt-0.5 text-[10px] font-sans font-semibold uppercase tracking-wide
+          {% if job.breakdown.band == 'strong' %}text-success
+          {% elif job.breakdown.band == 'stretch' %}text-accent
+          {% else %}text-text-muted{% endif %}">{{ job.breakdown.band }}</div>
+      {% endif %}
     {% else %}
       —
     {% endif %}

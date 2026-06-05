@@ -63,6 +63,44 @@
   <div id="scan-summary"></div>
 </section>
 
+<section class="mb-6 border border-border bg-surface rounded p-4">
+  <h2 class="text-sm font-medium mb-2">Remote &amp; aggregator sources</h2>
+  <p class="text-xs text-text-muted mb-2">
+    Pull remote roles from Himalayas and Remotive (no key needed). Add a free
+    Adzuna key for broad full-time coverage including India.
+  </p>
+  <button
+    class="bg-accent text-white rounded px-3 py-1 text-sm"
+    hx-post="/sources/scan-remote"
+    hx-target="#remote-scan-summary"
+    hx-swap="outerHTML"
+    hx-indicator="#remote-indicator"
+  >Scan remote jobs</button>
+  <span id="remote-indicator" class="htmx-indicator text-xs text-text-muted ml-2">scanning…</span>
+  <div id="remote-scan-summary"></div>
+
+  <form
+    class="grid grid-cols-4 gap-2 items-end mt-3 pt-3 border-t border-border"
+    hx-post="/sources/adzuna"
+    hx-target="#adzuna-status"
+    hx-swap="innerHTML"
+  >
+    <label class="text-xs text-text-muted">Adzuna app_id
+      <input class="block w-full border border-border rounded px-2 py-1 text-sm" name="app_id" value="{{ adzuna.app_id or '' }}" /></label>
+    <label class="text-xs text-text-muted">Adzuna app_key
+      <input class="block w-full border border-border rounded px-2 py-1 text-sm" name="app_key" value="{{ adzuna.app_key or '' }}" /></label>
+    <label class="text-xs text-text-muted">Country
+      <input class="block w-full border border-border rounded px-2 py-1 text-sm" name="country" value="{{ (adzuna.queries[0].country if adzuna.queries else 'in') }}" placeholder="in" /></label>
+    <label class="text-xs text-text-muted">Keywords
+      <input class="block w-full border border-border rounded px-2 py-1 text-sm" name="what" value="{{ (adzuna.queries[0].what if adzuna.queries else '') }}" placeholder="e.g. backend" /></label>
+    <button class="bg-accent text-white rounded px-3 py-1 text-sm">Save Adzuna key</button>
+    <span id="adzuna-status" class="text-xs col-span-3"></span>
+  </form>
+  <p class="text-[10px] text-text-muted mt-1">
+    Free key at developer.adzuna.com. Results carry "Jobs by Adzuna" attribution.
+  </p>
+</section>
+
 <section>
   <table id="sources-table" class="w-full text-sm border border-border bg-surface rounded">
     <thead class="bg-bg">

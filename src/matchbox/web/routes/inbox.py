@@ -7,12 +7,14 @@ work-queue.json the brain will pick up.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
+from matchbox.matching.embed import Embedder, FastEmbedEmbedder
 from matchbox.scoring.rubric import score_all_new
 from matchbox.scoring.runs import JobSelection, create_run
 from matchbox.web.deps import ConnDep
@@ -34,6 +36,8 @@ def _list_jobs(
     status: str | None = None,
     min_score: float | None = None,
     q: str | None = None,
+    remote: bool | None = None,
+    country: str | None = None,
 ) -> list[dict[str, Any]]:
     where = ["status IN ('new', 'scored', 'selected', 'skipped', 'rejected')"]
     params: list[object] = []
@@ -45,11 +49,16 @@ def _list_jobs(
     if q:
         where.append("(company LIKE ? OR title LIKE ?)")
         params.extend([f"%{q}%", f"%{q}%"])
+    if remote:
+        where.append("remote = 1")
+    if country:
+        where.append("country = ?")
+        params.append(country.strip().lower())
     sql = f"""
         SELECT id, company, title, location, url, apply_url, jd_text,
-               status, score, score_breakdown_json
+               status, score, score_breakdown_json, country, remote
           FROM job
-         WHERE {' AND '.join(where)}
+         WHERE {" AND ".join(where)}
          ORDER BY COALESCE(score, 0) DESC, id DESC
     """
     rows = conn.execute(sql, params).fetchall()
@@ -70,8 +79,10 @@ def inbox_index(
     status: str | None = None,
     min_score: float | None = None,
     q: str | None = None,
+    remote: bool | None = None,
+    country: str | None = None,
 ) -> HTMLResponse:
-    jobs = _list_jobs(conn, status=status, min_score=min_score, q=q)
+    jobs = _list_jobs(conn, status=status, min_score=min_score, q=q, remote=remote, country=country)
     counts = {
         s: conn.execute("SELECT COUNT(*) FROM job WHERE status = ?", (s,)).fetchone()[0]
         for s in TRIAGE_STATUSES + ("tailored", "applied")
@@ -87,15 +98,28 @@ def inbox_index(
             "filter_status": status,
             "filter_min_score": min_score,
             "filter_q": q,
+            "filter_remote": remote,
+            "filter_country": country,
         },
     )
 
 
+def _scoring_embedder() -> Embedder | None:
+    """Real embedder for semantic scoring in production. Tests set
+    MATCHBOX_DISABLE_SEMANTIC=1 to stay offline and lexical-only."""
+    if os.environ.get("MATCHBOX_DISABLE_SEMANTIC"):
+        return None
+    try:
+        return FastEmbedEmbedder()
+    except Exception:
+        return None
+
+
 @router.post("/inbox/score-all", response_class=HTMLResponse)
 def score_all(request: Request, conn: ConnDep) -> HTMLResponse:
-    n = score_all_new(conn)
+    n = score_all_new(conn, embedder=_scoring_embedder())
     return HTMLResponse(
-        f"""<span id="score-status" class="text-xs text-success">scored {n} new job{'' if n == 1 else 's'}</span>"""
+        f"""<span id="score-status" class="text-xs text-success">scored {n} new job{"" if n == 1 else "s"}</span>"""
     )
 
 

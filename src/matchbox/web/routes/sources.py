@@ -6,6 +6,7 @@ left with a phantom source that always errors.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from typing import Any
 
@@ -14,7 +15,7 @@ from fastapi.responses import HTMLResponse, Response
 
 from matchbox.discovery.base import PollerError
 from matchbox.discovery.pollers import POLLERS
-from matchbox.discovery.runner import scan_all, scan_source
+from matchbox.discovery.runner import scan_aggregators, scan_all, scan_source
 from matchbox.web.deps import ConnDep
 from matchbox.web.templates_env import templates
 
@@ -42,12 +43,28 @@ def _get_source(conn: sqlite3.Connection, source_id: int) -> dict[str, Any]:
     return dict(row)
 
 
+def _adzuna_config(conn: sqlite3.Connection) -> dict[str, Any]:
+    """The user's Adzuna BYO-key config, stored in `setting`. Empty if unset."""
+    row = conn.execute("SELECT value FROM setting WHERE key = 'adzuna'").fetchone()
+    if row is None:
+        return {}
+    try:
+        cfg = json.loads(row["value"])
+    except (ValueError, TypeError):
+        return {}
+    return cfg if isinstance(cfg, dict) else {}
+
+
 @router.get("/sources", response_class=HTMLResponse)
 def sources_index(request: Request, conn: ConnDep) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "sources/index.html.j2",
-        {"sources": _list_sources(conn), "ats_types": ATS_TYPES},
+        {
+            "sources": _list_sources(conn),
+            "ats_types": ATS_TYPES,
+            "adzuna": _adzuna_config(conn),
+        },
     )
 
 
@@ -137,6 +154,46 @@ def scan_all_route(request: Request, conn: ConnDep) -> HTMLResponse:
             "ok_count": sum(1 for r in results if r.ok),
             "fail_count": sum(1 for r in results if not r.ok),
         },
+    )
+
+
+@router.post("/sources/adzuna", response_class=HTMLResponse)
+def save_adzuna(
+    request: Request,
+    conn: ConnDep,
+    app_id: str = Form(""),
+    app_key: str = Form(""),
+    country: str = Form("in"),
+    what: str = Form(""),
+) -> HTMLResponse:
+    """Save the user's Adzuna BYO key + default query in `setting`."""
+    cfg = {
+        "app_id": app_id.strip(),
+        "app_key": app_key.strip(),
+        "queries": [{"country": (country.strip() or "in"), "what": what.strip()}],
+    }
+    conn.execute(
+        "INSERT INTO setting (key, value) VALUES ('adzuna', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (json.dumps(cfg),),
+    )
+    return HTMLResponse('<span class="text-success">Adzuna settings saved.</span>')
+
+
+@router.post("/sources/scan-remote", response_class=HTMLResponse)
+def scan_remote_route(request: Request, conn: ConnDep) -> HTMLResponse:
+    """Scan the no-auth remote aggregators (Himalayas + Remotive), plus Adzuna
+    if a BYO key is configured. Jobs land with source = NULL, tagged remote."""
+    adzuna = _adzuna_config(conn)
+    results = scan_aggregators(conn, himalayas=True, remotive=True, adzuna=adzuna or None)
+    total = sum(r.inserted for r in results)
+    parts = "; ".join(
+        f"{r.name} +{r.inserted}" if r.ok else f"{r.name} error: {r.error}" for r in results
+    )
+    return HTMLResponse(
+        f'<div id="remote-scan-summary" class="text-xs">'
+        f'<div class="text-success">added {total} remote/aggregator jobs</div>'
+        f'<div class="text-text-muted">{parts}</div></div>'
     )
 
 

@@ -1,0 +1,245 @@
+"""Discovery persistence + serialization (the DAL).
+
+Serializes each scored `job` (left-joined to its `ats_source`) into the exact
+`Role` view-model the SPA consumes, loads the role set / watchlist, and performs
+the decision writes. Keeps SQL in one place. Only scored jobs (those with a
+`score_breakdown_json`) enter discovery — unscored rows need an upstream
+scoring run and are simply not selected here.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from datetime import date
+from typing import Any
+
+from matchbox.core.db import transaction
+from matchbox.discovery_api import rules
+from matchbox.tracker.rules import mono_for
+
+# Scored jobs only, with the ATS source for the display label. `requirements_json`
+# is reserved for a future coverage match; it is not populated today so coverage
+# serializes to null.
+_ROLE_SELECT = """
+  SELECT j.id, j.company, j.title, j.location, j.url, j.apply_url, j.jd_text,
+         j.posted_at, j.score, j.score_breakdown_json,
+         j.remote, j.discovery_decision, j.skipped_on, j.freshness, j.closes_at,
+         s.ats_type AS ats_type
+    FROM job j
+    LEFT JOIN ats_source s ON s.id = j.source
+   WHERE j.score_breakdown_json IS NOT NULL
+"""
+
+
+def serialize(
+    row: sqlite3.Row, today: date | None = None, *, jd_preview: bool = False
+) -> dict[str, Any]:
+    """One scored `job` row -> the design's `Role` shape.
+
+    `jd_preview` trims the JD to a short pulled line for the list surface (the JD
+    drawer fetches the full text via load_one)."""
+    today = today or date.today()
+    breakdown = rules.load_breakdown(row["score_breakdown_json"])
+
+    level = rules.fit_level(row["score"], (breakdown or {}).get("band"))
+    fit = {"level": level, "reason": rules.fit_reason(breakdown)}
+    elig = rules.eligibility(breakdown)
+    fresh, closing_in = rules.freshness(row["freshness"], row["closes_at"], today)
+    jd = rules.jd_paragraphs(row["jd_text"])
+    if jd_preview:
+        jd = [rules.jd_teaser(jd[0])] if jd else []
+
+    return {
+        "id": str(row["id"]),
+        "company": row["company"],
+        "title": row["title"],
+        "location": row["location"] or "",
+        "remote": bool(row["remote"]),
+        # Salary is not stored on `job` -> undisclosed (the UI shows the fallback).
+        "salary": None,
+        "source": rules.source_label(row["ats_type"]),
+        "postedDaysAgo": rules.days_since(row["posted_at"], today),
+        "link": row["apply_url"] or row["url"],
+        "fit": fit,
+        "eligibility": elig,
+        # No requirement-match data persisted yet -> no coverage bar.
+        "coverage": None,
+        "freshness": fresh,
+        "closingInDays": closing_in,
+        "mono": mono_for(row["company"]),
+        "jd": jd,
+        "decision": row["discovery_decision"],
+    }
+
+
+def _skipped_today(skipped_on: str | None, today: date) -> bool:
+    return bool(skipped_on) and (skipped_on or "")[:10] == today.isoformat()
+
+
+def load_roles(conn: sqlite3.Connection, today: date | None = None) -> list[dict[str, Any]]:
+    """All scored roles, minus those skipped today (they return tomorrow),
+    serialized slim (JD trimmed to its first paragraph for the card's pulled
+    line; the drawer fetches the full text via load_one).
+
+    The SPA owns queue/browse membership, ordering, and the cap client-side —
+    byte-identical to the design prototype — so this stays a thin serializer
+    (the single source of that logic lives where the design put it)."""
+    today = today or date.today()
+    rows = conn.execute(_ROLE_SELECT).fetchall()
+    return [
+        serialize(r, today, jd_preview=True)
+        for r in rows
+        if not _skipped_today(r["skipped_on"], today)
+    ]
+
+
+def load_watchlist(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """Watched companies + a live count of their open, eligible, scored roles."""
+    rows = conn.execute(
+        "SELECT company, note, status FROM watchlist ORDER BY id DESC"
+    ).fetchall()
+    out: list[dict[str, Any]] = []
+    for w in rows:
+        open_roles = _open_eligible_count(conn, w["company"])
+        out.append(
+            {
+                "company": w["company"],
+                "note": w["note"] or "",
+                "status": w["status"] or "watching",
+                "openRoles": open_roles,
+                "mono": mono_for(w["company"]),
+            }
+        )
+    return out
+
+
+def _open_eligible_count(conn: sqlite3.Connection, company: str) -> int:
+    """Open, eligible (not judged ineligible), scored, undecided roles at a company."""
+    rows = conn.execute(
+        _ROLE_SELECT + " AND j.company = ? AND j.discovery_decision IS NULL",
+        (company,),
+    ).fetchall()
+    count = 0
+    for r in rows:
+        role = serialize(r)
+        if role["eligibility"]["status"] != "ineligible" and role["freshness"] != "closed":
+            count += 1
+    return count
+
+
+# ── reads for one role ─────────────────────────────────────────────────────────
+
+
+def raw(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:
+    row: sqlite3.Row | None = conn.execute(
+        _ROLE_SELECT + " AND j.id = ?", (job_id,)
+    ).fetchone()
+    return row
+
+
+def load_one(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] | None:
+    row = raw(conn, job_id)
+    return serialize(row) if row else None
+
+
+def job_facts(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:
+    """Company/title/url for the decision effects (works for any job, scored or not)."""
+    row: sqlite3.Row | None = conn.execute(
+        "SELECT id, company, title, url, apply_url FROM job WHERE id = ?", (job_id,)
+    ).fetchone()
+    return row
+
+
+# ── writes ─────────────────────────────────────────────────────────────────────
+
+
+def set_decision(conn: sqlite3.Connection, job_id: int, decision: str | None) -> None:
+    with transaction(conn):
+        conn.execute(
+            "UPDATE job SET discovery_decision = ? WHERE id = ?", (decision, job_id)
+        )
+
+
+def set_skipped(conn: sqlite3.Connection, job_id: int, when: str) -> None:
+    with transaction(conn):
+        conn.execute("UPDATE job SET skipped_on = ? WHERE id = ?", (when, job_id))
+
+
+def existing_application(conn: sqlite3.Connection, job_id: int) -> int | None:
+    row = conn.execute(
+        "SELECT id FROM application WHERE job_id = ? ORDER BY id LIMIT 1", (job_id,)
+    ).fetchone()
+    return int(row["id"]) if row else None
+
+
+def create_application(
+    conn: sqlite3.Connection,
+    job_id: int,
+    *,
+    stage: str = "saved",
+    run_id: str | None = None,
+) -> int:
+    """Create a tracker `application` for a job (idempotent per job).
+
+    Inserts with the legacy `status='draft'` (the table's CHECK), and the
+    tracker's `stage` (what the tracker SPA reads). Seeds `updated_at` and a
+    'saved' history event so the timeline is not empty.
+    """
+    existing = existing_application(conn, job_id)
+    if existing is not None:
+        if run_id is not None:
+            with transaction(conn):
+                conn.execute(
+                    "UPDATE application SET run_id = COALESCE(run_id, ?) WHERE id = ?",
+                    (run_id, existing),
+                )
+        return existing
+
+    with transaction(conn):
+        cur = conn.execute(
+            """
+            INSERT INTO application (job_id, run_id, status, stage, has_draft,
+                                     updated_at)
+            VALUES (?, ?, 'draft', ?, 0,
+                    strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+            """,
+            (job_id, run_id, stage),
+        )
+        app_id = int(cur.lastrowid or 0)
+        conn.execute(
+            "INSERT INTO app_event (application_id, kind, text) VALUES (?, 'saved', 'Saved from discovery')",
+            (app_id,),
+        )
+    return app_id
+
+
+def upsert_watchlist(conn: sqlite3.Connection, company: str, note: str | None = None) -> None:
+    with transaction(conn):
+        conn.execute(
+            """
+            INSERT INTO watchlist (company, note, status)
+            VALUES (?, ?, 'watching')
+            ON CONFLICT(company) DO UPDATE SET note = COALESCE(excluded.note, watchlist.note)
+            """,
+            (company, note or "Watching for a role you're eligible for."),
+        )
+
+
+def is_dismissed_duplicate(
+    conn: sqlite3.Connection, *, url: str | None, company: str, title: str
+) -> bool:
+    """Whether an incoming job matches a previously dismissed one (spec §6 dedupe:
+    match on `url`, else `company`+`title`)."""
+    if url:
+        row = conn.execute(
+            "SELECT 1 FROM job WHERE discovery_decision = 'dismissed' AND url = ? LIMIT 1",
+            (url,),
+        ).fetchone()
+        if row:
+            return True
+    row = conn.execute(
+        "SELECT 1 FROM job WHERE discovery_decision = 'dismissed' "
+        "AND company = ? AND title = ? LIMIT 1",
+        (company, title),
+    ).fetchone()
+    return row is not None

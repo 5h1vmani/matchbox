@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matchbox — Applications · Engineering handoff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="colors_and_type.css">
+<style>
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--zinc-50); color: var(--foreground); -webkit-font-smoothing: antialiased; }
+  ::selection { background: color-mix(in srgb, var(--oat-600) 20%, transparent); }
+
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 36px; display: grid; grid-template-columns: 212px 1fr; gap: 48px; align-items: start; }
+  .mono { font-family: var(--font-mono); }
+
+  /* ---- masthead ---- */
+  .mast { grid-column: 1 / -1; padding: 56px 0 28px; border-bottom: 1px solid var(--border); }
+  .mast .brand { display: flex; align-items: center; gap: 11px; margin-bottom: 26px; }
+  .mk { position: relative; width: 13px; height: 25px; flex: 0 0 auto; }
+  .mk .head { position: absolute; top: 0; left: 0; width: 13px; height: 9px; border-radius: 6px; background: var(--oat-600); }
+  .mk .stick { position: absolute; bottom: 0; left: 4px; width: 5px; height: 17px; border-radius: 3px; background: var(--oat-300); }
+  .mast .brand b { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+  .mast .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--oat-600); margin-bottom: 12px; }
+  .mast h1 { font-size: 40px; line-height: 1.08; letter-spacing: -.03em; margin: 0 0 14px; max-width: 16ch; }
+  .mast p.lede { font-size: 17px; color: var(--muted-foreground); margin: 0; max-width: 62ch; line-height: 1.55; }
+  .meta { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 26px; }
+  .meta .m .k { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint-foreground); }
+  .meta .m .v { font-size: 14px; font-weight: 500; margin-top: 3px; }
+  .meta .m .v.mono { font-family: var(--font-mono); }
+
+  /* ---- sticky TOC ---- */
+  .toc { position: sticky; top: 28px; padding-top: 44px; font-size: 13.5px; }
+  .toc .lbl { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint-foreground); margin-bottom: 12px; }
+  .toc a { display: block; color: var(--muted-foreground); text-decoration: none; padding: 5px 0 5px 12px; border-left: 2px solid var(--border); transition: var(--transition); }
+  .toc a:hover { color: var(--foreground); border-color: var(--oat-300); }
+  .toc a .num { font-family: var(--font-mono); font-size: 11px; color: var(--faint-foreground); margin-right: 7px; }
+
+  /* ---- content ---- */
+  main { padding-top: 44px; padding-bottom: 96px; min-width: 0; }
+  section { margin-bottom: 52px; scroll-margin-top: 24px; }
+  section > h2 { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--oat-600); margin: 0 0 4px; display: flex; align-items: baseline; gap: 10px; }
+  section > h2 .num { font-family: var(--font-mono); color: var(--faint-foreground); }
+  section > h3.title { font-size: 26px; letter-spacing: -.02em; margin: 0 0 18px; }
+  h4 { font-size: 16px; margin: 26px 0 10px; }
+  p { font-size: 15px; line-height: 1.62; color: var(--zinc-700); max-width: 70ch; }
+  p strong, li strong { color: var(--foreground); font-weight: 600; }
+  ul, ol { font-size: 15px; line-height: 1.62; color: var(--zinc-700); max-width: 70ch; padding-left: 20px; }
+  li { margin-bottom: 7px; }
+  li::marker { color: var(--faint-foreground); }
+  a.inline { color: var(--oat-600); text-underline-offset: 2px; }
+  code.t { font-family: var(--font-mono); font-size: 13px; background: var(--oat-100); color: var(--oat-700); border-radius: 4px; padding: 1px 6px; }
+
+  /* code block */
+  pre { background: var(--zinc-900); color: #e8e6e3; border-radius: 10px; padding: 18px 20px; overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65; margin: 16px 0; border: 1px solid var(--zinc-800); }
+  pre .c { color: #8a8a93; }
+  pre .k { color: #c9a6f0; }
+  pre .s { color: #9ecb8a; }
+  pre .t { color: #e0b06a; }
+  pre .f { color: #82b4e0; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 16px 0; }
+  th { text-align: left; font-weight: 500; color: var(--muted-foreground); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 11px 12px; border-bottom: 1px solid var(--muted); vertical-align: top; line-height: 1.5; color: var(--zinc-700); }
+  td:first-child { color: var(--foreground); }
+  tr:last-child td { border-bottom: 0; }
+  td code, th code { font-family: var(--font-mono); font-size: 12.5px; color: var(--oat-700); }
+  .tbl-card { border: 1px solid var(--border); border-radius: 10px; background: var(--card); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .tbl-card table { margin: 0; }
+  .tbl-card th { padding: 12px 16px; background: color-mix(in srgb, var(--muted) 45%, transparent); }
+  .tbl-card td { padding: 12px 16px; }
+
+  /* callout */
+  .note { border: 1px solid var(--border); border-left: 3px solid var(--oat-600); background: var(--card); border-radius: 8px; padding: 14px 16px; margin: 18px 0; font-size: 14px; line-height: 1.55; color: var(--zinc-700); }
+  .note.warn { border-left-color: var(--warning); }
+  .note b { color: var(--foreground); }
+  .note .tag { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--oat-600); display: block; margin-bottom: 4px; }
+  .note.warn .tag { color: var(--warning); }
+
+  /* chips / pills used inline */
+  .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--radius-pill); padding: 2px 9px; font-size: 12px; font-weight: 500; background: var(--muted); color: var(--secondary-foreground); white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  /* stage flow diagram */
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 18px 0; }
+  .flow .st { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--card); font-size: 13px; font-weight: 500; }
+  .flow .arr { color: var(--faint-foreground); font-family: var(--font-mono); }
+  .flow .term { opacity: .65; border-style: dashed; }
+
+  /* token swatches */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 12px; margin: 16px 0; }
+  .sw { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--card); }
+  .sw .chip { height: 52px; }
+  .sw .meta2 { padding: 8px 10px; }
+  .sw .n { font-size: 12.5px; font-weight: 500; }
+  .sw .h { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+
+  /* two col */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .cols h4 { margin-top: 0; }
+
+  hr.soft { border: 0; border-top: 1px solid var(--border); margin: 0 0 0; }
+
+  @media (max-width: 860px) {
+    .wrap { grid-template-columns: 1fr; gap: 0; }
+    .toc { display: none; }
+    .cols { grid-template-columns: 1fr; }
+  }
+  @media print {
+    body { background: #fff; }
+    .toc { display: none; }
+    .wrap { grid-template-columns: 1fr; max-width: 100%; }
+    pre { background: #f4f4f5; color: #18181b; border-color: #d4d4d8; }
+    pre .c{color:#71717a}pre .k{color:#6b4a86}pre .s{color:#2f6b46}pre .t{color:#8a5a1f}pre .f{color:#2f5d72}
+    section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="mast">
+    <div class="brand"><span class="mk"><span class="head"></span><span class="stick"></span></span> <b>Matchbox</b></div>
+    <div class="eyebrow">Design → Engineering handoff</div>
+    <h1>Applications tracker</h1>
+    <p class="lede">A calm, local-first home for one job-seeker to see what needs them today, where every application stands, and to act on it without leaving the page. This document specifies the screens, data model, state contract, and rules needed to build it.</p>
+    <div class="meta">
+      <div class="m"><div class="k">Status</div><div class="v">Design approved · ready to build</div></div>
+      <div class="m"><div class="k">Surface</div><div class="v">Web app (desktop-first)</div></div>
+      <div class="m"><div class="k">Design system</div><div class="v">Oat + Matchbox brand layer</div></div>
+      <div class="m"><div class="k">Stack</div><div class="v">React + TypeScript</div></div>
+      <div class="m"><div class="k">Prototype</div><div class="v"><a class="inline" href="Matchbox.html">Matchbox.html</a></div></div>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <div class="lbl">Contents</div>
+    <a href="#overview"><span class="num">01</span>Overview &amp; goals</a>
+    <a href="#screens"><span class="num">02</span>Screens</a>
+    <a href="#directions"><span class="num">03</span>Two directions</a>
+    <a href="#ia"><span class="num">04</span>Navigation &amp; IA</a>
+    <a href="#data"><span class="num">05</span>Data model</a>
+    <a href="#store"><span class="num">06</span>State &amp; actions</a>
+    <a href="#rules"><span class="num">07</span>Business rules</a>
+    <a href="#components"><span class="num">08</span>Components</a>
+    <a href="#tokens"><span class="num">09</span>Design tokens</a>
+    <a href="#motion"><span class="num">10</span>Interaction &amp; motion</a>
+    <a href="#states"><span class="num">11</span>States &amp; edges</a>
+    <a href="#a11y"><span class="num">12</span>Accessibility</a>
+    <a href="#voice"><span class="num">13</span>Voice &amp; copy</a>
+    <a href="#files"><span class="num">14</span>File map</a>
+    <a href="#open"><span class="num">15</span>Open questions</a>
+  </nav>
+
+  <main>
+
+    <!-- 01 -->
+    <section id="overview">
+      <h2><span class="num">01</span> Overview &amp; goals</h2>
+      <h3 class="title">One screen, one job: "what do I do now, and where does everything stand?"</h3>
+      <p>The user is a <strong>single, stressed job-seeker</strong> tracking every role they are pursuing — not a recruiter managing a funnel. The product is local-first and single-user. Every design decision serves four priorities, in order:</p>
+      <ol>
+        <li><strong>Tell them what to act on today</strong> — follow-ups due, interviews coming up, drafts ready to send, applications gone stale.</li>
+        <li><strong>Show where everything stands at a glance</strong> — the pipeline.</li>
+        <li><strong>Stay calm and honest</strong> — never anxiety-inducing, never gamified. Stale and closed applications are shown truthfully, without nagging.</li>
+        <li><strong>Let them act fast inline</strong> — advance a status, set a reminder, log a response, jot a note — without leaving the page.</li>
+      </ol>
+      <div class="note"><span class="tag">Design principle</span> When a rule and "calm" conflict, calm wins. No red badges on counts, no streaks, no "you're behind" language. Overdue items are stated plainly and grouped, not amplified.</div>
+    </section>
+
+    <!-- 02 -->
+    <section id="screens">
+      <h2><span class="num">02</span> Screens</h2>
+      <h3 class="title">Three surfaces plus a detail drawer</h3>
+      <p>Navigation is a fixed left sidebar. The default landing is <strong>Today</strong>. The <strong>detail drawer</strong> slides in over whichever screen is active, so the user never loses their place.</p>
+
+      <h4>Today / Focus home <span class="pill">default route</span></h4>
+      <p>Answers priority #1 first. Sections render top-to-bottom in urgency order:</p>
+      <ul>
+        <li><strong>Greeting + glance row</strong> — time-of-day greeting, today's date, and four read-only counters: <code class="t">to do today</code>, <code class="t">interviews this week</code>, <code class="t">active</code>, <code class="t">offers</code> (offers only shown when &gt; 0).</li>
+        <li><strong>Today list</strong> — today's and overdue tasks as a checklist. Each row: complete-tick, action line, due pill, a "Draft" badge when a draft is ready, and on hover a <em>Snooze</em> button + quick-action menu. <strong>Capped to 7 visible</strong> with a "Show N more" expander so a busy day never reads as a wall.</li>
+        <li><strong>Upcoming interviews</strong> — next interviews (0–7 days), each with a date/time and a <em>Prep</em> button.</li>
+        <li><strong>Drafts ready to send</strong> — follow-ups / thank-yous already drafted, each with a one-click <em>Send</em>.</li>
+        <li><strong>Going cold</strong> — collapsible, <strong>dimmed</strong> group of stale applications. Collapsed by default. Per row: <em>Follow up</em> (sets a reminder) or <em>Let go</em> (logs no-response). This is the honest-but-not-nagging treatment of stale work.</li>
+      </ul>
+
+      <h4>Applications tracker <span class="pill">route: /applications</span></h4>
+      <ul>
+        <li><strong>Pipeline panel</strong> — the at-a-glance view of priority #2. Renders as a proportional segmented bar (ledger) or a funnel (focus). Each stage is a filter; clicking toggles it.</li>
+        <li><strong>Toolbar</strong> — search (company / role / location) and a sort cycle (Next action → Last updated → Company).</li>
+        <li><strong>List view</strong> — rows grouped by stage. Columns: company + role, next action + due (+ draft badge), salary + last-updated, star + quick-action menu. Stale rows are dimmed to ~60% opacity and brighten on hover.</li>
+        <li><strong>Board view</strong> — one calm column per stage with compact cards. Same data, horizontal scroll.</li>
+      </ul>
+
+      <h4>Application detail drawer <span class="pill">overlay</span></h4>
+      <p>Right-docked, 560px, slides in over the active screen. This is where priority #4 lives — everything can be done here:</p>
+      <ul>
+        <li><strong>Header</strong> — monogram, company, role, and tag chips (stage, location, salary).</li>
+        <li><strong>Stage stepper</strong> — honest progress across the pipeline; dims entirely when closed.</li>
+        <li><strong>Next-action card</strong> — the current action with a primary CTA (Mark sent / Mark applied / Accept offer …) and Snooze. Falls back to a "Waiting to hear back" or "Closed" state.</li>
+        <li><strong>Quick actions grid</strong> — Advance stage · Log a reply · Set a reminder · Mark closed.</li>
+        <li><strong>Details</strong> — applied date, last update, salary, source.</li>
+        <li><strong>Notes</strong> — list + inline composer (⌘/Ctrl+Enter to save).</li>
+        <li><strong>People</strong> — contacts with an email affordance.</li>
+        <li><strong>History</strong> — reverse-chronological timeline of events.</li>
+      </ul>
+
+      <h4>Insights <span class="pill">route: /insights</span></h4>
+      <p>A light, supporting read on priority #2 ("is my search healthy?"). Honest stats only — active count, response rate, interviewing, offers — plus the pipeline viz and a calm note about what's gone cold. <strong>No streaks, no vanity metrics.</strong></p>
+    </section>
+
+    <!-- 03 -->
+    <section id="directions">
+      <h2><span class="num">03</span> Two directions</h2>
+      <h3 class="title">A single prop swaps the whole feel</h3>
+      <p>The prototype ships two approved directions behind one value, <code class="t">direction: 'ledger' | 'focus'</code>. It threads from app state into two components; everything else is shared. Pick one for v1 (recommend shipping <strong>ledger</strong> as default, <strong>focus</strong> as an optional preference) or keep both as a setting.</p>
+      <div class="tbl-card">
+        <table>
+          <thead><tr><th>Aspect</th><th>Calm ledger</th><th>Focus &amp; flow</th></tr></thead>
+          <tbody>
+            <tr><td>Today</td><td>Checklist only — no hero</td><td>Warm "Right now" hero surfacing the single top action, then the list</td></tr>
+            <tr><td>Pipeline</td><td><code>&lt;PipeBar&gt;</code> — proportional segmented bar + legend</td><td><code>&lt;Funnel&gt;</code> — labelled descending bars</td></tr>
+            <tr><td>Temperature</td><td>Cool zinc, restrained</td><td>Warmer; oat accent on hero &amp; active states</td></tr>
+            <tr><td>Best for</td><td>Scanning, dense pipelines</td><td>"Just tell me the one thing" focus</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Two presentational prefs ride alongside: <code class="t">density: 'regular' | 'compact'</code> (set on the shell as <code class="t">data-density</code>) and <code class="t">accent: 'taupe' | 'forest' | 'slate'</code> (swaps the <code class="t">--oat-*</code> custom properties at runtime).</p>
+    </section>
+
+    <!-- 04 -->
+    <section id="ia">
+      <h2><span class="num">04</span> Navigation &amp; IA</h2>
+      <h3 class="title">Fixed sidebar shell</h3>
+      <p>A 236px sidebar + scrolling main. Primary nav: <strong>Today</strong>, <strong>Applications</strong> (count badge), <strong>Saved roles</strong> (count badge). A "Workspace" group holds <strong>Insights</strong>, <strong>Documents</strong>, <strong>Settings</strong>. Today shows a small amber dot when there are tasks due. "Saved roles" is the tracker pre-filtered to the <code class="t">saved</code> stage. Footer carries a user chip with a "Saved locally" indicator (reinforces local-first).</p>
+      <div class="note"><span class="tag">Prototype shortcut</span> Documents and Settings are stubs (toast only). Companies/Contacts from the original sketch were dropped as out of scope for this screen.</div>
+    </section>
+
+    <!-- 05 -->
+    <section id="data">
+      <h2><span class="num">05</span> Data model</h2>
+      <h3 class="title">TypeScript shapes</h3>
+      <p>The prototype generates ~45 deterministic records in <code class="t">data.js</code>. Production types below. Dates in the prototype are stored as relative <code class="t">daysAgo</code> integers for determinism — <strong>production should store ISO timestamps and derive the day offsets.</strong></p>
+<pre><span class="k">type</span> <span class="t">StageId</span> =
+  | <span class="s">'saved'</span> | <span class="s">'applied'</span> | <span class="s">'phone'</span> | <span class="s">'onsite'</span> | <span class="s">'offer'</span> | <span class="s">'rejected'</span>;
+
+<span class="k">interface</span> <span class="t">Stage</span> {
+  id: <span class="t">StageId</span>;
+  label: <span class="t">string</span>;   <span class="c">// "Phone screen"</span>
+  short: <span class="t">string</span>;   <span class="c">// "Screen" — used on board/stepper</span>
+  tone:  <span class="t">string</span>;   <span class="c">// hex; the stage's dot/bar color</span>
+}
+
+<span class="k">type</span> <span class="t">ActionKind</span> =
+  | <span class="s">'apply'</span> | <span class="s">'followup'</span> | <span class="s">'interview'</span> | <span class="s">'prep'</span>
+  | <span class="s">'thanks'</span> | <span class="s">'offer'</span>  | <span class="s">'wait'</span>;
+
+<span class="k">interface</span> <span class="t">NextAction</span> {
+  kind:  <span class="t">ActionKind</span>;
+  label: <span class="t">string</span>;          <span class="c">// "Send follow-up"</span>
+  due:   <span class="t">number</span> | <span class="k">null</span>;   <span class="c">// days from today: &lt;0 overdue, 0 today, null = no date</span>
+  time?: <span class="t">string</span>;          <span class="c">// "13:30" for interviews</span>
+}
+
+<span class="k">interface</span> <span class="t">TimelineEvent</span> {
+  daysAgo: <span class="t">number</span>;
+  kind: <span class="s">'saved'</span>|<span class="s">'applied'</span>|<span class="s">'reply'</span>|<span class="s">'screen'</span>|<span class="s">'onsite'</span>|<span class="s">'offer'</span>|<span class="s">'rejected'</span>|<span class="s">'note'</span>|<span class="s">'advanced'</span>|<span class="s">'followup'</span>;
+  text: <span class="t">string</span>;
+}
+
+<span class="k">interface</span> <span class="t">Contact</span> { name: <span class="t">string</span>; role: <span class="t">string</span>; initials: <span class="t">string</span>; }
+<span class="k">interface</span> <span class="t">Note</span>    { daysAgo: <span class="t">number</span>; text: <span class="t">string</span>; }
+
+<span class="k">interface</span> <span class="t">Application</span> {
+  id: <span class="t">string</span>;
+  company: <span class="t">string</span>;
+  role: <span class="t">string</span>;
+  location: <span class="t">string</span>;
+  salary: <span class="t">string</span>;          <span class="c">// display string, e.g. "$150–185k"</span>
+  source: <span class="t">string</span>;          <span class="c">// "Referral · Dana"</span>
+  stage: <span class="t">StageId</span>;
+  appliedDaysAgo: <span class="t">number</span> | <span class="k">null</span>;  <span class="c">// null while still 'saved'</span>
+  updatedDaysAgo: <span class="t">number</span>;         <span class="c">// drives staleness + "last update"</span>
+  nextAction: <span class="t">NextAction</span> | <span class="k">null</span>;
+  hasDraft: <span class="t">boolean</span>;             <span class="c">// a follow-up / thank-you is written &amp; ready</span>
+  events: <span class="t">TimelineEvent</span>[];
+  contacts: <span class="t">Contact</span>[];
+  notes: <span class="t">Note</span>[];
+  starred: <span class="t">boolean</span>;
+  mono: { bg: <span class="t">string</span>; fg: <span class="t">string</span> };  <span class="c">// monogram colors</span>
+  stale: <span class="t">boolean</span>;               <span class="c">// DERIVED — see §07, recompute, don't persist</span>
+}</pre>
+    </section>
+
+    <!-- 06 -->
+    <section id="store">
+      <h2><span class="num">06</span> State &amp; actions</h2>
+      <h3 class="title">One store, a flat set of inline actions</h3>
+      <p>The prototype centralizes mutations in a <code class="t">useApps()</code> hook (see <code class="t">store.jsx</code>). Every action updates the record <em>and</em> writes a timeline event, then surfaces a toast. Port this to your store of choice (reducer, Zustand, signals) — the contract is what matters:</p>
+<pre><span class="k">interface</span> <span class="t">TrackerActions</span> {
+  <span class="f">advanceStage</span>(id: <span class="t">string</span>): <span class="t">void</span>;                 <span class="c">// → next stage in FLOW</span>
+  <span class="f">setStage</span>(id: <span class="t">string</span>, stage: <span class="t">StageId</span>): <span class="t">void</span>;     <span class="c">// explicit move (incl. close/reopen)</span>
+  <span class="f">snooze</span>(id: <span class="t">string</span>, days?: <span class="t">number</span>): <span class="t">void</span>;        <span class="c">// default +2; pushes the action's due out</span>
+  <span class="f">remind</span>(id: <span class="t">string</span>, days: <span class="t">number</span>): <span class="t">void</span>;         <span class="c">// set/replace the due (0 = today)</span>
+  <span class="f">markDone</span>(id: <span class="t">string</span>): <span class="t">void</span>;                     <span class="c">// complete current action, clear draft</span>
+  <span class="f">logResponse</span>(id: <span class="t">string</span>, type: <span class="s">'reply'</span>|<span class="s">'rejected'</span>|<span class="s">'ghosted'</span>): <span class="t">void</span>;
+  <span class="f">addNote</span>(id: <span class="t">string</span>, text: <span class="t">string</span>): <span class="t">void</span>;
+  <span class="f">toggleStar</span>(id: <span class="t">string</span>): <span class="t">void</span>;
+}</pre>
+      <div class="tbl-card">
+        <table>
+          <thead><tr><th>Action</th><th>Effect</th><th>Timeline event</th></tr></thead>
+          <tbody>
+            <tr><td><code>advanceStage</code></td><td>Move to next stage in <code>FLOW</code>; set a sensible default next action; <code>updatedDaysAgo→0</code>; <code>stale→false</code></td><td>"Moved to …"</td></tr>
+            <tr><td><code>markDone</code></td><td>Logs the current action done; clears <code>hasDraft</code>; an <code>apply</code> moves <code>saved→applied</code>; a sent follow-up becomes "Waiting to hear back"</td><td>"Follow-up sent" / "Applied" …</td></tr>
+            <tr><td><code>logResponse('reply')</code></td><td><code>applied→phone</code>; otherwise keeps stage but clears stale</td><td>"Heard back — positive"</td></tr>
+            <tr><td><code>logResponse('rejected')</code></td><td><code>stage→rejected</code>; clears next action</td><td>"No longer moving forward"</td></tr>
+            <tr><td><code>logResponse('ghosted')</code></td><td>Clears next action; marks stale (no shame, just true)</td><td>"Marked as no response"</td></tr>
+            <tr><td><code>snooze</code> / <code>remind</code></td><td>Shifts / sets the action's <code>due</code></td><td>"Reminder set …" (remind only)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 07 -->
+    <section id="rules">
+      <h2><span class="num">07</span> Business rules</h2>
+      <h3 class="title">The logic that makes it feel right</h3>
+
+      <h4>Stage flow</h4>
+      <div class="flow">
+        <span class="st"><span class="dot" style="background:#a1a1aa"></span>Saved</span><span class="arr">→</span>
+        <span class="st"><span class="dot" style="background:#574747"></span>Applied</span><span class="arr">→</span>
+        <span class="st"><span class="dot" style="background:#2f5d72"></span>Phone screen</span><span class="arr">→</span>
+        <span class="st"><span class="dot" style="background:#8a5a1f"></span>Onsite</span><span class="arr">→</span>
+        <span class="st"><span class="dot" style="background:#2f6b46"></span>Offer</span>
+        <span class="arr">·</span>
+        <span class="st term"><span class="dot" style="background:#b8b8bd"></span>Closed (terminal)</span>
+      </div>
+      <p><code class="t">FLOW = ['saved','applied','phone','onsite','offer']</code>. <code class="t">rejected</code> ("Closed") is off-flow and terminal but reopenable via <code class="t">setStage</code>.</p>
+
+      <h4>Due buckets (drives the due pill + sort)</h4>
+      <div class="tbl-card"><table>
+        <thead><tr><th>Condition</th><th>Label</th><th>Tone</th></tr></thead>
+        <tbody>
+          <tr><td><code>due &lt; 0</code></td><td>"Nd overdue"</td><td><span class="pill" style="background:#fbe7ea;color:#c0182a">danger</span></td></tr>
+          <tr><td><code>due === 0</code></td><td>"Today"</td><td><span class="pill" style="background:#f5ead9;color:#8a5a1f">warning</span></td></tr>
+          <tr><td><code>due === 1</code></td><td>"Tomorrow"</td><td><span class="pill">muted</span></td></tr>
+          <tr><td><code>2 ≤ due ≤ 6</code></td><td>"in N days"</td><td><span class="pill">muted</span></td></tr>
+          <tr><td><code>due &gt; 6</code></td><td>"in N days"</td><td><span class="pill" style="background:transparent;color:var(--faint-foreground)">faint</span></td></tr>
+        </tbody>
+      </table></div>
+
+      <h4>Staleness ("Going cold") — derived, never persisted</h4>
+<pre><span class="f">isStale</span>(a) =
+  a.stage <span class="k">in</span> {<span class="s">'applied'</span>,<span class="s">'phone'</span>,<span class="s">'onsite'</span>}        <span class="c">// only active stages</span>
+  &amp;&amp; <span class="k">!</span>(a.nextAction &amp;&amp; a.nextAction.due &lt;= <span class="t">3</span>)  <span class="c">// no imminent action</span>
+  &amp;&amp; a.updatedDaysAgo &gt;= <span class="t">11</span>;                  <span class="c">// untouched ~1.5+ weeks</span></pre>
+      <p>Saved, offered, and closed applications are <strong>never</strong> stale. Recompute on read.</p>
+
+      <h4>"Today" selection &amp; ranking</h4>
+      <p>An application appears in Today when <code class="t">nextAction.due !== null &amp;&amp; due &lt;= 0 &amp;&amp; stage !== 'rejected' &amp;&amp; kind !== 'wait'</code>. Sort by kind-rank, then by due (most overdue first):</p>
+      <ul>
+        <li><strong>Rank 0</strong> — <code class="t">interview</code>, <code class="t">offer</code> (time-sensitive, high stakes)</li>
+        <li><strong>Rank 1</strong> — <code class="t">thanks</code>, <code class="t">prep</code></li>
+        <li><strong>Rank 2</strong> — <code class="t">apply</code>, <code class="t">followup</code></li>
+      </ul>
+      <p>The <em>focus</em> hero shows <code class="t">today[0]</code>, falling back to the nearest upcoming interview when Today is empty. <strong>Upcoming interviews</strong> = <code class="t">kind==='interview' &amp;&amp; 0 ≤ due ≤ 7</code>. <strong>Drafts</strong> = <code class="t">hasDraft &amp;&amp; stage !== 'rejected'</code>.</p>
+    </section>
+
+    <!-- 08 -->
+    <section id="components">
+      <h2><span class="num">08</span> Components</h2>
+      <h3 class="title">Inventory</h3>
+      <p>The prototype is split by responsibility. Suggested production component tree mirrors it:</p>
+      <div class="tbl-card"><table>
+        <thead><tr><th>Component</th><th>Role</th><th>Key props</th></tr></thead>
+        <tbody>
+          <tr><td><code>&lt;AppShell&gt;</code></td><td>Sidebar + routing + toast + tweak/prefs context</td><td><code>direction, density, accent</code></td></tr>
+          <tr><td><code>&lt;Today&gt;</code></td><td>Focus home; owns the local "done" + expand state</td><td><code>apps, actions, direction</code></td></tr>
+          <tr><td><code>&lt;TaskRow&gt;</code></td><td>One checklist task (tick, action line, due, snooze, menu)</td><td><code>app, onToggle, onOpen</code></td></tr>
+          <tr><td><code>&lt;Tracker&gt;</code></td><td>Pipeline panel + toolbar + list/board switch</td><td><code>apps, view, filter, direction</code></td></tr>
+          <tr><td><code>&lt;PipeBar&gt; / &lt;Funnel&gt;</code></td><td>Pipeline viz (ledger / focus)</td><td><code>counts, active, onPick</code></td></tr>
+          <tr><td><code>&lt;ListView&gt; / &lt;Row&gt;</code></td><td>Stage-grouped rows; stale dimming</td><td><code>groups, actions, onOpen</code></td></tr>
+          <tr><td><code>&lt;BoardView&gt; / &lt;BoardCard&gt;</code></td><td>Column-per-stage board</td><td><code>groups, actions, onOpen</code></td></tr>
+          <tr><td><code>&lt;Detail&gt;</code></td><td>Right drawer; all inline actions live here</td><td><code>app, actions, focusNote, onClose</code></td></tr>
+          <tr><td><code>&lt;QuickMenu&gt; / &lt;QuickButton&gt;</code></td><td>The shared "…" popover (advance / log / remind / note)</td><td><code>app, actions, onOpen</code></td></tr>
+          <tr><td><code>&lt;Insights&gt;</code></td><td>Honest stats + pipeline</td><td><code>apps, direction</code></td></tr>
+          <tr><td>Atoms</td><td><code>Icon, MonoLogo, StageDot, Due, Badge, StageStepper</code></td><td>see <code>ui.jsx</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="note"><span class="tag">Note</span> Icons are <a class="inline" href="https://lucide.dev">Lucide</a> (Oat ships none) — 1.5–2px stroke, <code class="t">currentColor</code>, 16–20px in UI. Keep them monochrome.</div>
+    </section>
+
+    <!-- 09 -->
+    <section id="tokens">
+      <h2><span class="num">09</span> Design tokens</h2>
+      <h3 class="title">Everything comes from Oat</h3>
+      <p>Import <code class="t">colors_and_type.css</code> first; it defines all <code class="t">--*</code> custom properties. Do not invent values. The identity is cool zinc neutrals + one warm taupe accent.</p>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#574747"></div><div class="meta2"><div class="n">Primary / oat-600</div><div class="h">#574747</div></div></div>
+        <div class="sw"><div class="chip" style="background:#473a3a"></div><div class="meta2"><div class="n">Hover / oat-700</div><div class="h">#473a3a</div></div></div>
+        <div class="sw"><div class="chip" style="background:#ede8e8"></div><div class="meta2"><div class="n">oat-100</div><div class="h">#ede8e8</div></div></div>
+        <div class="sw"><div class="chip" style="background:#fafafa;border-bottom:1px solid #e4e4e7"></div><div class="meta2"><div class="n">Page / zinc-50</div><div class="h">#fafafa</div></div></div>
+        <div class="sw"><div class="chip" style="background:#d4d4d8"></div><div class="meta2"><div class="n">Border / zinc-300</div><div class="h">#d4d4d8</div></div></div>
+        <div class="sw"><div class="chip" style="background:#09090b"></div><div class="meta2"><div class="n">Text / zinc-950</div><div class="h">#09090b</div></div></div>
+        <div class="sw"><div class="chip" style="background:#008032"></div><div class="meta2"><div class="n">Success</div><div class="h">#008032</div></div></div>
+        <div class="sw"><div class="chip" style="background:#a65b00"></div><div class="meta2"><div class="n">Warning</div><div class="h">#a65b00</div></div></div>
+        <div class="sw"><div class="chip" style="background:#c0182a"></div><div class="meta2"><div class="n">Danger</div><div class="h">#c0182a</div></div></div>
+      </div>
+      <div class="cols">
+        <div>
+          <h4>Type</h4>
+          <ul>
+            <li><strong>UI:</strong> Hanken Grotesk (400/500/600)</li>
+            <li><strong>Data/numerals:</strong> JetBrains Mono, <code class="t">tnum</code> on — salary, dates, counts</li>
+            <li>Base 16px / 1.5; UI text 14px; badges 12px</li>
+            <li>Headings 600, tight; <code class="t">text-wrap: balance</code></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Shape &amp; depth</h4>
+          <ul>
+            <li>Radius <strong>6px</strong> default; <strong>pill</strong> for badges/avatars; 10–12px on cards</li>
+            <li>Structure from <strong>1px borders</strong>, not shadows</li>
+            <li>Shadows barely-there: <code class="t">0 1px 2px rgba(0,0,0,.05)</code></li>
+            <li><strong>No gradients</strong> (the focus hero is the one soft wash); no glassmorphism</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 -->
+    <section id="motion">
+      <h2><span class="num">10</span> Interaction &amp; motion</h2>
+      <ul>
+        <li><strong>Transition:</strong> <code class="t">.12s cubic-bezier(.4,0,.2,1)</code> on background, color, opacity, transform. Fast and subtle.</li>
+        <li><strong>Hover:</strong> faint <code class="t">--muted</code> fill on rows/buttons; board cards lift 1px. Row quick-actions fade in on hover (and must be reachable via keyboard focus, not hover-only — see §12).</li>
+        <li><strong>Press:</strong> ~0.5px translate nudge. Never bouncy.</li>
+        <li><strong>Drawer:</strong> slides in ~220ms from <code class="t">translateX(24px)</code>; scrim fades. Close on Esc, scrim click, or the X.</li>
+        <li><strong>Complete a task:</strong> tick fills, line strikes through for ~280ms, then the row leaves the list (commits <code class="t">markDone</code>). Gentle, not celebratory.</li>
+        <li><strong>Toast:</strong> single, bottom-center, ~2.4s auto-dismiss. Consider an Undo affordance on destructive logs (close / let go).</li>
+        <li>Respect <code class="t">prefers-reduced-motion</code>; no decorative looping animation anywhere.</li>
+      </ul>
+    </section>
+
+    <!-- 11 -->
+    <section id="states">
+      <h2><span class="num">11</span> States &amp; edge cases</h2>
+      <div class="tbl-card"><table>
+        <thead><tr><th>Context</th><th>Empty / edge copy &amp; behavior</th></tr></thead>
+        <tbody>
+          <tr><td>Today, nothing due</td><td>"Nothing needs you today. Go for a walk." (focus hero shows an all-caught-up checkmark)</td></tr>
+          <tr><td>No upcoming interviews</td><td>"No interviews scheduled. Keep applying."</td></tr>
+          <tr><td>No drafts</td><td>"No drafts waiting."</td></tr>
+          <tr><td>Nothing stale</td><td>Hide the "Going cold" section entirely</td></tr>
+          <tr><td>List filtered to empty</td><td>"No applications match. Try a different stage or clear the search."</td></tr>
+          <tr><td>Board column empty</td><td>"Empty"</td></tr>
+          <tr><td>Detail · waiting</td><td>Next-action card → "Waiting to hear back · applied Nd ago" + a Follow-up button</td></tr>
+          <tr><td>Detail · closed</td><td>"Closed — no further action. Logged for your records." + Reopen</td></tr>
+        </tbody>
+      </table></div>
+      <div class="note warn"><span class="tag">Not yet built</span> Loading / error / first-run (zero applications) states, and the "Add application" form, are out of scope for this pass — flag for a follow-up. Long lists are not virtualized in the prototype; add virtualization if a real user exceeds a few hundred records.</div>
+    </section>
+
+    <!-- 12 -->
+    <section id="a11y">
+      <h2><span class="num">12</span> Accessibility</h2>
+      <ul>
+        <li>Real semantic elements throughout — <code class="t">&lt;button&gt;</code>, <code class="t">&lt;nav&gt;</code>, <code class="t">&lt;input&gt;</code>. The drawer should be a proper <code class="t">role="dialog"</code> with focus trap + restore, labelled by the company name.</li>
+        <li>Visible focus ring in the brand brown (<code class="t">--ring</code>), 2px, ~3px offset halo. Keep it on every interactive element.</li>
+        <li><strong>Hover-revealed actions must also appear on keyboard focus</strong> (the row "…" menu, snooze, star) — don't gate them on <code class="t">:hover</code> alone.</li>
+        <li>Due state and stage must not rely on color alone — they always carry a text label.</li>
+        <li>Quick-action menu: arrow-key navigation, Esc to close, focus returns to the trigger.</li>
+        <li>Hit targets ≥ 40px where practical; the complete-tick and icon buttons currently sit at ~21–32px — pad their tap area.</li>
+        <li>Honor <code class="t">prefers-reduced-motion</code> and <code class="t">prefers-color-scheme</code> (Oat tokens already define dark via <code class="t">light-dark()</code>; dark wasn't designed this pass — see §15).</li>
+      </ul>
+    </section>
+
+    <!-- 13 -->
+    <section id="voice">
+      <h2><span class="num">13</span> Voice &amp; copy</h2>
+      <h3 class="title">Calm, plain, on your side</h3>
+      <ul>
+        <li><strong>Sentence case everywhere.</strong> Never Title Case, never ALL CAPS (except tiny letter-spaced eyebrows).</li>
+        <li><strong>No em dashes, no double hyphens.</strong> Use a period, comma, or parentheses.</li>
+        <li><strong>Second person, present tense.</strong> "3 follow-ups due today", not "You may wish to address…".</li>
+        <li><strong>Verbs on buttons:</strong> "Log application", "Snooze", "Mark applied", "Add note".</li>
+        <li><strong>Lead with the number</strong> when it helps you act. <strong>No emoji.</strong> The warmth is in the words and color.</li>
+        <li><strong>Empty/quiet states are kind:</strong> "Nothing needs you today. Go for a walk." not "No records found."</li>
+      </ul>
+      <p style="color:var(--faint-foreground)">❌ "You have not updated this application in a while, perhaps follow up." &nbsp;→&nbsp; ✅ "No update in 12 days. Send a follow-up?"</p>
+    </section>
+
+    <!-- 14 -->
+    <section id="files">
+      <h2><span class="num">14</span> File map</h2>
+      <h3 class="title">What's in the prototype</h3>
+      <p>React 18 + in-browser Babel for the prototype; port to a bundled React + TS app. Files under <code class="t">matchbox/</code>:</p>
+      <div class="tbl-card"><table>
+        <tbody>
+          <tr><td><code>Matchbox.html</code></td><td>Entry — loads fonts, tokens, Lucide, and the scripts below</td></tr>
+          <tr><td><code>colors_and_type.css</code></td><td>Oat design tokens (import first)</td></tr>
+          <tr><td><code>mb.css</code></td><td>All component styles (shell, today, pipeline, list/board, drawer, menu)</td></tr>
+          <tr><td><code>data.js</code></td><td>Deterministic sample data; <code>STAGES</code>, <code>APPS</code>, <code>PROFILE</code></td></tr>
+          <tr><td><code>store.jsx</code></td><td><code>useApps()</code> — state + the action contract (§06)</td></tr>
+          <tr><td><code>ui.jsx</code></td><td>Atoms + helpers (Icon, MonoLogo, Due, StageStepper, ranking helpers)</td></tr>
+          <tr><td><code>parts.jsx</code></td><td>QuickMenu/QuickButton, StarBtn, PipeBar, Funnel, PipeChips</td></tr>
+          <tr><td><code>Today.jsx</code> · <code>Tracker.jsx</code> · <code>Detail.jsx</code> · <code>Insights.jsx</code></td><td>The four screens</td></tr>
+          <tr><td><code>App.jsx</code></td><td>Shell, routing, toast, prefs (direction/density/accent)</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- 15 -->
+    <section id="open">
+      <h2><span class="num">15</span> Open questions</h2>
+      <h3 class="title">Decisions for product before/while building</h3>
+      <ol>
+        <li><strong>One direction or a preference?</strong> Ship ledger as default; is focus a setting, or do we drop it for v1?</li>
+        <li><strong>Persistence model.</strong> Local-first is core — IndexedDB? A single local file (the "Saved locally" chip implies a file)? Define the source of truth and the date format.</li>
+        <li><strong>Reminders &amp; notifications.</strong> Are due dates purely in-app, or do they fire OS/browser notifications? That changes the "remind me" UX.</li>
+        <li><strong>Add / import applications.</strong> Manual form, paste-a-URL parse, or email forwarding? Out of scope here but it's the top of the funnel.</li>
+        <li><strong>Board interactivity.</strong> Drag-to-reorder / drag-between-stages was not built — wanted for v1?</li>
+        <li><strong>Dark mode.</strong> Tokens support it; the screens weren't designed in dark this pass. Schedule a dark pass if it ships.</li>
+        <li><strong>Drafts.</strong> The prototype models <code class="t">hasDraft</code> as a flag. Where does draft content live, and does "Send" actually send, or mark-as-sent?</li>
+      </ol>
+      <div class="note"><span class="tag">Reference</span> The interactive prototype is the source of truth for behavior and pixels: <a class="inline" href="Matchbox.html">open Matchbox.html</a> and toggle directions in the Tweaks panel.</div>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

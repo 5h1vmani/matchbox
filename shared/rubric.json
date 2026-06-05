@@ -1,26 +1,36 @@
 {
-  "schema_version": 1,
-  "_comment": "v0.3 5-dimension rubric. Section 11 of v0.3-design.md. Every dimension is computed from real data — no hardcoded constants. Replaces v0.2's rubric.yaml which had dishonest comp_score / cultural_score dimensions.",
+  "schema_version": 2,
+  "_comment": "v0.4 scoring rubric. Section 11 of v0.3-design.md, revised by the data-science pass (docs/v0.4-design.md). semantic_fit is the dense-embedding signal (profile centroid vs JD), computed locally with bge-small, zero tokens. The lexical dimensions remain as cheap, explainable signals. Weights are renormalized over whichever dimensions are present, so the total is always in [0,1]. Weights live here so they are tunable without code edits; the eval harness is how you tune them.",
   "dimensions": {
-    "role_title": {
-      "description": "JD title token overlap with the user's target role_families.",
-      "default_weight": 0.3
+    "semantic_fit": {
+      "description": "Cosine similarity between the candidate's profile centroid (mean of skill and bullet embeddings) and the JD embedding. Captures role, skill, and domain alignment semantically, including synonyms the lexical signals miss.",
+      "default_weight": 0.35
     },
     "skills_overlap": {
-      "description": "Fraction of the user's tech tags and skill names that appear in the JD body.",
-      "default_weight": 0.3
+      "description": "Explicit skill recall: how many of the user's skills/tech appear literally in the JD body, normalized by a target hit count. The ATS-literal complement to semantic_fit.",
+      "default_weight": 0.2
+    },
+    "role_title": {
+      "description": "Best semantic match between the JD title and the user's target role_families (cosine when an embedder is available, token overlap as fallback).",
+      "default_weight": 0.15
     },
     "company_tier": {
       "description": "Boost for dream_companies; neutral for unknown; zero for exclusions.",
-      "default_weight": 0.15
+      "default_weight": 0.1
     },
     "location_remote": {
       "description": "Match against target locations or 'remote' indicators in the JD location.",
-      "default_weight": 0.15
+      "default_weight": 0.1
     },
     "red_flags": {
       "description": "Penalty when an exclusion term appears in the JD body or title. Inverse: 1.0 means clean.",
       "default_weight": 0.1
     }
-  }
+  },
+  "calibration": {
+    "_comment": "Raw totals are mapped to interpretable bands by percentile across the scored batch (no labels needed). Cutoffs are quantiles of the batch score distribution.",
+    "bands": ["skip", "weak", "stretch", "strong"],
+    "quantile_cutoffs": [0.4, 0.7, 0.9]
+  },
+  "skills_target_hits": 5
 }
