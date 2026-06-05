@@ -15,12 +15,14 @@ from fastapi.staticfiles import StaticFiles
 from matchbox.web.deps import ConnDep
 from matchbox.web.routes import (
     agent_tasks,
+    ai,
     api,
     artifacts,
     discovery,
     inbox,
     insights,
     library,
+    library_api,
     offers,
     onboarding,
     profile,
@@ -45,12 +47,14 @@ def create_app() -> FastAPI:
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     app.include_router(agent_tasks.router)
+    app.include_router(ai.router)
     app.include_router(api.router)
     app.include_router(artifacts.router)
     app.include_router(discovery.router)
     app.include_router(inbox.router)
     app.include_router(insights.router)
     app.include_router(library.router)
+    app.include_router(library_api.router)
     app.include_router(offers.router)
     app.include_router(onboarding.router)
     app.include_router(profile.router)

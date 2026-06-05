@@ -88,6 +88,11 @@
     "max_word_count_cv_bullet": 25,
     "min_word_count_cv_bullet": 8,
     "max_bullets_per_role": 5,
-    "min_bullets_per_role": 2
+    "min_bullets_per_role": 2,
+    "_prose_comment": "Free-prose tiers for /api/voice-check. The CV-bullet gate (max 25 words) is a bullet rule and rejects all prose; these tiers scope the word-count check per prose kind so cover paragraphs and screening answers pass.",
+    "min_word_count_cover": 40,
+    "max_word_count_cover": 400,
+    "min_word_count_answer": 10,
+    "max_word_count_answer": 300
   }
 }

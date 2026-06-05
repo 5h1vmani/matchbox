@@ -7,6 +7,7 @@ routes call them; tests call them; nothing else writes those rows directly.
 from __future__ import annotations
 
 import sqlite3
+from typing import Any
 
 from matchbox.core.models import (
     Bullet,
@@ -398,3 +399,51 @@ def summaries_with_tags(conn: sqlite3.Connection) -> list[TaggedItem]:
         )
         for s in list_summaries(conn)
     ]
+
+
+# ─── verified facts (grounding payload for BYOK prose) ─────────────────
+
+
+def verified_facts(conn: sqlite3.Connection, *, verified: bool = True) -> dict[str, Any]:
+    """Structured factual grounding for prose generation.
+
+    When ``verified`` is True (the default, and the only honest mode for BYOK),
+    only verified bullets and projects are returned -- this is the real
+    anti-fabrication lever: the browser client is fed verified facts, never
+    invented ones. Bullets carry their experience context and a stable id so
+    a per-paragraph provenance pill can be shown *only where a real fact link
+    exists*. Skills are the user's own explicit claims; they carry no
+    verification gate, so they are always included and labelled as such.
+    """
+    experiences: list[dict[str, Any]] = []
+    for e in list_experiences(conn):
+        bullets = list_bullets(conn, e.id)
+        if verified:
+            bullets = [b for b in bullets if b.facts_verified]
+        if not bullets:
+            continue
+        experiences.append(
+            {
+                "company": e.company,
+                "role": e.role,
+                "start_date": e.start_date,
+                "end_date": e.end_date,
+                "location": e.location,
+                "bullets": [
+                    {"id": b.id, "text": b.text, "has_metric": b.has_metric} for b in bullets
+                ],
+            }
+        )
+
+    projects = list_projects(conn)
+    if verified:
+        projects = [p for p in projects if p.facts_verified]
+
+    return {
+        "verified_only": verified,
+        "experiences": experiences,
+        "projects": [
+            {"id": p.id, "name": p.name, "text": p.text, "url": p.url} for p in projects
+        ],
+        "skills": [{"name": s.name, "category": s.category} for s in list_skills(conn)],
+    }
