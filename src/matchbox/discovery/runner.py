@@ -23,6 +23,7 @@ from typing import Any, cast
 import httpx
 
 from matchbox.core.db import transaction
+from matchbox.discovery import enrich
 from matchbox.discovery.aggregators import (
     AggregatorError,
     _looks_remote,
@@ -66,6 +67,36 @@ def _list_enabled_sources(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+def _row_params(source_id: int | None, j: JobRecord) -> dict[str, Any]:
+    """INSERT params for one job, with Tier-2 enrichment + the dedup key.
+
+    country/remote come off the JobRecord; the eligibility/seniority signals are
+    deterministic regex reads of the title + JD (no LLM)."""
+    rec = enrich.enrich_record(j.title, j.jd_text)
+    return {
+        "source": source_id,
+        "company": j.company,
+        "title": j.title,
+        "location": j.location,
+        "url": j.url,
+        "apply_url": j.apply_url,
+        "jd_text": j.jd_text,
+        "posted_at": j.posted_at,
+        "fetched_at": _now_iso(),
+        "country": j.country,
+        # ATS pollers leave remote=False; derive it from the JD text so an ATS
+        # remote role is filterable like an aggregator one.
+        "remote": 1 if (j.remote or _looks_remote(j.title, j.location, j.jd_text)) else 0,
+        "dedup_key": enrich.dedup_key(j.url, j.company, j.title, j.location),
+        "seniority": rec["seniority"],
+        "min_years_exp": rec["min_years_exp"],
+        "sponsorship": rec["sponsorship"],
+        "citizenship_required": rec["citizenship_required"],
+        "clearance_required": rec["clearance_required"],
+        "remote_scope": rec["remote_scope"],
+    }
+
+
 def _upsert_jobs(conn: sqlite3.Connection, source_id: int | None, jobs: list[JobRecord]) -> int:
     """INSERT OR IGNORE by url. Returns number of new rows inserted.
 
@@ -90,32 +121,57 @@ def _upsert_jobs(conn: sqlite3.Connection, source_id: int | None, jobs: list[Job
         """
         INSERT OR IGNORE INTO job (
             source, company, title, location, url, apply_url,
-            jd_text, posted_at, fetched_at, status, country, remote
+            jd_text, posted_at, fetched_at, status, country, remote,
+            dedup_key, seniority, min_years_exp, sponsorship,
+            citizenship_required, clearance_required, remote_scope
         ) VALUES (
             :source, :company, :title, :location, :url, :apply_url,
-            :jd_text, :posted_at, :fetched_at, 'new', :country, :remote
+            :jd_text, :posted_at, :fetched_at, 'new', :country, :remote,
+            :dedup_key, :seniority, :min_years_exp, :sponsorship,
+            :citizenship_required, :clearance_required, :remote_scope
         )
         """,
-        [
-            {
-                "source": source_id,
-                "company": j.company,
-                "title": j.title,
-                "location": j.location,
-                "url": j.url,
-                "apply_url": j.apply_url,
-                "jd_text": j.jd_text,
-                "posted_at": j.posted_at,
-                "fetched_at": _now_iso(),
-                "country": j.country,
-                # ATS pollers leave remote=False; derive it from the JD text so
-                # an ATS remote role is filterable like an aggregator one.
-                "remote": 1 if (j.remote or _looks_remote(j.title, j.location, j.jd_text)) else 0,
-            }
-            for j in jobs
-        ],
+        [_row_params(source_id, j) for j in jobs],
+    )
+    # Link the new rows to a company row (insert any newly-seen employer first).
+    conn.execute(
+        "INSERT OR IGNORE INTO company (name) SELECT DISTINCT company FROM job "
+        "WHERE company_id IS NULL AND company IS NOT NULL AND trim(company) <> ''"
+    )
+    conn.execute(
+        "UPDATE job SET company_id = (SELECT id FROM company WHERE company.name = job.company) "
+        "WHERE company_id IS NULL"
     )
     return cur.rowcount
+
+
+def backfill_enrichment(conn: sqlite3.Connection) -> int:
+    """One-time pass: enrich jobs that predate Tier-2 (sponsorship still NULL).
+
+    Idempotent -- enrichment always sets `sponsorship` to a non-null value, so a
+    re-run skips already-enriched rows. (dedup_key/company_id were filled by the
+    007 migration backfill.) Returns the number of rows enriched."""
+    rows = conn.execute(
+        "SELECT id, title, jd_text FROM job WHERE sponsorship IS NULL"
+    ).fetchall()
+    with transaction(conn):
+        for r in rows:
+            rec = enrich.enrich_record(r["title"], r["jd_text"])
+            conn.execute(
+                "UPDATE job SET seniority = ?, min_years_exp = ?, sponsorship = ?, "
+                "citizenship_required = ?, clearance_required = ?, remote_scope = ? "
+                "WHERE id = ?",
+                (
+                    rec["seniority"],
+                    rec["min_years_exp"],
+                    rec["sponsorship"],
+                    rec["citizenship_required"],
+                    rec["clearance_required"],
+                    rec["remote_scope"],
+                    r["id"],
+                ),
+            )
+    return len(rows)
 
 
 def _call_with_backoff(

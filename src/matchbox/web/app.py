@@ -18,7 +18,9 @@ from matchbox.web.routes import (
     api,
     discovery,
     inbox,
+    insights,
     library,
+    offers,
     onboarding,
     profile,
     review,
@@ -45,7 +47,9 @@ def create_app() -> FastAPI:
     app.include_router(api.router)
     app.include_router(discovery.router)
     app.include_router(inbox.router)
+    app.include_router(insights.router)
     app.include_router(library.router)
+    app.include_router(offers.router)
     app.include_router(onboarding.router)
     app.include_router(profile.router)
     app.include_router(review.router)
