@@ -37,6 +37,8 @@ def benchmark(
         percentile  int 0..100 or None
         sampleSize  int
         median      float or None
+        range       {"low": float, "high": float} or None  (p25-p75 of the pool)
+        basis       plain-English description of what the figure is drawn from
         currency    str or None
         confidence  "none" | "low" | "medium"
     """
@@ -56,10 +58,13 @@ def benchmark(
     rows = conn.execute(sql, params).fetchall()
 
     if not rows:
+        scope = _scope_text(role_family, currency)
         return {
             "percentile": None,
             "sampleSize": 0,
             "median": None,
+            "range": None,
+            "basis": f"No matching salary data in your pool yet{scope}.",
             "currency": currency,
             "confidence": "none",
         }
@@ -100,10 +105,28 @@ def benchmark(
     else:
         confidence = "medium"
 
+    # Interquartile range (p25-p75) of the pool's midpoints -- a real spread, not
+    # a generic "typical" band. Falls back to min/max when n is too small to
+    # quantile.
+    if n >= 2:
+        q = statistics.quantiles(sorted_pts, n=4)
+        low, high = q[0], q[2]
+    else:
+        low = high = sorted_pts[0]
+
     return {
         "percentile": percentile,
         "sampleSize": n,
         "median": median_val,
+        "range": {"low": low, "high": high},
+        "basis": f"Based on {n} role{'' if n == 1 else 's'} in your own pool"
+        f"{_scope_text(role_family, resolved_currency)}.",
         "currency": resolved_currency,
         "confidence": confidence,
     }
+
+
+def _scope_text(role_family: str | None, currency: str | None) -> str:
+    """The ' (backend, USD)'-style scope suffix for the basis line."""
+    parts = [p for p in (role_family, currency) if p]
+    return f" ({', '.join(parts)})" if parts else ""
