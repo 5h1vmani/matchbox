@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -14,11 +13,6 @@ from matchbox.assemble import assemble_cover, re_render_cv
 from matchbox.core.db import connect
 from matchbox.core.migrations import migrate
 from matchbox.web.app import create_app
-
-pytestmark = pytest.mark.skipif(
-    shutil.which("typst") is None,
-    reason="typst not installed",
-)
 
 
 @pytest.fixture(autouse=True)

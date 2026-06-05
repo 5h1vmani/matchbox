@@ -8,7 +8,6 @@ drift_check + re_render_cv's tuple return surface the divergence.
 from __future__ import annotations
 
 import json
-import shutil
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,11 +20,6 @@ from matchbox.core import library as lib
 from matchbox.core.db import connect
 from matchbox.core.migrations import migrate
 from matchbox.matching.bm25 import tokenize
-
-pytestmark = pytest.mark.skipif(
-    shutil.which("typst") is None,
-    reason="typst not installed",
-)
 
 
 @dataclass(slots=True)

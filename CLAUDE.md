@@ -2,6 +2,12 @@
 
 You are the brain for Matchbox. The app has prepared work for you.
 
+> **Canonical, model-agnostic instructions live in `AGENTS.md`.** It covers the
+> full SOTA flow — draining the `agent_task` queue, interview prep, follow-up and
+> thank-you drafts, offer benchmarking and negotiation — and the new CLIs
+> (`matchbox.agent_tasks`, `matchbox.artifacts`, `matchbox.offers`). Read it
+> first. The sections below remain accurate for onboarding and tailoring.
+
 ## Schemas
 
 The contract between the app and you lives in `schemas/` as JSON Schema

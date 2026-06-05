@@ -1,4 +1,4 @@
-"""HTML + weasyprint CV renderer.
+"""HTML + weasyprint CV and cover-letter renderer.
 
 Populates the in-repo HTML/CSS template (templates/html/cv.html) from a cv.json
 dict, embeds the bundled fonts as base64, and renders to PDF via weasyprint —
@@ -13,6 +13,9 @@ section headings, real selectable text, no tables for layout.
 The renderer is tolerant: any section with no content is omitted, so a thin
 cv.json and a rich one both render cleanly. palette/font args are accepted for
 call-site compatibility but the look is fixed by the template.
+
+render_cover_pdf renders a plain-text cover letter body (cover.txt) to PDF
+using the same fonts, colours, and page size as render_cv_pdf. No Typst needed.
 """
 
 from __future__ import annotations
@@ -194,3 +197,164 @@ def render_cv_pdf(
     html_str = cv_json_to_html(cv, palette=palette, font=font)
     (cv_json_path.parent / "cv.html").write_text(html_str, encoding="utf-8")
     HTML(string=html_str, base_url=str(cv_json_path.parent)).write_pdf(str(out_path))
+
+
+# ─── cover-letter renderer ────────────────────────────────────────────────────
+
+_COVER_CSS = """\
+@font-face {{ font-family:'IBM Plex Sans'; font-style:normal; font-weight:400; src:url(data:font/ttf;base64,{sans_reg}) format('truetype'); }}
+@font-face {{ font-family:'IBM Plex Sans'; font-style:normal; font-weight:600; src:url(data:font/ttf;base64,{sans_sb}) format('truetype'); }}
+@font-face {{ font-family:'IBM Plex Mono'; font-style:normal; font-weight:400; src:url(data:font/ttf;base64,{mono_reg}) format('truetype'); }}
+@font-face {{ font-family:'IBM Plex Mono'; font-style:normal; font-weight:600; src:url(data:font/ttf;base64,{mono_sb}) format('truetype'); }}
+
+* {{ margin:0; padding:0; box-sizing:border-box; }}
+@page {{ size:A4; margin:20mm 20mm 20mm 20mm; }}
+html, body {{
+  font-family:'IBM Plex Sans', system-ui, sans-serif; font-size:12.5px; line-height:1.6;
+  color:#3f3f46; background:#ffffff; -webkit-font-smoothing:antialiased;
+}}
+.page {{ max-width:100%; }}
+.sender-name {{ font-weight:600; font-size:18px; letter-spacing:-0.01em; color:#09090b; margin-bottom:3px; }}
+.sender-contact {{
+  font-family:'IBM Plex Mono'; font-size:10px; color:#696970; margin-bottom:16px;
+  border-bottom:1px solid #e4e4e7; padding-bottom:14px;
+}}
+.sender-contact .sep {{ color:#d4d4d8; margin:0 6px; }}
+.cover-date {{ font-family:'IBM Plex Mono'; font-size:10px; color:#696970; margin-bottom:14px; }}
+.recipient {{ margin-bottom:14px; }}
+.recipient p {{ font-size:12.5px; color:#3f3f46; line-height:1.5; }}
+.salutation {{ margin-bottom:12px; font-size:12.5px; color:#3f3f46; }}
+.body p {{ font-size:12.5px; color:#3f3f46; line-height:1.65; margin-bottom:12px; text-align:left; }}
+.closing {{ margin-top:16px; }}
+.closing .closing-line {{ font-size:12.5px; color:#3f3f46; margin-bottom:20px; }}
+.closing .sig-name {{ font-weight:600; font-size:13px; color:#09090b; }}
+@media print {{
+  html, body {{ background:#ffffff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }}
+}}
+"""
+
+
+def cover_data_to_html(
+    *,
+    body_text: str,
+    profile: dict[str, Any],
+    palette: str = "slate",
+    font: str = "ibm-plex",
+) -> str:
+    """Build a standalone HTML string for a cover letter.
+
+    ``body_text`` is the raw plain-text body (blank lines separate paragraphs).
+    ``profile`` must have at minimum ``candidate_name``; optionally ``contact``
+    (list[str]), ``date``, ``recipient`` (list[str]), ``salutation``, ``closing``.
+
+    palette and font args are accepted for call-site compatibility but the visual
+    style is fixed to match the CV template.
+    """
+    css = _COVER_CSS.format(
+        sans_reg=_b64("IBMPlexSans-Regular.ttf"),
+        sans_sb=_b64("IBMPlexSans-SemiBold.ttf"),
+        mono_reg=_b64("IBMPlexMono-Regular.ttf"),
+        mono_sb=_b64("IBMPlexMono-SemiBold.ttf"),
+    )
+
+    name = _esc(profile.get("candidate_name", ""))
+
+    # Contact line — join with separator
+    contact_items: list[str] = list(profile.get("contact", []))
+    sep = '<span class="sep">/</span>'
+    contact_html = (" " + sep + " ").join(_esc(c) for c in contact_items) if contact_items else ""
+
+    date_html = (
+        f'<div class="cover-date">{_esc(profile.get("date", ""))}</div>'
+        if profile.get("date")
+        else ""
+    )
+
+    recipient_lines: list[str] = list(profile.get("recipient", []))
+    recipient_html = (
+        '<div class="recipient">'
+        + "".join(f"<p>{_esc(line)}</p>" for line in recipient_lines)
+        + "</div>"
+        if recipient_lines
+        else ""
+    )
+
+    salutation_html = (
+        f'<div class="salutation">{_esc(profile.get("salutation", ""))}</div>'
+        if profile.get("salutation")
+        else ""
+    )
+
+    # Split body on blank lines → paragraphs
+    paragraphs = [p.strip() for p in body_text.split("\n\n") if p.strip()]
+    body_html = (
+        '<div class="body">'
+        + "".join(f"<p>{_esc(para)}</p>" for para in paragraphs)
+        + "</div>"
+    )
+
+    closing = _esc(profile.get("closing", "Sincerely,"))
+    closing_html = (
+        '<div class="closing">'
+        f'<div class="closing-line">{closing}</div>'
+        f'<div class="sig-name">{name}</div>'
+        "</div>"
+    )
+
+    body_block = "\n".join(
+        x
+        for x in (
+            f'<div class="sender-name">{name}</div>',
+            f'<div class="sender-contact">{contact_html}</div>' if contact_html else "",
+            date_html,
+            recipient_html,
+            salutation_html,
+            body_html,
+            closing_html,
+        )
+        if x
+    )
+
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="en">\n'
+        "<head>\n"
+        '  <meta charset="UTF-8">\n'
+        f"  <title>{name} — Cover Letter</title>\n"
+        f"  <style>{css}</style>\n"
+        "</head>\n"
+        "<body>\n"
+        '  <div class="page">\n'
+        f"{body_block}\n"
+        "  </div>\n"
+        "</body>\n"
+        "</html>\n"
+    )
+
+
+def render_cover_pdf(
+    cover_txt_path_or_text: Path | str,
+    out_path: Path,
+    *,
+    profile: dict[str, Any],
+    palette: str = "slate",
+    font: str = "ibm-plex",
+) -> None:
+    """Render a cover letter to PDF via the HTML template + weasyprint.
+
+    ``cover_txt_path_or_text`` is either a Path to a .txt file or the raw body
+    string. ``profile`` supplies candidate_name, contact, date, recipient,
+    salutation, closing (mirrors the shape assemble_cover builds for Typst).
+
+    A sibling cover.html is written beside out_path for inspection.
+    """
+    from weasyprint import HTML  # type: ignore[import-untyped]
+
+    if isinstance(cover_txt_path_or_text, Path):
+        body_text = cover_txt_path_or_text.read_text(encoding="utf-8")
+    else:
+        body_text = cover_txt_path_or_text
+
+    html_str = cover_data_to_html(body_text=body_text, profile=profile, palette=palette, font=font)
+    (out_path.parent / "cover.html").write_text(html_str, encoding="utf-8")
+    HTML(string=html_str, base_url=str(out_path.parent)).write_pdf(str(out_path))

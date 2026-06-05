@@ -1,4 +1,4 @@
-"""assemble — deterministic selection + Typst render for one job.
+"""assemble — deterministic selection + HTML/weasyprint render for one job.
 
 The brain invokes this once per job in a run:
 
@@ -18,9 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import shutil
 import sqlite3
-import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -51,14 +49,6 @@ from matchbox.polish import (
 )
 
 RUNS_DIR = PROJECT_ROOT / "runs"
-TEMPLATE_DIR = PROJECT_ROOT / "src" / "matchbox" / "templates" / "typst"
-CV_TEMPLATE = TEMPLATE_DIR / "cv.typ"
-COVER_TEMPLATE = TEMPLATE_DIR / "cover.typ"
-# Fonts are bundled in-repo and passed to Typst via --font-path, so renders do
-# not depend on system-installed fonts. The old template named fonts that were
-# never installed (Source Serif Pro, Inter), so every render silently fell back
-# to a Typst default. Bundling makes typography deterministic and portable.
-FONTS_DIR = PROJECT_ROOT / "shared" / "fonts"
 DEFAULT_K = 12  # max bullets across all roles
 
 
@@ -339,15 +329,6 @@ def _pick_summary(conn: sqlite3.Connection) -> str:
     we use the most recently added one, if any."""
     row = conn.execute("SELECT text FROM summary_variant ORDER BY id DESC LIMIT 1").fetchone()
     return str(row[0]) if row else ""
-
-
-def _ensure_typst() -> str:
-    typst = shutil.which("typst")
-    if not typst:
-        raise FileNotFoundError(
-            "typst not found on PATH. Install: https://github.com/typst/typst#installation"
-        )
-    return typst
 
 
 def _render_pdf(cv_json_path: Path, out_path: Path, palette: str, font: str) -> None:
@@ -744,42 +725,6 @@ def re_render_cv(
 # ─── cover letter render ──────────────────────────────────────────────
 
 
-def _render_cover_pdf(
-    cover_txt_path: Path,
-    cover_meta_path: Path,
-    out_path: Path,
-    palette: str,
-    font: str,
-) -> None:
-    typst = _ensure_typst()
-    root_dir = cover_txt_path.parent
-    local_template = root_dir / "cover.typ"
-    shutil.copy2(COVER_TEMPLATE, local_template)
-    cmd = [
-        typst,
-        "compile",
-        str(local_template),
-        str(out_path),
-        "--root",
-        str(root_dir),
-        "--font-path",
-        str(FONTS_DIR),
-        "--input",
-        f"data={cover_txt_path.name}",
-        "--input",
-        f"meta={cover_meta_path.name}",
-        "--input",
-        f"palette={palette}",
-        "--input",
-        f"font={font}",
-    ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"typst compile failed (rc={proc.returncode}):\n{proc.stderr or proc.stdout}"
-        )
-
-
 def assemble_cover(
     *,
     conn: sqlite3.Connection,
@@ -788,8 +733,13 @@ def assemble_cover(
     palette: str,
     font: str,
 ) -> Path:
-    """Render cover.txt → cover.pdf. The brain writes cover.txt; this
-    builds cover_meta.json from the profile + job, then calls Typst."""
+    """Render cover.txt → cover.pdf via HTML + weasyprint.
+
+    The brain writes cover.txt; this builds the profile/job metadata and
+    calls render_cover_pdf, which produces a sibling cover.html and cover.pdf.
+    """
+    from matchbox.render_html import render_cover_pdf
+
     job = _load_job(conn, job_id)
     profile = _load_profile(conn)
 
@@ -811,7 +761,7 @@ def assemble_cover(
         contact.append(str(profile["location"]))
     contact.extend(json.loads(str(profile.get("links_json") or "[]")))
 
-    meta = {
+    cover_profile: dict[str, Any] = {
         "candidate_name": str(profile.get("full_name", "Your Name")),
         "contact": contact,
         "date": datetime.now(UTC).strftime("%B %d, %Y"),
@@ -819,11 +769,9 @@ def assemble_cover(
         "salutation": "Dear Hiring Team,",
         "closing": "Sincerely,",
     }
-    cover_meta = out_dir / "cover_meta.json"
-    cover_meta.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
     cover_pdf = out_dir / "cover.pdf"
-    _render_cover_pdf(cover_txt, cover_meta, cover_pdf, palette, font)
+    render_cover_pdf(cover_txt, cover_pdf, profile=cover_profile, palette=palette, font=font)
     return cover_pdf
 
 

@@ -1,17 +1,14 @@
-"""End-to-end smoke test for the matching + assembly + Typst path.
+"""End-to-end smoke test for the matching + assembly + weasyprint path.
 
 This is the M5 mandatory check (section 14 of v0.3-design.md):
 "asserts a non-empty, well-formed PDF whose extracted text contains
 the expected keywords — the single check whose absence let v0.2 ship a
 blank page."
-
-Skipped if typst is not on PATH.
 """
 
 from __future__ import annotations
 
 import json
-import shutil
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,12 +46,6 @@ class FakeEmbedder:
                 v /= n
             out.append(v)
         return out
-
-
-pytestmark = pytest.mark.skipif(
-    shutil.which("typst") is None,
-    reason="typst not installed; install from https://github.com/typst/typst#installation",
-)
 
 
 @pytest.fixture()

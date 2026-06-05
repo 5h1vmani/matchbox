@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,8 +20,6 @@ from matchbox.polish import (
     validate_polish_payload,
     validate_voice,
 )
-
-TYPST_AVAILABLE = shutil.which("typst") is not None
 
 
 @dataclass(slots=True)
@@ -48,7 +45,7 @@ class FakeEmbedder:
         return out
 
 
-# ─── voice-rules unit tests (no typst needed) ────────────────────────
+# ─── voice-rules unit tests ──────────────────────────────────────────
 
 
 def test_validate_voice_clean() -> None:
@@ -116,7 +113,7 @@ def test_validate_polish_payload_rejects_bad_shape() -> None:
     assert errors  # minItems: 1
 
 
-# ─── apply_polish unit tests (no typst) ───────────────────────────────
+# ─── apply_polish unit tests ─────────────────────────────────────────
 
 
 @pytest.fixture()
@@ -239,10 +236,9 @@ def test_apply_polish_rejects_banned_word(
     assert any(v.rule == "banned_word" for v in rejected[0].violations)
 
 
-# ─── end-to-end polish_run (requires typst) ──────────────────────────
+# ─── end-to-end polish_run ───────────────────────────────────────────
 
 
-@pytest.mark.skipif(not TYPST_AVAILABLE, reason="typst not installed")
 def test_polish_run_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("matchbox.assemble.RUNS_DIR", tmp_path / "runs")
 
