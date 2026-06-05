@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from matchbox.web.deps import ConnDep
 from matchbox.web.routes import (
+    agent_tasks,
     api,
     discovery,
     inbox,
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+    app.include_router(agent_tasks.router)
     app.include_router(api.router)
     app.include_router(discovery.router)
     app.include_router(inbox.router)

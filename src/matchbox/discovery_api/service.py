@@ -19,6 +19,7 @@ import sqlite3
 from datetime import date
 from typing import Any
 
+from matchbox.agent_tasks import repo as task_repo
 from matchbox.discovery_api import repo
 from matchbox.scoring.runs import JobSelection, create_run
 
@@ -49,8 +50,14 @@ def decide(
 
     elif decision == "tailoring":
         run_id, _ = create_run(conn, selections=[JobSelection(job_id, want_cv=True, want_cover=False)])
-        repo.create_application(conn, job_id, stage="saved", run_id=run_id)
+        app_id = repo.create_application(conn, job_id, stage="saved", run_id=run_id)
         repo.set_decision(conn, job_id, "tailoring")
+        # Enqueue the work so the agent can drain it (the SOTA loop). The run +
+        # "process run X" prompt below stay for the manual hand-off (back-compat).
+        task_repo.enqueue(
+            conn, "tailor", job_id=job_id, application_id=app_id,
+            payload={"runId": run_id, "wantCover": False},
+        )
         run_info = {"runId": run_id, "prompt": _run_prompt(run_id)}
 
     elif decision == "dismissed":
