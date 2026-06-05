@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api")
 
 class StageBody(BaseModel):
     stage: str
+    closeReason: str | None = None
 
 
 class SnoozeBody(BaseModel):
@@ -33,6 +34,7 @@ class RemindBody(BaseModel):
 
 class ResponseBody(BaseModel):
     type: str
+    closeReason: str | None = None
 
 
 class NoteBody(BaseModel):
@@ -110,7 +112,7 @@ def advance(app_id: int, conn: ConnDep) -> dict[str, Any]:
 
 @router.post("/applications/{app_id}/stage")
 def set_stage(app_id: int, body: StageBody, conn: ConnDep) -> dict[str, Any]:
-    return _require(service.set_stage(conn, app_id, body.stage))
+    return _require(service.set_stage(conn, app_id, body.stage, body.closeReason))
 
 
 @router.post("/applications/{app_id}/snooze")
@@ -132,7 +134,7 @@ def mark_done(app_id: int, conn: ConnDep) -> dict[str, Any]:
 def log_response(app_id: int, body: ResponseBody, conn: ConnDep) -> dict[str, Any]:
     if body.type not in ("reply", "rejected", "ghosted"):
         raise HTTPException(status_code=400, detail="invalid response type")
-    return _require(service.log_response(conn, app_id, body.type))
+    return _require(service.log_response(conn, app_id, body.type, body.closeReason))
 
 
 @router.post("/applications/{app_id}/note")

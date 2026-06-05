@@ -324,4 +324,10 @@ def test_summary_has_all_keys(tmp_path: Path) -> None:
     conn = _db(tmp_path)
     _seed(conn)
     result = summary(conn)
-    assert set(result.keys()) == {"totals", "funnel", "calibration", "whatsWorking"}
+    assert set(result.keys()) == {
+        "totals",
+        "funnel",
+        "calibration",
+        "whatsWorking",
+        "rejectionReasons",
+    }

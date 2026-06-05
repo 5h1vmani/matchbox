@@ -18,7 +18,9 @@ Event-kind -> ladder-stage mapping used by reached_stage_for():
 
 from __future__ import annotations
 
+import math
 import sqlite3
+from datetime import date, timedelta
 from typing import Any
 
 # ── ladder ────────────────────────────────────────────────────────────────────
@@ -239,6 +241,69 @@ def whats_working(conn: sqlite3.Connection) -> dict[str, Any]:
     }
 
 
+def momentum(
+    conn: sqlite3.Connection,
+    *,
+    week_start: date | None = None,
+    target: int = 5,
+) -> dict[str, Any]:
+    """Real weekly pace over a 7-day window: applications sent, interview
+    activity, follow-ups -- all from captured `app_event` rows. The status is a
+    plain threshold on the applied count (rest at/above target, healthy on the
+    way, push when well behind). No fabricated cause, no n-of-1 dressed up.
+
+    `week_start` defaults to 6 days ago (a trailing 7-day window ending today).
+    """
+    start = week_start or (date.today() - timedelta(days=6))
+    end = start + timedelta(days=7)
+    start_s, end_s = start.isoformat(), end.isoformat()
+
+    def _count(kinds: tuple[str, ...]) -> int:
+        placeholders = ",".join("?" for _ in kinds)
+        row = conn.execute(
+            f"SELECT COUNT(*) FROM app_event "
+            f"WHERE kind IN ({placeholders}) "
+            f"AND date(created_at) >= ? AND date(created_at) < ?",
+            (*kinds, start_s, end_s),
+        ).fetchone()
+        return int(row[0] or 0)
+
+    applied = _count(("applied",))
+    interviews = _count(("screen", "onsite"))
+    followups = _count(("followup",))
+
+    if target <= 0 or applied >= target:
+        status = "rest"
+    elif applied >= math.ceil(target / 2):
+        status = "healthy"
+    else:
+        status = "push"
+
+    return {
+        "weekStart": start_s,
+        "weekEnd": end_s,
+        "target": target,
+        "applied": applied,
+        "interviews": interviews,
+        "followups": followups,
+        "status": status,
+    }
+
+
+def rejection_reasons(conn: sqlite3.Connection) -> dict[str, int]:
+    """Deterministic GROUP BY over captured `close_reason` for closed
+    applications. Uncaptured closures read as "unknown" -- never inferred."""
+    rows = conn.execute(
+        "SELECT close_reason, COUNT(*) AS n FROM application "
+        "WHERE stage = 'rejected' GROUP BY close_reason"
+    ).fetchall()
+    out: dict[str, int] = {}
+    for r in rows:
+        reason = r["close_reason"] or "unknown"
+        out[reason] = out.get(reason, 0) + int(r["n"])
+    return out
+
+
 def summary(conn: sqlite3.Connection) -> dict[str, Any]:
     """Top-level summary for the Insights dashboard.
 
@@ -289,4 +354,5 @@ def summary(conn: sqlite3.Connection) -> dict[str, Any]:
         "funnel": funnel(conn),
         "calibration": calibration(conn),
         "whatsWorking": whats_working(conn),
+        "rejectionReasons": rejection_reasons(conn),
     }

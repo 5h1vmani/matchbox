@@ -12,6 +12,21 @@ from datetime import date, timedelta
 # Linear progression; `rejected` ("Closed") is off-flow and terminal.
 FLOW = ["saved", "applied", "phone", "onsite", "offer"]
 
+# Structured rejection categories captured at close. Anything outside this set
+# (or simply not captured) is treated as "unknown" by the rejection-reason
+# rollup -- we never infer a cause.
+CLOSE_REASONS = (
+    "role_filled",
+    "not_a_fit",
+    "comp",
+    "location",
+    "timing",
+    "ghosted",
+    "withdrew",
+    "other",
+    "unknown",
+)
+
 STAGE_LABELS = {
     "saved": "Saved",
     "applied": "Applied",

@@ -46,7 +46,21 @@ def advance_stage(conn: sqlite3.Connection, app_id: int) -> App:
     return repo.load_one(conn, app_id)
 
 
-def set_stage(conn: sqlite3.Connection, app_id: int, stage: str) -> App:
+def _close_reason(value: str | None) -> str | None:
+    """Normalize a captured close reason to the controlled vocab (or 'other'
+    when something non-empty but unrecognized is sent). None stays None ->
+    reads as 'unknown' in the rollup."""
+    if value is None:
+        return None
+    v = value.strip().lower()
+    if not v:
+        return None
+    return v if v in rules.CLOSE_REASONS else "other"
+
+
+def set_stage(
+    conn: sqlite3.Connection, app_id: int, stage: str, close_reason: str | None = None
+) -> App:
     row = repo.raw(conn, app_id)
     if row is None:
         return None
@@ -54,6 +68,10 @@ def set_stage(conn: sqlite3.Connection, app_id: int, stage: str) -> App:
         return repo.load_one(conn, app_id)
     closing = stage == "rejected"
     updates: dict[str, Any] = {"stage": stage}
+    if closing:
+        reason = _close_reason(close_reason)
+        if reason is not None:
+            updates["close_reason"] = reason
     _set_next_action(updates, None if closing else rules.default_action_for(stage))
     repo.update_app(conn, app_id, **updates)
     repo.add_event(
@@ -122,7 +140,9 @@ def mark_done(conn: sqlite3.Connection, app_id: int) -> App:
     return repo.load_one(conn, app_id)
 
 
-def log_response(conn: sqlite3.Connection, app_id: int, rtype: str) -> App:
+def log_response(
+    conn: sqlite3.Connection, app_id: int, rtype: str, close_reason: str | None = None
+) -> App:
     row = repo.raw(conn, app_id)
     if row is None:
         return None
@@ -138,6 +158,9 @@ def log_response(conn: sqlite3.Connection, app_id: int, rtype: str) -> App:
         repo.add_event(conn, app_id, "reply", "Heard back — positive")
     elif rtype == "rejected":
         updates = {"stage": "rejected"}
+        reason = _close_reason(close_reason)
+        if reason is not None:
+            updates["close_reason"] = reason
         _set_next_action(updates, None)
         repo.update_app(conn, app_id, **updates)
         repo.add_event(conn, app_id, "rejected", "No longer moving forward")
