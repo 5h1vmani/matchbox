@@ -110,6 +110,23 @@ def test_freshness_open_default_and_closing_and_closed():
     assert rules.freshness(None, "2026-06-01", today) == ("closed", None)  # past deadline
 
 
+def test_salary_display_formats_and_undisclosed():
+    # Undisclosed stays None (honest -- never a guess).
+    assert rules.salary_display(None, None) is None
+    # Annual USD range reads like the design's "$150–185k".
+    assert rules.salary_display(150000, 185000, "USD", "year") == "$150–185k"
+    # A single bound (only one side reported) renders without a dash.
+    assert rules.salary_display(120000, None, "USD", "year") == "$120k"
+    assert rules.salary_display(None, 90000, "EUR", "year") == "€90k"
+    # Equal bounds collapse to a single figure.
+    assert rules.salary_display(100000, 100000, "GBP", "year") == "£100k"
+    # Non-annual periods carry an explicit suffix.
+    assert rules.salary_display(85, 110, "USD", "hour") == "$85–110/hr"
+    # INR uses lakhs; unknown currency codes are kept as a prefix.
+    assert rules.salary_display(1500000, 2500000, "INR", "year") == "₹15–25L"
+    assert rules.salary_display(50000, 60000, "CHF", "year") == "CHF 50–60k"
+
+
 # Queue membership / ordering / cap live client-side (byte-identical to the
 # design), so there is no Python membership to unit-test here. load_roles' one
 # server-side membership rule — excluding roles skipped today — is covered by
@@ -130,8 +147,8 @@ def test_serialize_shape_and_only_scored_enter(conn):
     assert r1["fit"]["reason"] == "great match"
     assert r1["eligibility"]["status"] == "eligible"
     assert r1["remote"] is True
-    assert r1["salary"] is None             # not stored on job
-    assert r1["coverage"] is None           # no requirement match data
+    assert r1["salary"] is None             # this fixture job reported no salary
+    assert r1["coverage"] is None           # no tailoring run yet
     assert r1["source"] == "Greenhouse"
     assert r1["freshness"] == "open"        # default until verify_open runs
     assert r1["mono"]["bg"].startswith("#")

@@ -18,14 +18,16 @@ from matchbox.core.db import transaction
 from matchbox.discovery_api import rules
 from matchbox.tracker.rules import mono_for
 
-# Scored jobs only, with the ATS source for the display label. `requirements_json`
-# is reserved for a future coverage match; it is not populated today so coverage
-# serializes to null.
+# Scored jobs only, with the ATS source for the display label. Salary columns
+# (added in 007_sota.sql) are serialized when the ad reported them; coverage is
+# read from the tailoring artifact when a run exists for the job (see
+# `_coverage_for_job`).
 _ROLE_SELECT = """
   SELECT j.id, j.company, j.title, j.location, j.url, j.apply_url, j.jd_text,
          j.posted_at, j.score, j.score_breakdown_json,
          j.remote, j.discovery_decision, j.skipped_on, j.freshness, j.closes_at,
          j.sponsorship, j.citizenship_required, j.clearance_required, j.remote_scope,
+         j.salary_min, j.salary_max, j.salary_currency, j.salary_period,
          s.ats_type AS ats_type
     FROM job j
     LEFT JOIN ats_source s ON s.id = j.source
@@ -39,12 +41,15 @@ def serialize(
     *,
     jd_preview: bool = False,
     work_auth: dict[str, Any] | None = None,
+    coverage: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """One scored `job` row -> the design's `Role` shape.
 
     `jd_preview` trims the JD to a short pulled line for the list surface (the JD
     drawer fetches the full text via load_one). `work_auth` (the user's target
-    work-authorization) feeds the deterministic eligibility pre-filter."""
+    work-authorization) feeds the deterministic eligibility pre-filter.
+    `coverage` (`{covered, total}`) is supplied by the caller when a tailoring
+    run has produced a coverage report for this job; None means no run yet."""
     today = today or date.today()
     breakdown = rules.load_breakdown(row["score_breakdown_json"])
 
@@ -68,15 +73,17 @@ def serialize(
         "title": row["title"],
         "location": row["location"] or "",
         "remote": bool(row["remote"]),
-        # Salary is not stored on `job` -> undisclosed (the UI shows the fallback).
-        "salary": None,
+        "salary": rules.salary_display(
+            row["salary_min"], row["salary_max"], row["salary_currency"], row["salary_period"]
+        ),
         "source": rules.source_label(row["ats_type"]),
         "postedDaysAgo": rules.days_since(row["posted_at"], today),
         "link": row["apply_url"] or row["url"],
         "fit": fit,
         "eligibility": elig,
-        # No requirement-match data persisted yet -> no coverage bar.
-        "coverage": None,
+        # Coverage is real only once a tailoring run has matched this job's
+        # requirements against the verified library; null until then.
+        "coverage": coverage,
         "freshness": fresh,
         "closingInDays": closing_in,
         "mono": mono_for(row["company"]),
