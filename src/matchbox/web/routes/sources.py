@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 
+from matchbox.core.settings import get_setting, set_setting
 from matchbox.discovery.base import PollerError
 from matchbox.discovery.pollers import POLLERS
 from matchbox.discovery.runner import scan_aggregators, scan_all, scan_source
@@ -45,11 +46,11 @@ def _get_source(conn: sqlite3.Connection, source_id: int) -> dict[str, Any]:
 
 def _adzuna_config(conn: sqlite3.Connection) -> dict[str, Any]:
     """The user's Adzuna BYO-key config, stored in `setting`. Empty if unset."""
-    row = conn.execute("SELECT value FROM setting WHERE key = 'adzuna'").fetchone()
-    if row is None:
+    value = get_setting(conn, "adzuna")
+    if value is None:
         return {}
     try:
-        cfg = json.loads(row["value"])
+        cfg = json.loads(value)
     except (ValueError, TypeError):
         return {}
     return cfg if isinstance(cfg, dict) else {}
@@ -172,11 +173,7 @@ def save_adzuna(
         "app_key": app_key.strip(),
         "queries": [{"country": (country.strip() or "in"), "what": what.strip()}],
     }
-    conn.execute(
-        "INSERT INTO setting (key, value) VALUES ('adzuna', ?) "
-        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        (json.dumps(cfg),),
-    )
+    set_setting(conn, "adzuna", json.dumps(cfg))
     return HTMLResponse('<span class="text-success">Adzuna settings saved.</span>')
 
 
