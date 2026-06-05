@@ -41,6 +41,13 @@ class JobRecord:
     # leave these at their defaults, so existing pollers/tests are unaffected.
     country: str | None = None  # ISO-ish country code/name the source reports
     remote: bool = False  # True when the role is remote
+    # Tier-1 fields the source API reports (aggregators set these; ATS pollers
+    # leave them None). Salary is the source's figure, annualized where known.
+    salary_min: float | None = None
+    salary_max: float | None = None
+    salary_currency: str | None = None
+    salary_period: str | None = None  # year | month | day | hour
+    employment_type: str | None = None  # full_time | part_time | contract | internship
 
 
 class PollerError(Exception):

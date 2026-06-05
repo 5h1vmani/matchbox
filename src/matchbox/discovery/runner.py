@@ -94,6 +94,11 @@ def _row_params(source_id: int | None, j: JobRecord) -> dict[str, Any]:
         "citizenship_required": rec["citizenship_required"],
         "clearance_required": rec["clearance_required"],
         "remote_scope": rec["remote_scope"],
+        "salary_min": j.salary_min,
+        "salary_max": j.salary_max,
+        "salary_currency": j.salary_currency,
+        "salary_period": j.salary_period,
+        "employment_type": j.employment_type,
     }
 
 
@@ -123,12 +128,14 @@ def _upsert_jobs(conn: sqlite3.Connection, source_id: int | None, jobs: list[Job
             source, company, title, location, url, apply_url,
             jd_text, posted_at, fetched_at, status, country, remote,
             dedup_key, seniority, min_years_exp, sponsorship,
-            citizenship_required, clearance_required, remote_scope
+            citizenship_required, clearance_required, remote_scope,
+            salary_min, salary_max, salary_currency, salary_period, employment_type
         ) VALUES (
             :source, :company, :title, :location, :url, :apply_url,
             :jd_text, :posted_at, :fetched_at, 'new', :country, :remote,
             :dedup_key, :seniority, :min_years_exp, :sponsorship,
-            :citizenship_required, :clearance_required, :remote_scope
+            :citizenship_required, :clearance_required, :remote_scope,
+            :salary_min, :salary_max, :salary_currency, :salary_period, :employment_type
         )
         """,
         [_row_params(source_id, j) for j in jobs],

@@ -135,6 +135,27 @@ def _as_list(data: Any, key: str, source: str) -> list[dict[str, Any]]:
 # tool; commercial aggregation may need a licence — revisit on monetization.
 
 
+_ADZUNA_CURRENCY = {
+    "in": "INR", "gb": "GBP", "us": "USD", "au": "AUD", "ca": "CAD",
+    "nz": "NZD", "sg": "SGD", "za": "ZAR", "pl": "PLN", "br": "BRL",
+    "mx": "MXN", "de": "EUR", "fr": "EUR", "nl": "EUR", "at": "EUR",
+    "it": "EUR", "es": "EUR",
+}
+
+
+def _adzuna_employment(job: dict[str, Any]) -> str | None:
+    """Map Adzuna's contract_time/contract_type onto our employment_type."""
+    ct = (job.get("contract_time") or "").lower()
+    if ct in ("full_time", "part_time"):
+        return ct
+    cty = (job.get("contract_type") or "").lower()
+    if cty == "contract":
+        return "contract"
+    if cty == "permanent":
+        return "full_time"
+    return None
+
+
 def poll_adzuna(
     *,
     app_id: str,
@@ -205,6 +226,11 @@ def poll_adzuna(
                 posted_at=job.get("created"),
                 country=country,
                 remote=_looks_remote(title, loc_str, jd_text),
+                salary_min=job.get("salary_min"),
+                salary_max=job.get("salary_max"),
+                salary_currency=_ADZUNA_CURRENCY.get(country),
+                salary_period="year",
+                employment_type=_adzuna_employment(job),
             )
         )
     return out
