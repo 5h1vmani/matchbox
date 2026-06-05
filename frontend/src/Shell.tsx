@@ -19,6 +19,9 @@ import { Tracker } from "./screens/Tracker";
 import { Insights } from "./screens/Insights";
 import { Detail } from "./screens/Detail";
 import { Settings } from "./screens/Settings";
+import { Answers } from "./screens/Answers";
+import { Offers } from "./screens/Offers";
+import { Workspace } from "./screens/Workspace";
 import { Review } from "./discovery/screens/Review";
 import { Browse } from "./discovery/screens/Browse";
 import { JDDrawer, Watchlist } from "./discovery/screens/WatchlistJD";
@@ -46,11 +49,14 @@ interface NavDef {
 const NAV: NavDef[] = [
   { id: "today", label: "Today", icon: "sun", group: "Track" },
   { id: "applications", label: "Applications", icon: "layout-list", group: "Track" },
+  { id: "workspace", label: "Workspace", icon: "users", group: "Track" },
+  { id: "offers", label: "Offers", icon: "party-popper", group: "Track" },
   { id: "insights", label: "Insights", icon: "chart-line", group: "Track" },
   { id: "review", label: "Today's roles", icon: "sparkles", group: "Discover" },
   { id: "browse", label: "Browse", icon: "search", group: "Discover" },
   { id: "watchlist", label: "Watchlist", icon: "bookmark", group: "Discover" },
   { id: "library", label: "Library", icon: "book-open", group: "Workspace", href: "/library" },
+  { id: "answers", label: "Answers", icon: "messages-square", group: "Workspace" },
   { id: "sources", label: "Sources", icon: "rss", group: "Workspace", href: "/sources" },
   { id: "settings", label: "Settings", icon: "settings", group: "Workspace" },
   { id: "onboarding", label: "Onboarding", icon: "upload", group: "Workspace", href: "/onboarding" },
@@ -272,6 +278,9 @@ export function Shell() {
   else if (nav === "browse") screen = <Browse roles={roles} sel={sel} onToggleSel={toggleSel} onClearSel={clearSel} onOpen={(r) => setJd(r.id)} onDecide={onDecide} onBatch={onBatch} />;
   else if (nav === "watchlist") screen = <Watchlist watch={watch} flash={flash} />;
   else if (nav === "insights") screen = <Insights apps={apps} dir={DIR} />;
+  else if (nav === "workspace") screen = <Workspace flash={flash} />;
+  else if (nav === "offers") screen = <Offers flash={flash} />;
+  else if (nav === "answers") screen = <Answers flash={flash} />;
   else if (nav === "settings") screen = <Settings flash={flash} />;
   else if (nav === "applications") screen = <Tracker apps={apps} actions={actions} flash={flash} onOpen={openDetail} dir={DIR} view={view} setView={setView} filter={filter} setFilter={setFilter} />;
   else screen = <Today apps={apps} actions={actions} flash={flash} onOpen={openDetail} dir={DIR} />;
