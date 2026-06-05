@@ -30,8 +30,10 @@ def stage_label(stage: str) -> str:
 
 
 def default_action_for(stage: str) -> DefaultAction | None:
+    # These are reminders -- a due-date computed on read (`due_from`), not a
+    # scheduled task (there is no scheduler). The applied follow-up sits at +7d.
     return {
-        "applied": ("followup", "Send follow-up", 5, None),
+        "applied": ("followup", "Send follow-up", 7, None),
         "phone": ("prep", "Prep screening notes", 2, None),
         "onsite": ("interview", "Onsite interview", 3, "13:00"),
         "offer": ("offer", "Respond to offer", 5, None),

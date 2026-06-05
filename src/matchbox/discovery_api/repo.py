@@ -17,6 +17,7 @@ from typing import Any
 from matchbox.core.db import PROJECT_ROOT, transaction
 from matchbox.discovery_api import rules
 from matchbox.matching.coverage import summarize_coverage
+from matchbox.tracker import rules as tracker_rules
 from matchbox.tracker.rules import mono_for
 
 _RUNS_DIR = PROJECT_ROOT / "runs"
@@ -248,7 +249,11 @@ def create_application(
 
     Inserts with the legacy `status='draft'` (the table's CHECK), and the
     tracker's `stage` (what the tracker SPA reads). Seeds `updated_at` and a
-    'saved' history event so the timeline is not empty.
+    history event so the timeline is not empty.
+
+    When created at the `applied` stage (the Apply-packet submit), it stamps
+    `applied_at` and seeds the stage's default next action -- the +7d follow-up
+    "reminder" (a due-date computed on read, not a scheduled task).
     """
     existing = existing_application(conn, job_id)
     if existing is not None:
@@ -270,20 +275,33 @@ def create_application(
         if job and job["score_breakdown_json"]
         else None
     )
+
+    applied_at = tracker_rules.today().isoformat() if stage == "applied" else None
+    action = tracker_rules.default_action_for(stage)
+    na_kind, na_label, na_due, na_time = action if action else (None, None, None, None)
+    na_at = tracker_rules.date_in(na_due) if action else None
+    ev_kind, ev_text = (
+        ("applied", "Applied from packet") if stage == "applied" else ("saved", "Saved from discovery")
+    )
+
     with transaction(conn):
         cur = conn.execute(
             """
             INSERT INTO application (job_id, run_id, status, stage, has_draft,
-                                     updated_at, predicted_band, predicted_score)
-            VALUES (?, ?, 'draft', ?, 0,
-                    strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, ?)
+                                     applied_at, updated_at, predicted_band, predicted_score,
+                                     next_action, next_action_kind, next_action_at, next_action_time)
+            VALUES (?, ?, 'draft', ?, 0, ?,
+                    strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, ?, ?, ?, ?, ?)
             """,
-            (job_id, run_id, stage, predicted_band, predicted_score),
+            (
+                job_id, run_id, stage, applied_at, predicted_band, predicted_score,
+                na_label, na_kind, na_at, na_time,
+            ),
         )
         app_id = int(cur.lastrowid or 0)
         conn.execute(
-            "INSERT INTO app_event (application_id, kind, text) VALUES (?, 'saved', 'Saved from discovery')",
-            (app_id,),
+            "INSERT INTO app_event (application_id, kind, text) VALUES (?, ?, ?)",
+            (app_id, ev_kind, ev_text),
         )
     return app_id
 
