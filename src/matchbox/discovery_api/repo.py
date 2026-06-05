@@ -9,6 +9,7 @@ scoring run and are simply not selected here.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import date
 from typing import Any
@@ -24,6 +25,7 @@ _ROLE_SELECT = """
   SELECT j.id, j.company, j.title, j.location, j.url, j.apply_url, j.jd_text,
          j.posted_at, j.score, j.score_breakdown_json,
          j.remote, j.discovery_decision, j.skipped_on, j.freshness, j.closes_at,
+         j.sponsorship, j.citizenship_required, j.clearance_required, j.remote_scope,
          s.ats_type AS ats_type
     FROM job j
     LEFT JOIN ats_source s ON s.id = j.source
@@ -32,18 +34,29 @@ _ROLE_SELECT = """
 
 
 def serialize(
-    row: sqlite3.Row, today: date | None = None, *, jd_preview: bool = False
+    row: sqlite3.Row,
+    today: date | None = None,
+    *,
+    jd_preview: bool = False,
+    work_auth: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One scored `job` row -> the design's `Role` shape.
 
     `jd_preview` trims the JD to a short pulled line for the list surface (the JD
-    drawer fetches the full text via load_one)."""
+    drawer fetches the full text via load_one). `work_auth` (the user's target
+    work-authorization) feeds the deterministic eligibility pre-filter."""
     today = today or date.today()
     breakdown = rules.load_breakdown(row["score_breakdown_json"])
 
     level = rules.fit_level(row["score"], (breakdown or {}).get("band"))
     fit = {"level": level, "reason": rules.fit_reason(breakdown)}
-    elig = rules.eligibility(breakdown)
+    elig = rules.eligibility_status(
+        breakdown,
+        sponsorship=row["sponsorship"],
+        citizenship_required=row["citizenship_required"],
+        clearance_required=row["clearance_required"],
+        work_auth=work_auth,
+    )
     fresh, closing_in = rules.freshness(row["freshness"], row["closes_at"], today)
     jd = rules.jd_paragraphs(row["jd_text"])
     if jd_preview:
@@ -76,6 +89,19 @@ def _skipped_today(skipped_on: str | None, today: date) -> bool:
     return bool(skipped_on) and (skipped_on or "")[:10] == today.isoformat()
 
 
+def _work_auth(conn: sqlite3.Connection) -> dict[str, Any]:
+    """The user's work-authorization block from `target` (for the eligibility
+    pre-filter). Empty dict when unset -- then nothing is ruled out."""
+    row = conn.execute("SELECT work_auth_json FROM target LIMIT 1").fetchone()
+    if not row or not row["work_auth_json"]:
+        return {}
+    try:
+        val = json.loads(row["work_auth_json"])
+        return val if isinstance(val, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
 def load_roles(conn: sqlite3.Connection, today: date | None = None) -> list[dict[str, Any]]:
     """All scored roles, minus those skipped today (they return tomorrow),
     serialized slim (JD trimmed to its first paragraph for the card's pulled
@@ -85,9 +111,10 @@ def load_roles(conn: sqlite3.Connection, today: date | None = None) -> list[dict
     byte-identical to the design prototype — so this stays a thin serializer
     (the single source of that logic lives where the design put it)."""
     today = today or date.today()
+    wa = _work_auth(conn)
     rows = conn.execute(_ROLE_SELECT).fetchall()
     return [
-        serialize(r, today, jd_preview=True)
+        serialize(r, today, jd_preview=True, work_auth=wa)
         for r in rows
         if not _skipped_today(r["skipped_on"], today)
     ]
@@ -115,13 +142,14 @@ def load_watchlist(conn: sqlite3.Connection) -> list[dict[str, Any]]:
 
 def _open_eligible_count(conn: sqlite3.Connection, company: str) -> int:
     """Open, eligible (not judged ineligible), scored, undecided roles at a company."""
+    wa = _work_auth(conn)
     rows = conn.execute(
         _ROLE_SELECT + " AND j.company = ? AND j.discovery_decision IS NULL",
         (company,),
     ).fetchall()
     count = 0
     for r in rows:
-        role = serialize(r)
+        role = serialize(r, work_auth=wa)
         if role["eligibility"]["status"] != "ineligible" and role["freshness"] != "closed":
             count += 1
     return count
@@ -139,7 +167,7 @@ def raw(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:
 
 def load_one(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] | None:
     row = raw(conn, job_id)
-    return serialize(row) if row else None
+    return serialize(row, work_auth=_work_auth(conn)) if row else None
 
 
 def job_facts(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:
@@ -195,15 +223,25 @@ def create_application(
                 )
         return existing
 
+    # Snapshot the predicted fit at apply-time so Learn can calibrate later.
+    job = conn.execute(
+        "SELECT score, score_breakdown_json FROM job WHERE id = ?", (job_id,)
+    ).fetchone()
+    predicted_score = job["score"] if job else None
+    predicted_band = (
+        (rules.load_breakdown(job["score_breakdown_json"]) or {}).get("band")
+        if job and job["score_breakdown_json"]
+        else None
+    )
     with transaction(conn):
         cur = conn.execute(
             """
             INSERT INTO application (job_id, run_id, status, stage, has_draft,
-                                     updated_at)
+                                     updated_at, predicted_band, predicted_score)
             VALUES (?, ?, 'draft', ?, 0,
-                    strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+                    strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, ?)
             """,
-            (job_id, run_id, stage),
+            (job_id, run_id, stage, predicted_band, predicted_score),
         )
         app_id = int(cur.lastrowid or 0)
         conn.execute(

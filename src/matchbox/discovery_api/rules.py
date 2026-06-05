@@ -109,6 +109,64 @@ def eligibility(breakdown: dict[str, Any] | None) -> dict[str, str]:
     return {"status": status, "reason": str(elig.get("reason", ""))}
 
 
+def deterministic_ineligible(
+    *,
+    sponsorship: str | None,
+    citizenship_required: int | None,
+    clearance_required: int | None,
+    work_auth: dict[str, Any] | None,
+) -> dict[str, str] | None:
+    """A hard, no-LLM INELIGIBLE verdict from the job's Tier-2 signals vs the
+    user's work authorization -- or None when nothing rules the role out.
+
+    This is the eligibility-at-scale lever: it runs on every scored job without
+    an LLM. It only ever proves INELIGIBLE (a concrete conflict); it never
+    asserts 'eligible' -- that remains the judge's job, and absence of a conflict
+    stays 'unclear'. Truthful by construction: we hide a role only on an explicit
+    signal the user cannot meet.
+    """
+    wa = work_auth or {}
+    needs_sponsorship = bool(wa.get("needs_sponsorship"))
+    has_clearance = bool(wa.get("has_clearance"))
+    if sponsorship == "none" and needs_sponsorship:
+        return {"status": "ineligible", "reason": "No visa sponsorship, which you need."}
+    if citizenship_required and needs_sponsorship:
+        return {
+            "status": "ineligible",
+            "reason": "Citizenship required; you would need sponsorship.",
+        }
+    if clearance_required and not has_clearance:
+        return {
+            "status": "ineligible",
+            "reason": "Security clearance required, which you do not hold.",
+        }
+    return None
+
+
+def eligibility_status(
+    breakdown: dict[str, Any] | None,
+    *,
+    sponsorship: str | None = None,
+    citizenship_required: int | None = None,
+    clearance_required: int | None = None,
+    work_auth: dict[str, Any] | None = None,
+) -> dict[str, str]:
+    """Eligibility reconciled from BOTH the deterministic signals and the judge.
+
+    A hard deterministic conflict wins (it is certain); otherwise we defer to the
+    judge's enum (or 'unclear' when it has not run). This makes ineligibility
+    visible across the whole pool without an LLM per job."""
+    det = deterministic_ineligible(
+        sponsorship=sponsorship,
+        citizenship_required=citizenship_required,
+        clearance_required=clearance_required,
+        work_auth=work_auth,
+    )
+    if det is not None:
+        return det
+    return eligibility(breakdown)
+
+
 # ── freshness ──────────────────────────────────────────────────────────────────
 
 
