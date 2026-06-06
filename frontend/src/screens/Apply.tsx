@@ -105,7 +105,35 @@ function MustHaveRow({ m }: { m: PacketMustHave }) {
   );
 }
 
-function ResumeTab({ packet }: { packet: Packet }) {
+const PALETTES: ReadonlyArray<string> = ["slate", "ink", "forest", "claret", "bronze"];
+const FONTS: ReadonlyArray<string> = ["source-serif", "source-sans", "inter", "atkinson-hyperlegible"];
+
+function ResumeTab({ packet, flash }: { packet: Packet; flash: (msg: string) => void }) {
+  const [palette, setPalette] = useState("slate");
+  const [font, setFont] = useState("source-serif");
+  const [cvSrc, setCvSrc] = useState<string | null>(packet.resume?.cvUrl ?? null);
+  const [restyling, setRestyling] = useState(false);
+
+  // Re-seed the iframe src when the selected application's packet changes.
+  useEffect(() => {
+    setCvSrc(packet.resume?.cvUrl ?? null);
+  }, [packet]);
+
+  const restyle = async () => {
+    setRestyling(true);
+    const res = await packetApi.restyleCv(String(packet.applicationId), palette, font);
+    setRestyling(false);
+    if (res) {
+      setCvSrc(`${res.cvUrl}?t=${Date.now()}`);
+      flash("Restyled.");
+      if (res.drift.length > 0) {
+        flash("Heads up: a bullet changed in your library since this CV was built.");
+      }
+    } else {
+      flash("Could not restyle the CV.");
+    }
+  };
+
   if (!packet.resume) {
     return (
       <div className="card" style={{ padding: "16px 20px" }}>
@@ -137,10 +165,39 @@ function ResumeTab({ packet }: { packet: Packet }) {
           )}
         </div>
         <iframe
-          src={packet.resume.cvUrl}
+          src={cvSrc ?? packet.resume.cvUrl}
           title="CV"
           style={{ width: "100%", height: 520, border: "1px solid var(--border)", borderRadius: 8 }}
         />
+        <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <select
+            className="inp"
+            value={palette}
+            onChange={(e) => setPalette(e.target.value)}
+            style={{ width: "auto" }}
+          >
+            {PALETTES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <select
+            className="inp"
+            value={font}
+            onChange={(e) => setFont(e.target.value)}
+            style={{ width: "auto" }}
+          >
+            {FONTS.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+          <button className="btn ghost" disabled={restyling} onClick={() => void restyle()}>
+            <Icon name="sparkles" size={14} /> {restyling ? "Restyling…" : "Restyle"}
+          </button>
+        </div>
       </div>
 
       {coverage && (
@@ -549,7 +606,7 @@ export function Apply({ flash }: { flash: (msg: string) => void }) {
               </p>
             </div>
           ) : tab === "resume" ? (
-            <ResumeTab packet={packet} />
+            <ResumeTab packet={packet} flash={flash} />
           ) : tab === "cover" ? (
             <CoverTab appId={String(selectedId)} packet={packet} flash={flash} />
           ) : tab === "questions" ? (

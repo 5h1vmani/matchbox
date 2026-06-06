@@ -6,6 +6,7 @@
    out. Nothing is invented: counts and statuses come straight from the server. */
 import { useEffect, useState } from "react";
 import * as api from "../api/sources";
+import * as jobsApi from "../api/jobs";
 import { cx } from "../lib/derive";
 import { Icon } from "../ui/icon";
 
@@ -147,6 +148,16 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
   const [adzWhat, setAdzWhat] = useState<string>("");
   const [adzBusy, setAdzBusy] = useState<boolean>(false);
 
+  // Add-a-role-by-hand form.
+  const [jobCompany, setJobCompany] = useState<string>("");
+  const [jobTitle, setJobTitle] = useState<string>("");
+  const [jobUrl, setJobUrl] = useState<string>("");
+  const [jobApplyUrl, setJobApplyUrl] = useState<string>("");
+  const [jobLocation, setJobLocation] = useState<string>("");
+  const [jobText, setJobText] = useState<string>("");
+  const [jobBusy, setJobBusy] = useState<boolean>(false);
+  const [scoreBusy, setScoreBusy] = useState<boolean>(false);
+
   useEffect(() => {
     void api.getSources().then((view) => {
       setSources(view.sources);
@@ -223,6 +234,49 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
     } else {
       flash("Could not save the Adzuna key.");
     }
+  };
+
+  const submitJob = async () => {
+    const co = jobCompany.trim();
+    const ti = jobTitle.trim();
+    const ur = jobUrl.trim();
+    const jd = jobText.trim();
+    if (!co || !ti || !ur || !jd) {
+      flash("Company, title, URL, and the JD text are all required.");
+      return;
+    }
+    setJobBusy(true);
+    const res = await jobsApi.addJobByHand({
+      company: co,
+      title: ti,
+      url: ur,
+      jd_text: jd,
+      apply_url: jobApplyUrl.trim() || null,
+      location: jobLocation.trim() || null,
+    });
+    setJobBusy(false);
+    if (res.ok) {
+      setJobCompany("");
+      setJobTitle("");
+      setJobUrl("");
+      setJobApplyUrl("");
+      setJobLocation("");
+      setJobText("");
+      flash("Role added. Score new roles to see it in Discover.");
+    } else if (res.status === 409) {
+      flash("A role with that URL already exists.");
+    } else if (res.status === 400) {
+      flash("Company, title, URL, and the JD text are all required.");
+    } else {
+      flash("Could not add that role.");
+    }
+  };
+
+  const scoreNew = async () => {
+    setScoreBusy(true);
+    const res = await jobsApi.scoreNewJobs();
+    setScoreBusy(false);
+    flash(`Scored ${res.scored} role(s).`);
   };
 
   const adzunaConfigured = adzunaCfg["configured"] === true;
@@ -421,6 +475,97 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
             onClick={() => void saveAdzuna()}
           >
             <Icon name="check" size={14} /> Save Adzuna key
+          </button>
+        </div>
+      </section>
+
+      <section className="card" style={{ padding: "18px 20px", marginBottom: 18 }}>
+        <div className="sec-h" style={{ marginBottom: 12 }}>
+          <span className="t">Add a role by hand</span>
+        </div>
+        <p className="sub" style={{ margin: "0 0 14px" }}>
+          Paste a JD that isn't on a polled ATS (LinkedIn, a careers page, a referral). It is scored by
+          the same rubric and shows up in Discover.
+        </p>
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <label className="fld" style={{ flex: 1, minWidth: 200 }}>
+            <span className="fld__l">Company</span>
+            <input
+              className="inp"
+              value={jobCompany}
+              onChange={(e) => setJobCompany(e.target.value)}
+              placeholder="Acme Inc."
+            />
+          </label>
+          <label className="fld" style={{ flex: 1, minWidth: 200 }}>
+            <span className="fld__l">Title</span>
+            <input
+              className="inp"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              placeholder="Senior Software Engineer"
+            />
+          </label>
+        </div>
+
+        <label className="fld" style={{ marginTop: 14 }}>
+          <span className="fld__l">URL</span>
+          <input
+            className="inp"
+            value={jobUrl}
+            onChange={(e) => setJobUrl(e.target.value)}
+            placeholder="the link to the posting"
+          />
+        </label>
+
+        <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+          <label className="fld" style={{ flex: 1, minWidth: 200 }}>
+            <span className="fld__l">Apply URL (optional)</span>
+            <input
+              className="inp"
+              value={jobApplyUrl}
+              onChange={(e) => setJobApplyUrl(e.target.value)}
+              placeholder="where to apply, if different"
+            />
+          </label>
+          <label className="fld" style={{ flex: 1, minWidth: 160 }}>
+            <span className="fld__l">Location (optional)</span>
+            <input
+              className="inp"
+              value={jobLocation}
+              onChange={(e) => setJobLocation(e.target.value)}
+              placeholder="e.g. Remote (US)"
+            />
+          </label>
+        </div>
+
+        <label className="fld" style={{ marginTop: 14 }}>
+          <span className="fld__l">JD text</span>
+          <textarea
+            className="inp"
+            value={jobText}
+            onChange={(e) => setJobText(e.target.value)}
+            placeholder="Paste the full job description here."
+            rows={8}
+          />
+        </label>
+
+        <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
+          <button
+            className="btn primary"
+            disabled={jobBusy || !jobCompany.trim() || !jobTitle.trim() || !jobUrl.trim() || !jobText.trim()}
+            onClick={() => void submitJob()}
+          >
+            <Icon name="plus" size={14} /> Add role
+          </button>
+          <button
+            className="btn ghost"
+            disabled={scoreBusy}
+            onClick={() => void scoreNew()}
+          >
+            <Icon name="radar" size={14} className={cx(scoreBusy && "spin")} />
+            {scoreBusy ? " Scoring…" : " Score new roles"}
           </button>
         </div>
       </section>

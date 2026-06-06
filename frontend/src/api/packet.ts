@@ -76,6 +76,27 @@ export async function saveCover(appId: string, text: string): Promise<{ coverUrl
   return { coverUrl: null };
 }
 
+/* Re-render the CV under a new palette/font. The server re-styles and returns
+   the new cv.pdf URL plus any library bullets that drifted since the CV was
+   built. Null on a failed/rejected restyle (e.g. an unknown palette/font). */
+export async function restyleCv(
+  appId: string,
+  palette: string,
+  font: string,
+): Promise<{ cvUrl: string; drift: unknown[] } | null> {
+  try {
+    const r = await fetch(`/api/applications/${appId}/restyle`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ palette, font }),
+    });
+    if (r.ok) return (await r.json()) as { cvUrl: string; drift: unknown[] };
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
+
 /* Mark applied: the server moves the application to `applied` and stamps a
    +7d follow-up reminder. It returns the full Application; the screen only
    needs the new stage. Null on failure. */
