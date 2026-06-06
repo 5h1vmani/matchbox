@@ -24,8 +24,17 @@ router = APIRouter(prefix="/api/applications")
 _RUNS_DIR = PROJECT_ROOT / "runs"
 
 
+PALETTES = ("slate", "ink", "forest", "claret", "bronze")
+FONTS = ("source-serif", "source-sans", "inter", "atkinson-hyperlegible")
+
+
 class CoverBody(BaseModel):
     text: str
+
+
+class RestyleBody(BaseModel):
+    palette: str
+    font: str
 
 
 def _out_dir(run_id: str, job_id: int) -> Path:
@@ -114,6 +123,36 @@ def save_cover(app_id: int, body: CoverBody, conn: ConnDep) -> dict[str, Any]:
     except FileNotFoundError as e:  # missing cover.txt should not happen (just wrote it)
         raise HTTPException(status_code=500, detail=str(e)) from e
     return {"coverUrl": _file_url(run_id, job_id, "cover.pdf")}
+
+
+@router.post("/{app_id}/restyle")
+def restyle(app_id: int, body: RestyleBody, conn: ConnDep) -> dict[str, Any]:
+    """Re-render the CV with a new palette/font (no brain involved -- cv.json is
+    already on disk). Returns the cv url and any drift vs the live library."""
+    if body.palette not in PALETTES:
+        raise HTTPException(status_code=400, detail=f"unknown palette: {body.palette}")
+    if body.font not in FONTS:
+        raise HTTPException(status_code=400, detail=f"unknown font: {body.font}")
+    row = _app_row(conn, app_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="no such application")
+    run_id, job_id = row["run_id"], row["job_id"]
+    if not run_id:
+        raise HTTPException(status_code=409, detail="no tailoring run for this application")
+
+    from matchbox.assemble import re_render_cv
+
+    try:
+        _, drift = re_render_cv(
+            run_id=run_id, job_id=job_id, palette=body.palette, font=body.font, conn=conn
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    conn.execute(
+        "UPDATE run_job SET palette = ?, font = ? WHERE run_id = ? AND job_id = ?",
+        (body.palette, body.font, run_id, job_id),
+    )
+    return {"cvUrl": _file_url(run_id, job_id, "cv.pdf"), "drift": drift}
 
 
 @router.post("/{app_id}/submit")

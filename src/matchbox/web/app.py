@@ -21,6 +21,7 @@ from matchbox.web.routes import (
     discovery,
     insights,
     interviews,
+    jobs,
     library_api,
     library_crud,
     offers,
@@ -30,6 +31,7 @@ from matchbox.web.routes import (
     review_api,
     review_run,
     sources_api,
+    targets_api,
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -54,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(discovery.router)
     app.include_router(insights.router)
     app.include_router(interviews.router)
+    app.include_router(jobs.router)
     app.include_router(library_api.router)
     app.include_router(library_crud.router)
     app.include_router(offers.router)
@@ -63,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(review_api.router)
     app.include_router(review_run.router)
     app.include_router(sources_api.router)
+    app.include_router(targets_api.router)
 
     spa_index = STATIC_DIR / "app" / "index.html"
 
