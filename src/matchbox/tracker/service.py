@@ -187,3 +187,19 @@ def toggle_star(conn: sqlite3.Connection, app_id: int) -> App:
         return None
     repo.update_app(conn, app_id, starred=0 if row["starred"] else 1)
     return repo.load_one(conn, app_id)
+
+
+def submit(conn: sqlite3.Connection, app_id: int) -> App:
+    """The Apply packet's Submit: move an application to `applied`, stamp
+    `applied_at`, and seed the +7d follow-up reminder. Reuses the tracker rules;
+    idempotent on applied_at."""
+    row = repo.raw(conn, app_id)
+    if row is None:
+        return None
+    updates: dict[str, Any] = {"stage": "applied"}
+    if row["applied_at"] is None:
+        updates["applied_at"] = rules.today().isoformat()
+    _set_next_action(updates, rules.default_action_for("applied"))
+    repo.update_app(conn, app_id, **updates)
+    repo.add_event(conn, app_id, "applied", "Applied from packet")
+    return repo.load_one(conn, app_id)

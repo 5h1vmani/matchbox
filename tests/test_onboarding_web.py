@@ -88,9 +88,11 @@ def test_remove_staged_deletes_file(client_in_tmp: TestClient, tmp_path: Path) -
 
 def test_remove_staged_rejects_traversal(client_in_tmp: TestClient) -> None:
     r = client_in_tmp.delete("/onboarding/staged/..%2Fmatchbox.db")
-    # Sanitizer reduces this to a single non-path leaf; if no such file
-    # exists in inbox it 404s. Either way, no escape happens.
-    assert r.status_code in (404, 400)
+    # The %2F normalizes to an extra path segment, so this no longer matches the
+    # staged-delete route. With the SPA catch-all serving GET for any path, a
+    # DELETE to it is 405; without a match it is 404; a sanitized leaf miss is
+    # 404. Every branch refuses -- no traversal, no deletion.
+    assert r.status_code in (404, 400, 405)
 
 
 def test_targets_form_round_trip(client_in_tmp: TestClient) -> None:

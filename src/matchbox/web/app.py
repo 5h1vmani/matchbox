@@ -27,8 +27,11 @@ from matchbox.web.routes import (
     library_api,
     offers,
     onboarding,
+    onboarding_api,
+    packet,
     profile,
     review,
+    review_api,
     review_run,
     sources,
     targets,
@@ -61,8 +64,11 @@ def create_app() -> FastAPI:
     app.include_router(library_api.router)
     app.include_router(offers.router)
     app.include_router(onboarding.router)
+    app.include_router(onboarding_api.router)
+    app.include_router(packet.router)
     app.include_router(profile.router)
     app.include_router(review.router)
+    app.include_router(review_api.router)
     app.include_router(review_run.router)
     app.include_router(sources.router)
     app.include_router(targets.router)
@@ -100,6 +106,16 @@ def create_app() -> FastAPI:
         if onboarding.profile_exists(conn):
             return _spa()
         return RedirectResponse(url="/onboarding", status_code=302)
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa_catchall(full_path: str) -> Response:
+        """Serve the React SPA for any unmatched GET path so client-side routing
+        owns /apply, /library, /onboarding, /review, etc. Real routes (API, the
+        remaining Jinja pages, /static, sandboxed file serving) are registered
+        first and still win; this only catches what they do not."""
+        if full_path.startswith(("api/", "static/", "runs/")) or full_path == "healthz":
+            raise HTTPException(status_code=404, detail="not found")
+        return _spa()
 
     return app
 
