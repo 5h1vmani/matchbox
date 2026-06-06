@@ -25,15 +25,18 @@ from matchbox.web.routes import (
     interviews,
     library,
     library_api,
+    library_crud,
     offers,
     onboarding,
     onboarding_api,
     packet,
     profile,
+    profile_api,
     review,
     review_api,
     review_run,
     sources,
+    sources_api,
     targets,
 )
 
@@ -62,15 +65,18 @@ def create_app() -> FastAPI:
     app.include_router(interviews.router)
     app.include_router(library.router)
     app.include_router(library_api.router)
+    app.include_router(library_crud.router)
     app.include_router(offers.router)
     app.include_router(onboarding.router)
     app.include_router(onboarding_api.router)
     app.include_router(packet.router)
     app.include_router(profile.router)
+    app.include_router(profile_api.router)
     app.include_router(review.router)
     app.include_router(review_api.router)
     app.include_router(review_run.router)
     app.include_router(sources.router)
+    app.include_router(sources_api.router)
     app.include_router(targets.router)
 
     spa_index = STATIC_DIR / "app" / "index.html"
