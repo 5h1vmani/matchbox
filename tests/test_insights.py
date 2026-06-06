@@ -48,8 +48,6 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-import pytest
-
 from matchbox.core.db import connect
 from matchbox.core.migrations import migrate
 from matchbox.insights.metrics import (
@@ -60,7 +58,6 @@ from matchbox.insights.metrics import (
     summary,
     whats_working,
 )
-
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

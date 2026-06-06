@@ -85,6 +85,20 @@ def test_onboarding_upload_paste_and_remove(client: TestClient) -> None:
     assert client.delete("/api/onboarding/staged/cv.txt").status_code == 200
 
 
+def test_onboarding_remove_refuses_traversal_and_missing(client: TestClient) -> None:
+    # A sanitized name that isn't staged -> 404 (no deletion).
+    assert client.delete("/api/onboarding/staged/nope.txt").status_code == 404
+    # A %2F traversal attempt normalizes to an extra segment -> no staged-delete
+    # match; nothing escapes inbox/.
+    assert client.delete("/api/onboarding/staged/..%2Fmatchbox.db").status_code in (400, 404, 405)
+
+
+def test_root_serves_spa_not_a_redirect(client: TestClient) -> None:
+    # All-React: root serves the SPA bundle (200), or 503 when it is not built --
+    # never a Jinja redirect.
+    assert client.get("/", follow_redirects=False).status_code in (200, 503)
+
+
 # ── review JSON ──────────────────────────────────────────────────────────────────
 
 

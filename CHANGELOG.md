@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 * **Momentum coach + rejection learning**: `/api/insights/momentum` (real weekly pace + rest/healthy/push threshold) and structured `close_reason` (migration 010) with a deterministic category rollup (`/api/insights/rejection-reasons`).
 * **Offers**: own-pool benchmark gains an honest p25–p75 `range` and a `basis` line.
 * **Frontend**: ⌘K command palette, BYOK Settings, momentum/rejection panels, and Library Answers / Workspace (interview loop) / Offers screens.
+* **All-React UI.** The Jinja/HTMX pages (Library, Profile, Sources, onboarding/Intake, Review, Apply packet, run progress) are now React screens over a JSON-only API; a SPA catch-all serves the app for every non-`/api` route. The retired Jinja routes + templates are moved to `archive/jinja/`.
 * Documentation overhaul for open-source release: README badges, full `docs/` index, decision records (ADRs), troubleshooting guide, development guide, CLI reference.
 * `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
 * `SECURITY.md` with vulnerability-reporting policy and threat model.

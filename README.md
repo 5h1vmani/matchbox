@@ -15,8 +15,9 @@
 
 Two halves joined by a file-based handoff:
 
-* **The app** (this repo): SQLite, FastAPI + HTMX web UI, ATS pollers,
-  deterministic scoring, Typst PDF rendering. Holds no LLM client.
+* **The app** (this repo): SQLite, a FastAPI JSON API + React single-page UI,
+  ATS pollers, deterministic scoring, HTML/weasyprint PDF rendering. Holds no
+  LLM client (a BYOK localhost proxy can stream the user's own key, optionally).
 * **The brain** ([Claude Code](https://claude.com/claude-code)): parses
   your old CVs, extracts JD requirements, polishes wording. Drives the
   CLIs (`matchbox-ingest`, `matchbox-jobreqs`, `matchbox-assemble`)
@@ -85,15 +86,10 @@ Open the browser. Empty profile state lands you at **/onboarding**:
    example slugs per vendor. Workable is deferred — their public
    no-auth API was removed by the vendor.
 
-6. **Triage.** `/inbox`. The five-dimension rubric scores every new
-   job; click "Score new jobs" to refresh. Per row: Skip, Reject, or
-   include in a tailoring run by ticking CV and/or cover. Pick palette
-   and font for the run. Click "Start tailoring".
-
-   Have a LinkedIn link or a JD that is not on a polled ATS? Expand
-   **Add a job by hand** at the top of `/inbox`. Paste company, title,
-   URL, and the full JD text. The row lands as `new` and goes through
-   the same score / triage / tailor flow.
+6. **Triage.** The **Discover** surface in the SPA. The five-dimension
+   rubric scores every new job; per role: Skip, Dismiss, Track, or send
+   to a tailoring run. Eligibility and fit are shown honestly; ineligible
+   roles are set aside, not hidden.
 
 7. **Process the run.** A new `runs/<id>/work-queue.json` is on disk.
    Copy the prompt the page shows you, paste into Claude Code:
@@ -107,12 +103,12 @@ Open the browser. Empty profile state lands you at **/onboarding**:
    writes `status.json` as it progresses. The CV PDF, coverage report,
    and a `changes.md` diff land under `runs/<id>/output/<job>/`.
 
-8. **Review run + apply.** `/review-run/<id>` polls `status.json` and
-   shows each CV inline. The page surfaces uncovered must-haves, any
-   ATS keyword misses, and (M7+) "Polish candidates" the brain can
-   rephrase to carry missing keywords. When you click **Apply**, the
-   job's apply URL opens in a new tab. **Mark applied** when you
-   submit.
+8. **Review run + apply.** The **Apply packet** (4 tabs) shows each CV
+   inline, the coverage bands (covered / partial / uncovered) with
+   uncovered must-haves left empty, the cover letter (regenerate live
+   with your own key, or via the manual handoff), reusable answers, and
+   a Submit that records the application at `applied` with a +7d
+   follow-up reminder.
 
 ## Architecture (one screen)
 
@@ -132,8 +128,9 @@ src/matchbox/
   scoring/                   rubric + run creation
   matching/                  embed, BM25, RRF, MMR, coverage
   polish.py                  voice-rules-validated keyword alignment
-  templates/typst/           cv.typ + cover.typ
-  web/                       FastAPI + HTMX routes + Jinja templates
+  templates/html/            cv.html + cover.html (weasyprint)
+  web/                       FastAPI JSON API (the React SPA lives in frontend/;
+                             the retired Jinja/HTMX UI is under archive/jinja/)
   assemble.py                deterministic select + render orchestrator
   jobreqs.py                 brain's requirements writer
 ```

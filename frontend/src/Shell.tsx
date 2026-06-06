@@ -72,8 +72,26 @@ const NAV: NavDef[] = [
 ];
 const GROUPS = ["Track", "Discover", "Workspace"];
 
+// URL first path segment -> nav id, so a direct hit / refresh on any surface
+// opens the right screen (the backend serves the SPA for every non-API route).
+const PATH_NAV: Record<string, string> = {
+  discover: "review",
+  review: "verify",
+  apply: "apply",
+  library: "library",
+  onboarding: "onboarding",
+  sources: "sources",
+  profile: "profile",
+  workspace: "workspace",
+  offers: "offers",
+  answers: "answers",
+  settings: "settings",
+  insights: "insights",
+  applications: "applications",
+};
 function initialNav(): string {
-  return window.location.pathname.startsWith("/discover") ? "review" : "today";
+  const seg = window.location.pathname.split("/")[1] || "";
+  return PATH_NAV[seg] ?? "today";
 }
 
 function UserSwitcher({ profile, users }: { profile: ProfileInfo; users: UserInfo[] }) {

@@ -153,7 +153,8 @@ For each job in the queue:
    ```
 
    You MAY rewrite the whole file each time (the app file-watches it).
-   The app shows live progress in `/review-run/<run-id>`.
+   The React app shows progress via the run handoff and the Apply packet
+   (the artifacts land under `runs/<run-id>/output/<job-id>/`).
 
 7. When every job is processed, set the top-level `status` to `"done"`.
 
