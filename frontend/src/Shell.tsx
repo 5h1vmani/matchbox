@@ -23,6 +23,9 @@ import { Answers } from "./screens/Answers";
 import { Apply } from "./screens/Apply";
 import { Intake } from "./screens/Intake";
 import { ReviewFacts } from "./screens/ReviewFacts";
+import { Library } from "./screens/Library";
+import { Profile } from "./screens/Profile";
+import { Sources } from "./screens/Sources";
 import { Offers } from "./screens/Offers";
 import { Workspace } from "./screens/Workspace";
 import { Review } from "./discovery/screens/Review";
@@ -59,13 +62,13 @@ const NAV: NavDef[] = [
   { id: "review", label: "Today's roles", icon: "sparkles", group: "Discover" },
   { id: "browse", label: "Browse", icon: "search", group: "Discover" },
   { id: "watchlist", label: "Watchlist", icon: "bookmark", group: "Discover" },
-  { id: "library", label: "Library", icon: "book-open", group: "Workspace", href: "/library" },
+  { id: "library", label: "Library", icon: "book-open", group: "Workspace" },
   { id: "answers", label: "Answers", icon: "messages-square", group: "Workspace" },
   { id: "verify", label: "Review facts", icon: "check-circle", group: "Workspace" },
   { id: "onboarding", label: "Onboarding", icon: "upload", group: "Workspace" },
-  { id: "sources", label: "Sources", icon: "rss", group: "Workspace", href: "/sources" },
+  { id: "sources", label: "Sources", icon: "rss", group: "Workspace" },
   { id: "settings", label: "Settings", icon: "settings", group: "Workspace" },
-  { id: "profile", label: "Profile", icon: "user", group: "Workspace", href: "/profile" },
+  { id: "profile", label: "Profile", icon: "user", group: "Workspace" },
 ];
 const GROUPS = ["Track", "Discover", "Workspace"];
 
@@ -289,6 +292,9 @@ export function Shell() {
   else if (nav === "apply") screen = <Apply flash={flash} />;
   else if (nav === "verify") screen = <ReviewFacts flash={flash} />;
   else if (nav === "onboarding") screen = <Intake flash={flash} />;
+  else if (nav === "library") screen = <Library flash={flash} />;
+  else if (nav === "sources") screen = <Sources flash={flash} />;
+  else if (nav === "profile") screen = <Profile flash={flash} />;
   else if (nav === "settings") screen = <Settings flash={flash} />;
   else if (nav === "applications") screen = <Tracker apps={apps} actions={actions} flash={flash} onOpen={openDetail} dir={DIR} view={view} setView={setView} filter={filter} setFilter={setFilter} />;
   else screen = <Today apps={apps} actions={actions} flash={flash} onOpen={openDetail} dir={DIR} />;
