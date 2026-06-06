@@ -20,6 +20,9 @@ import { Insights } from "./screens/Insights";
 import { Detail } from "./screens/Detail";
 import { Settings } from "./screens/Settings";
 import { Answers } from "./screens/Answers";
+import { Apply } from "./screens/Apply";
+import { Intake } from "./screens/Intake";
+import { ReviewFacts } from "./screens/ReviewFacts";
 import { Offers } from "./screens/Offers";
 import { Workspace } from "./screens/Workspace";
 import { Review } from "./discovery/screens/Review";
@@ -49,6 +52,7 @@ interface NavDef {
 const NAV: NavDef[] = [
   { id: "today", label: "Today", icon: "sun", group: "Track" },
   { id: "applications", label: "Applications", icon: "layout-list", group: "Track" },
+  { id: "apply", label: "Apply packet", icon: "file-text", group: "Track" },
   { id: "workspace", label: "Workspace", icon: "users", group: "Track" },
   { id: "offers", label: "Offers", icon: "party-popper", group: "Track" },
   { id: "insights", label: "Insights", icon: "chart-line", group: "Track" },
@@ -57,9 +61,10 @@ const NAV: NavDef[] = [
   { id: "watchlist", label: "Watchlist", icon: "bookmark", group: "Discover" },
   { id: "library", label: "Library", icon: "book-open", group: "Workspace", href: "/library" },
   { id: "answers", label: "Answers", icon: "messages-square", group: "Workspace" },
+  { id: "verify", label: "Review facts", icon: "check-circle", group: "Workspace" },
+  { id: "onboarding", label: "Onboarding", icon: "upload", group: "Workspace" },
   { id: "sources", label: "Sources", icon: "rss", group: "Workspace", href: "/sources" },
   { id: "settings", label: "Settings", icon: "settings", group: "Workspace" },
-  { id: "onboarding", label: "Onboarding", icon: "upload", group: "Workspace", href: "/onboarding" },
   { id: "profile", label: "Profile", icon: "user", group: "Workspace", href: "/profile" },
 ];
 const GROUPS = ["Track", "Discover", "Workspace"];
@@ -281,6 +286,9 @@ export function Shell() {
   else if (nav === "workspace") screen = <Workspace flash={flash} />;
   else if (nav === "offers") screen = <Offers flash={flash} />;
   else if (nav === "answers") screen = <Answers flash={flash} />;
+  else if (nav === "apply") screen = <Apply flash={flash} />;
+  else if (nav === "verify") screen = <ReviewFacts flash={flash} />;
+  else if (nav === "onboarding") screen = <Intake flash={flash} />;
   else if (nav === "settings") screen = <Settings flash={flash} />;
   else if (nav === "applications") screen = <Tracker apps={apps} actions={actions} flash={flash} onOpen={openDetail} dir={DIR} view={view} setView={setView} filter={filter} setFilter={setFilter} />;
   else screen = <Today apps={apps} actions={actions} flash={flash} onOpen={openDetail} dir={DIR} />;
