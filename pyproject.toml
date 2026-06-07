@@ -35,6 +35,11 @@ dependencies = [
     "fastembed>=0.3",
     "rank-bm25>=0.2.2",
     "pypdf>=4.2",
+    # PDF rendering for tailored CVs / cover letters (render_html.py). Lazy-
+    # imported, but a hard runtime dep — was previously undeclared, so a fresh
+    # install (and CI) had no weasyprint and every render path/test broke.
+    # Needs system Pango/Cairo at runtime (see the CI workflow's apt step).
+    "weasyprint>=60",
 ]
 
 [project.urls]
