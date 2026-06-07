@@ -18,13 +18,19 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # Develop/CI on the latest stable Python; keep 3.12 (the requires-python
+        # floor) tested so we don't claim support we don't verify.
+        python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
 
       - name: Install uv
