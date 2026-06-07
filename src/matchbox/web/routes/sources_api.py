@@ -41,9 +41,24 @@ class AdzunaBody(BaseModel):
     what: str = ""
 
 
+def _adzuna_public(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Adzuna config for the browser -- the app_key is write-only, never echoed.
+
+    Mirrors the BYOK key pattern (web/routes/ai.py): the UI learns only whether a
+    key is set (`configured`), not the secret itself. The real key stays
+    server-side for scan-remote.
+    """
+    cfg = _adzuna_config(conn)
+    return {
+        "configured": bool(cfg.get("app_key")),
+        "app_id": cfg.get("app_id", ""),
+        "queries": cfg.get("queries", []),
+    }
+
+
 @router.get("")
 def sources(conn: ConnDep) -> dict[str, Any]:
-    return {"sources": _list_sources(conn), "atsTypes": ATS_TYPES, "adzuna": _adzuna_config(conn)}
+    return {"sources": _list_sources(conn), "atsTypes": ATS_TYPES, "adzuna": _adzuna_public(conn)}
 
 
 @router.post("")
@@ -94,7 +109,13 @@ def scan_remote(conn: ConnDep) -> dict[str, Any]:
     results = scan_aggregators(conn, adzuna=adzuna or None)
     return {
         "results": [
-            {"name": r.name, "ok": r.ok, "inserted": r.inserted, "fetched": r.fetched, "error": r.error}
+            {
+                "name": r.name,
+                "ok": r.ok,
+                "inserted": r.inserted,
+                "fetched": r.fetched,
+                "error": r.error,
+            }
             for r in results
         ]
     }

@@ -64,6 +64,9 @@ export function Profile({ flash }: { flash: (msg: string) => void }) {
   const [citizenships, setCitizenships] = useState("");
   const [needsSponsorship, setNeedsSponsorship] = useState(false);
   const [hasClearance, setHasClearance] = useState(false);
+  const [compMin, setCompMin] = useState("");
+  const [compMax, setCompMax] = useState("");
+  const [compCurrency, setCompCurrency] = useState("USD");
   const [targetsBusy, setTargetsBusy] = useState(false);
 
   const hydrateTargets = (t: targetsApi.Targets): void => {
@@ -74,6 +77,9 @@ export function Profile({ flash }: { flash: (msg: string) => void }) {
     setCitizenships(t.work_auth.citizenships.join(", "));
     setNeedsSponsorship(t.work_auth.needs_sponsorship);
     setHasClearance(t.work_auth.has_clearance);
+    setCompCurrency(t.comp.currency || "USD");
+    setCompMin(t.comp.min == null ? "" : String(t.comp.min));
+    setCompMax(t.comp.max == null ? "" : String(t.comp.max));
   };
 
   useEffect(() => {
@@ -83,11 +89,16 @@ export function Profile({ flash }: { flash: (msg: string) => void }) {
   const saveTargets = async (): Promise<void> => {
     if (targetsBusy) return;
     setTargetsBusy(true);
+    const toInt = (s: string): number | null => {
+      const n = parseInt(s.trim(), 10);
+      return Number.isFinite(n) ? n : null;
+    };
     const next = await targetsApi.saveTargets({
       role_families: splitList(roleFamilies),
       locations: splitList(locations),
       dream_companies: splitList(dreamCompanies),
       exclusions: splitList(exclusions),
+      comp: { currency: compCurrency.trim() || "USD", min: toInt(compMin), max: toInt(compMax) },
       work_auth: {
         citizenships: splitList(citizenships),
         needs_sponsorship: needsSponsorship,
@@ -239,6 +250,38 @@ export function Profile({ flash }: { flash: (msg: string) => void }) {
           />
           <span className="sub" style={{ marginTop: 6 }}>Comma or newline separated.</span>
         </label>
+
+        <div className="fld" style={{ marginTop: 14 }}>
+          <span className="fld__l">Compensation target</span>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <input
+              className="inp"
+              style={{ flex: 1, minWidth: 120 }}
+              value={compMin}
+              onChange={(e) => setCompMin(e.target.value)}
+              placeholder="Min"
+              inputMode="numeric"
+            />
+            <input
+              className="inp"
+              style={{ flex: 1, minWidth: 120 }}
+              value={compMax}
+              onChange={(e) => setCompMax(e.target.value)}
+              placeholder="Max"
+              inputMode="numeric"
+            />
+            <input
+              className="inp"
+              style={{ width: 90 }}
+              value={compCurrency}
+              onChange={(e) => setCompCurrency(e.target.value)}
+              placeholder="USD"
+            />
+          </div>
+          <span className="sub" style={{ marginTop: 6 }}>
+            Optional. Whole numbers — your own compensation reference, stored locally.
+          </span>
+        </div>
 
         <label className="fld" style={{ marginTop: 14 }}>
           <span className="fld__l">Citizenships</span>

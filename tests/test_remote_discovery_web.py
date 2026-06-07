@@ -47,3 +47,38 @@ def test_save_and_read_adzuna(client: TestClient) -> None:
     adzuna = client.get("/api/sources").json()["adzuna"]
     assert adzuna["app_id"] == "myid"
     assert adzuna["queries"][0]["what"] == "backend"
+    # The secret app_key is write-only: it must NOT be echoed to the browser;
+    # the UI learns only that a key is set (mirrors the BYOK key pattern).
+    assert "app_key" not in adzuna
+    assert adzuna["configured"] is True
+
+
+def test_sources_adzuna_unconfigured_by_default(client: TestClient) -> None:
+    adzuna = client.get("/api/sources").json()["adzuna"]
+    assert adzuna["configured"] is False
+    assert "app_key" not in adzuna
+
+
+def test_targets_comp_round_trips(client: TestClient) -> None:
+    # Compensation target must persist on first insert (regression: it was
+    # hard-coded to '{}') and survive an update.
+    body = {
+        "role_families": ["Backend"],
+        "comp": {"currency": "GBP", "min": 90000, "max": 130000},
+        "work_auth": {"citizenships": ["UK"], "needs_sponsorship": False, "has_clearance": False},
+    }
+    saved = client.post("/api/targets", json=body)
+    assert saved.status_code == 200
+    assert saved.json()["comp"] == {"currency": "GBP", "min": 90000, "max": 130000}
+    # Re-read from a fresh GET (not just the POST echo) to prove it was stored.
+    reread = client.get("/api/targets").json()
+    assert reread["comp"] == {"currency": "GBP", "min": 90000, "max": 130000}
+    # An update that omits comp leaves the other fields intact and keeps comp editable.
+    client.post(
+        "/api/targets", json={**body, "comp": {"currency": "USD", "min": None, "max": 200000}}
+    )
+    assert client.get("/api/targets").json()["comp"] == {
+        "currency": "USD",
+        "min": None,
+        "max": 200000,
+    }

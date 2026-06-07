@@ -25,11 +25,20 @@ class WorkAuth(BaseModel):
     has_clearance: bool = False
 
 
+class Comp(BaseModel):
+    """Compensation target. Plain data the user types -- never computed."""
+
+    currency: str = "USD"
+    min: int | None = None
+    max: int | None = None
+
+
 class TargetsBody(BaseModel):
     role_families: list[str] = []
     dream_companies: list[str] = []
     locations: list[str] = []
     exclusions: list[str] = []
+    comp: Comp = Comp()
     work_auth: WorkAuth = WorkAuth()
 
 
@@ -41,14 +50,21 @@ def _load(conn: Any) -> dict[str, Any]:
             "dream_companies": [],
             "locations": [],
             "exclusions": [],
+            "comp": {"currency": "USD", "min": None, "max": None},
             "work_auth": {"citizenships": [], "needs_sponsorship": False, "has_clearance": False},
         }
     wa = json.loads(row["work_auth_json"] or "{}")
+    comp = json.loads(row["comp_json"] or "{}")
     return {
         "role_families": json.loads(row["role_families_json"] or "[]"),
         "dream_companies": json.loads(row["dream_companies_json"] or "[]"),
         "locations": json.loads(row["locations_json"] or "[]"),
         "exclusions": json.loads(row["exclusions_json"] or "[]"),
+        "comp": {
+            "currency": comp.get("currency") or "USD",
+            "min": comp.get("min"),
+            "max": comp.get("max"),
+        },
         "work_auth": {
             "citizenships": wa.get("citizenships", []),
             "needs_sponsorship": bool(wa.get("needs_sponsorship", False)),
@@ -69,6 +85,7 @@ def save_targets(body: TargetsBody, conn: ConnDep) -> dict[str, Any]:
         "dream_companies_json": json.dumps([s.strip() for s in body.dream_companies if s.strip()]),
         "locations_json": json.dumps([s.strip() for s in body.locations if s.strip()]),
         "exclusions_json": json.dumps([s.strip() for s in body.exclusions if s.strip()]),
+        "comp_json": json.dumps(body.comp.model_dump()),
         "work_auth_json": json.dumps(body.work_auth.model_dump()),
     }
     with transaction(conn):
@@ -77,7 +94,7 @@ def save_targets(body: TargetsBody, conn: ConnDep) -> dict[str, Any]:
             conn.execute(
                 "INSERT INTO target (role_families_json, dream_companies_json, locations_json, "
                 "comp_json, exclusions_json, work_auth_json) "
-                "VALUES (:role_families_json, :dream_companies_json, :locations_json, '{}', "
+                "VALUES (:role_families_json, :dream_companies_json, :locations_json, :comp_json, "
                 ":exclusions_json, :work_auth_json)",
                 values,
             )
@@ -85,7 +102,8 @@ def save_targets(body: TargetsBody, conn: ConnDep) -> dict[str, Any]:
             conn.execute(
                 "UPDATE target SET role_families_json=:role_families_json, "
                 "dream_companies_json=:dream_companies_json, locations_json=:locations_json, "
-                "exclusions_json=:exclusions_json, work_auth_json=:work_auth_json WHERE id=:id",
+                "comp_json=:comp_json, exclusions_json=:exclusions_json, "
+                "work_auth_json=:work_auth_json WHERE id=:id",
                 {**values, "id": row[0]},
             )
     return _load(conn)

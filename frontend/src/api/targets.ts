@@ -11,11 +11,18 @@ export interface WorkAuth {
   has_clearance: boolean;
 }
 
+export interface Comp {
+  currency: string;
+  min: number | null;
+  max: number | null;
+}
+
 export interface Targets {
   role_families: string[];
   dream_companies: string[];
   locations: string[];
   exclusions: string[];
+  comp: Comp;
   work_auth: WorkAuth;
 }
 
@@ -26,6 +33,7 @@ const EMPTY: Targets = {
   dream_companies: [],
   locations: [],
   exclusions: [],
+  comp: { currency: "USD", min: null, max: null },
   work_auth: {
     citizenships: [],
     needs_sponsorship: false,
