@@ -2,7 +2,7 @@
 
 Thanks for considering a contribution. Matchbox is a personal-tools project that we share publicly because the patterns might be useful to others — every PR is read carefully and we'd rather close one quickly than leave it lingering.
 
-For a quick overview of how the project is laid out, see **[docs/architecture.md](docs/architecture.md)**.
+For a quick overview of how the project is laid out, see the **Architecture** section of the [README](README.md#architecture-one-screen), or the deeper [docs/v1-engineering-spec.md](docs/v1-engineering-spec.md).
 
 ## TL;DR
 
@@ -16,32 +16,46 @@ pre-commit install --install-hooks      # one-time
 ruff check src/ tests/                   # auto-runs in pre-commit
 ruff format src/ tests/
 mypy src/matchbox/
-pytest -q                                 # 109 tests at last count
+pytest -q                                 # 326 passed, 3 skipped at last count
 ```
 
 All four must pass. Pre-commit and CI enforce the same set, so if pre-commit is green, CI will be too.
 
 ## Setup
 
-You need Python 3.12+. The dev install pulls in:
+You need Python 3.12 or 3.13 — CI runs both in a matrix, so target either. The
+dev install pulls in:
 
 * `pytest` + `pytest-asyncio` for tests
 * `mypy` (strict mode)
 * `ruff` (lint + format)
 * `httpx` (used by FastAPI's `TestClient`)
+* `weasyprint` (>=60) for HTML-to-PDF rendering. It needs Pango and Cairo
+  system libraries at runtime — on macOS `brew install pango` covers it; on
+  Debian/Ubuntu install `libpango-1.0-0 libpangoft2-1.0-0 libgdk-pixbuf-2.0-0
+  libcairo2` (see the apt step in `.github/workflows/ci.yml`).
 
 Optional but recommended:
 
 * [uv](https://github.com/astral-sh/uv) for fast resolves: `uv sync --dev`
-* [Typst](https://typst.app) for PDF rendering: `brew install typst`. Only needed for `matchbox tailor` and `matchbox rebuild-canonicals`.
-* An `ANTHROPIC_API_KEY` env var. Only needed for `tailor`. Scan / score / web all work without it.
 
-Run the dashboard while you develop:
+The core CLIs (`matchbox`, `matchbox-web`, `matchbox-ingest`,
+`matchbox-assemble`, `matchbox-jobreqs`) need no API key — there is no
+in-process LLM client. The AI reasoning is a manual handoff: the app queues
+typed intents and surfaces a "process run `<id>`" prompt you paste into Claude
+Code, which drains the queue and runs `matchbox-assemble`.
+
+Build the React SPA once, then run the dashboard while you develop:
 
 ```bash
-matchbox seed-demo            # populate people/demo/db.sqlite if empty
-matchbox web --reload         # auto-reload on code changes
+cd frontend && npm install && npm run build   # builds the SPA the server serves
+matchbox-web                                   # serve on 127.0.0.1:8765
 ```
+
+`matchbox web` is the same server (it accepts only `--host`/`--port`). For
+frontend iteration use `npm run dev` from `frontend/` — Vite proxies `/api`
+to the running server. The server returns HTTP 503 ("SPA not built") if the
+build output is missing.
 
 ## Code standards
 
@@ -74,9 +88,9 @@ Examples from the repo history:
 
 ```text
 feat(web): add Cmd+K command palette with keyboard navigation
-fix(a11y): focus trap inside modals (palette, help, bulk-tailor)
-docs(setup): switch verify-install to seed-demo (shiva is gitignored)
-chore: align ScoringWeights with Job dimensions + 4 broken-on-arrival bugs
+fix(discovery): mask the Adzuna app_key in GET /api/sources
+chore(deps): pin ruff and bump the toolchain to latest
+ci: declare weasyprint dependency + install its system libs
 ```
 
 Multi-line commit messages are encouraged for non-trivial changes — explain the *why*, not just the *what*.
@@ -85,62 +99,83 @@ Multi-line commit messages are encouraged for non-trivial changes — explain th
 
 These are non-negotiable; PRs that violate them will be asked to refactor.
 
-* `people/{name}/profile.yaml` is the single source of truth for candidate facts.
-* `core/db.py` is the only file that imports `sqlite3`.
-* No module other than `core/person.py` reads from `people/*/profile.yaml`.
-* No module other than `tailor/content.py` calls the Anthropic API.
-* All currency / score / date formatting goes through `web/filters.py` Jinja filters.
-* All HTML responses go through `web/render.py:render()`. Never call `TemplateResponse` directly.
-* All toast notifications go through `render(toast=...)`. No OOB swap toast templates.
+* One SQLite database per profile (`people/<slug>/matchbox.db`) is the single
+  source of truth for candidate facts. The active profile is chosen by
+  `MATCHBOX_PROFILE` (or an explicit `MATCHBOX_DB` path).
+* `core/db.py` owns the connection layer — `db_path()`, `connect()`, and the
+  `transaction()` context manager. Code that touches the DB connects through
+  those helpers rather than opening its own path.
+* The web layer is a JSON API: routes under `web/routes/*_api.py` return JSON,
+  and the React SPA in `frontend/` consumes `/api/*`. No HTML is rendered
+  server-side for the live UI (the retired Jinja/HTMX templates are archived
+  under `archive/jinja/`).
+* The app holds no in-process LLM client and calls no model API. All AI work
+  is a manual handoff through the `agent_task` queue and
+  `runs/<id>/work-queue.json`.
 
 ## Adding things
 
-### A new ATS prober
+### A new ATS poller
 
-1. Implement `probe_<ats>(source: ATSSource) -> list[dict]` in `discovery/ats_probe.py`.
-2. Add factory function + base URL constant in `discovery/sources.py`.
-3. Add a dispatch entry in `probe()` in `discovery/ats_probe.py`.
-4. Add at least one entry to `KNOWN_SOURCES` so the new prober is exercised in scans.
-5. Add a test in `tests/test_discovery.py`.
+Direct-from-ATS sources live in `discovery/pollers.py`. Implement a
+`poll_<ats>(...)` function that returns `JobRecord`s (the dataclass in
+`discovery/base.py`) and register it in the `POLLERS` dispatch dict at the
+bottom of the file. Job-board aggregators are the parallel case in
+`discovery/aggregators.py` (the `AGGREGATORS` dict). The scan runner in
+`discovery/runner.py` drives both, and `discovery/enrich.py` parses the raw
+records into structured fields. Add coverage in `tests/test_discovery.py` or
+`tests/test_aggregators.py`.
 
 ### A new scoring dimension
 
-1. Add the field to `Job` in `core/schema.py` and write a migration in `core/migrations.py` if persisted.
-2. Add a corresponding weight to `ScoringWeights` in `core/schema.py`.
-3. Implement the heuristic in `scoring/rubric.py:score_job()`.
-4. Update `weighted_total()` to include the new dimension.
-5. Update the profile editor template + form handler (`web/templates/pages/profile.html`, `web/routes/profile.py`).
-6. Update `tests/test_scoring.py`.
-7. Document the dimension in `docs/architecture.md` ("Scoring dimensions" table).
+The rubric is data-driven: dimension names, descriptions, and
+`default_weight`s live in `shared/rubric.json`, loaded by
+`scoring/rubric.py:load_rubric()` (so weights are tunable without code edits).
+To add a dimension, declare it there, implement its per-dimension scorer in
+`scoring/rubric.py`, and wire it into `score_job()`. If it needs persisted
+inputs, add a column via a new `core/migrations.py` step and the matching model
+in `core/models.py`. Update `tests/test_scoring.py`.
 
 ### A new web route
 
-1. Decide which router file owns it — see `web/routes/` (one concern per file: `pages`, `jobs`, `bulk`, `profile`, `palette`, `files`, `system`).
-2. Use `ProfileDep` for any route that takes a profile name. This validates against the directory pattern + dir-exists check.
-3. Use `web/render.py:render()` for HTML; never `TemplateResponse` directly.
-4. Add a smoke test in `tests/test_web.py` covering happy path + at least one error case.
+1. Routes live in `web/routes/`, one concern per file. JSON API routers are the
+   `*_api.py` files (e.g. `profile_api.py`, `targets_api.py`); they return JSON,
+   not HTML.
+2. Register the router with `app.include_router(...)` in `web/app.py`.
+3. Surface it in the React SPA under `frontend/src/` (a screen in
+   `frontend/src/screens/` plus its `/api` call).
+4. Add a smoke test alongside the existing web tests (for example
+   `tests/test_ai_web.py`, `tests/test_review_run_web.py`,
+   `tests/test_library_crud_web.py`) covering the happy path and at least one
+   error case.
 
 ### A new person profile
 
+Profiles are SQLite-per-profile, selected by the `MATCHBOX_PROFILE`
+environment variable (or an explicit `MATCHBOX_DB` path). Onboard through the
+SPA (drop files, then ingest) or by feeding a payload to `matchbox-ingest`:
+
 ```bash
-matchbox init-profile alice
-$EDITOR people/alice/profile.yaml
-$EDITOR people/alice/stories.md
-matchbox scan alice --dry-run
+MATCHBOX_PROFILE=alice matchbox-ingest --file payload.json
 ```
 
-`people/alice/` is auto-gitignored; only `people/demo/` is committed.
+The DB lands at `people/alice/matchbox.db`. `people/alice/` is auto-gitignored;
+only `people/demo/` is committed.
 
 ## Testing conventions
 
-* `tests/test_schema.py` — unit tests for Pydantic models (no I/O).
-* `tests/test_scoring.py` — scoring rubric + `weighted_total` (deterministic).
-* `tests/test_person.py` — integration: load demo profile from disk.
-* `tests/test_web.py` — FastAPI TestClient against the demo profile (force-seeded in a fixture).
+* `tests/test_data_layer.py` — the core models + DB layer.
+* `tests/test_migrations.py` — schema migrations.
+* `tests/test_scoring.py` — the scoring rubric and `score_job()` (deterministic).
+* `tests/test_discovery.py` / `tests/test_aggregators.py` — pollers and aggregators.
+* Web routes are covered by the `*_web.py` suites (for example
+  `tests/test_ai_web.py`, `tests/test_review_run_web.py`,
+  `tests/test_library_crud_web.py`) using FastAPI's `TestClient`.
 * New tests go in `tests/test_<module>.py`.
-* Use `scope="module"` fixtures for expensive I/O (profile loading, DB seed).
-* Don't mock `load_person()` in integration tests — the real demo file is the test fixture.
-* If your test needs to write to `people/demo/profile.yaml`, use the `demo_yaml_backup` fixture pattern that snapshots and restores.
+* For anything that touches the database, use the `tmp_db` fixture in
+  `tests/conftest.py`: it builds a migrated, isolated SQLite DB at
+  `tmp_path/matchbox.db` (`connect(...)` then `migrate(...)`) — one fresh DB per
+  test, no shared on-disk state.
 
 ## Documentation
 
@@ -159,8 +194,13 @@ For architectural decisions, add an ADR to `docs/decisions/`. See the existing o
 ## What we won't merge
 
 * Code that breaks SSOT rules above.
-* Changes that add dependencies without a clear payoff. (Tailwind is via CDN; we don't want a Node toolchain.)
-* New web frameworks (Django, Flask). The HTMX choice is documented in `docs/decisions/`.
+* Changes that add dependencies without a clear payoff. The live UI is a
+  React + Vite + TypeScript SPA under `frontend/` with its own Node build; new
+  frontend dependencies still need to earn their place. (The earlier project
+  history ran an HTMX + Tailwind-via-CDN, no-Node UI — see `docs/decisions/`;
+  it now lives, retired, under `archive/jinja/`.)
+* New backend web frameworks (Django, Flask). The FastAPI JSON-API choice is
+  documented in `docs/decisions/`.
 * Changes that disable the security defaults (`127.0.0.1` binding, server-enforced cost confirmation).
 * Bulk PRs that mix unrelated concerns.
 

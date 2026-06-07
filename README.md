@@ -30,9 +30,11 @@ polish.
 
 ## Prerequisites
 
-* Python 3.12+
-* [Typst](https://github.com/typst/typst) for PDF rendering:
-  `brew install typst` (macOS) or download from the Typst releases.
+* Python 3.12+ (3.13 supported and tested)
+* weasyprint for PDF rendering. It is a declared dependency (pulled in by
+  `pip install -e ".[dev]"`) but needs system Pango/Cairo at runtime:
+  `brew install pango` (macOS) or the libpango/libcairo packages on
+  Debian/Ubuntu (see the apt step in `.github/workflows/ci.yml`).
 * [Claude Code](https://claude.com/claude-code) installed and runnable
   from your terminal. The app never talks to an LLM API directly.
 
@@ -44,6 +46,16 @@ cd matchbox
 pip install -e ".[dev]"
 ```
 
+Build the frontend SPA the server serves (the server returns HTTP 503
+"SPA not built" until you do):
+
+```bash
+cd frontend && npm install && npm run build
+```
+
+For UI development use `npm run dev` instead — Vite serves the SPA and
+proxies `/api` to the FastAPI process on `:8765`.
+
 The first time `matchbox-assemble` runs it downloads a ~30 MB ONNX
 embedding model (`BAAI/bge-small-en-v1.5`) via `fastembed`.
 
@@ -53,7 +65,8 @@ embedding model (`BAAI/bge-small-en-v1.5`) via `fastembed`.
 matchbox-web                  # starts http://127.0.0.1:8765
 ```
 
-Open the browser. Empty profile state lands you at **/onboarding**:
+Open `http://127.0.0.1:8765`. The whole app is one React SPA; an empty
+profile lands you on the **Onboarding** screen:
 
 1. **Onboarding.** Drag in old CVs (PDF/DOCX), LinkedIn exports, plain
    text notes, anything that describes your work. Or paste freeform
@@ -71,14 +84,14 @@ Open the browser. Empty profile state lands you at **/onboarding**:
    skills, writes them to your DB via `matchbox-ingest`. Rows land
    with `facts_verified = false`.
 
-3. **Review.** Open `/review`. Read every bullet. Fix wording. Delete
-   noise. Confirm what is true. Only confirmed bullets are eligible
-   for CV tailoring.
+3. **Review.** Open the **Review** screen. Read every bullet. Fix
+   wording. Delete noise. Confirm what is true. Only confirmed bullets
+   are eligible for CV tailoring.
 
-4. **Targets.** `/targets`. Role families, dream companies, locations,
-   exclusions.
+4. **Targets.** Inside the **Profile** screen. Role families, dream
+   companies, locations, exclusions.
 
-5. **Sources.** `/sources`. Add a company by ATS type (Greenhouse,
+5. **Sources.** The **Sources** screen. Add a company by ATS type (Greenhouse,
    Lever, Ashby, SmartRecruiters, Recruitee) and slug. Click
    "Test the slug" before saving to verify the endpoint. Click
    "Scan all enabled" to fetch jobs. See
@@ -128,7 +141,7 @@ src/matchbox/
   scoring/                   rubric + run creation
   matching/                  embed, BM25, RRF, MMR, coverage
   polish.py                  voice-rules-validated keyword alignment
-  templates/html/            cv.html + cover.html (weasyprint)
+  templates/html/            cv.html (weasyprint); cover HTML is built inline in render_html.py
   web/                       FastAPI JSON API (the React SPA lives in frontend/;
                              the retired Jinja/HTMX UI is under archive/jinja/)
   assemble.py                deterministic select + render orchestrator

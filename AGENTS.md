@@ -139,7 +139,7 @@ python -m matchbox.onboarding.ingest_cli --file runs/ingest-<timestamp>.json
 
 Rows land `facts_verified = false`. Then run an **active gap interview**: point
 out thin spots (a role with no metrics, a skill with no evidence) and ask the
-user to fill them — never invent the answers. Tell them to confirm at `/review`.
+user to fill them — never invent the answers. Tell them to confirm in the Review screen of the app.
 
 ## Voice
 

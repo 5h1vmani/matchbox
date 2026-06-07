@@ -1,4 +1,4 @@
-# Testing Matchbox (v0.3)
+# Testing Matchbox
 
 Two paths: the **shortcut** (uses committed fixtures, no Claude Code
 needed; ~5 minutes) and the **real flow** (your own CV + Claude Code
@@ -10,16 +10,20 @@ the install. Then the real flow.
 ```bash
 git clone <repo> matchbox
 cd matchbox
-pip install -e ".[dev]"
-brew install typst                       # macOS; otherwise see typst docs
+pip install -e ".[dev]"                   # pulls in weasyprint (the PDF renderer)
+brew install pango                        # macOS: weasyprint needs Pango/Cairo at runtime
+                                          # Debian/Ubuntu: see .github/workflows/ci.yml's apt step
+cd frontend && npm install && npm run build  # build the React SPA the server serves
+cd ..
 matchbox-web                             # http://127.0.0.1:8765
 ```
 
-Open the browser. With an empty profile the root path redirects to
-`/onboarding`. Run a sanity check:
+Open the browser at `http://127.0.0.1:8765`. The whole app is one React
+SPA; with an empty profile it lands on the onboarding screen. Run a
+sanity check:
 
 ```bash
-python -m pytest tests/ -q               # should report 186 passed, 3 skipped
+python -m pytest -q                       # should report 326 passed, 3 skipped
 ```
 
 ## Shortcut (no Claude Code)
@@ -33,14 +37,14 @@ export MATCHBOX_PROFILE=demo
 matchbox-ingest --file docs/examples/livefire-ingest.json
 
 # 2. Confirm in the UI
-#    Open http://127.0.0.1:8765/review and click "Verify all unverified"
+#    In the SPA, open the Review screen and click "Verify all unverified"
 
 # 3. Set targets
-#    Open http://127.0.0.1:8765/targets and fill role families,
-#    dream companies, locations.
+#    In the SPA, open the Profile screen (Targets live there now) and
+#    fill role families, dream companies, locations.
 
 # 4. Add a job by hand (the LinkedIn / non-polled-ATS path)
-#    Open http://127.0.0.1:8765/inbox
+#    In the SPA, open the Inbox screen.
 #    Expand "Add a job by hand" and paste any real LinkedIn JD, or use
 #    this synthetic one:
 #       company: Anthropic
@@ -63,7 +67,7 @@ matchbox-assemble --run <run_id> --job <job_id>
 
 # 8. Open the result
 open runs/<run_id>/output/<job_id>/cv.pdf
-open "http://127.0.0.1:8765/review-run/<run_id>"
+#    Then open the Run review screen for <run_id> in the SPA.
 ```
 
 **Pass criteria**: a non-empty CV PDF (~30 KB) whose extracted text
@@ -78,26 +82,28 @@ export MATCHBOX_PROFILE=$(whoami)
 matchbox-web                             # leave this running
 ```
 
-In a second terminal start Claude Code (`claude`) and drive each
-step by pasting the prompt the page shows you. The interesting touch
-points, in order:
+The AI engine is a manual handoff: there is no headless runner. The app
+writes typed intents to an agent-task queue plus `runs/<id>/work-queue.json`
+and surfaces a copyable `process run <id>` prompt. In a second terminal
+start Claude Code (`claude`) and drive each step by pasting the prompt the
+SPA shows you; Claude Code drains the queue and runs `matchbox-assemble`.
+The interesting touch points (each is a screen in the SPA at
+`http://127.0.0.1:8765`), in order:
 
-1. **`/onboarding`** — drag your old CVs / LinkedIn export / notes.
+1. **Onboarding screen** — drag your old CVs / LinkedIn export / notes.
    Paste `ingest my files` into Claude Code. It will read `inbox/`,
    extract structured data, and write rows via `matchbox-ingest`.
 
-2. **`/review`** — every bullet starts unverified. Read each one,
+2. **Review screen** — every bullet starts unverified. Read each one,
    fix anything that is wrong, delete noise. Hit "Verify all
    unverified" when you trust the lot. Per-bullet edit-in-place is
    on hover.
 
-3. **`/profile`** — fix anything the brain missed: typos, missing
-   email, links.
+3. **Profile screen** — fix anything the brain missed: typos, missing
+   email, links. Targets live here too: what you are looking for —
+   role families, dream companies, locations, exclusions.
 
-4. **`/targets`** — what you are looking for. Role families, dream
-   companies, locations, exclusions.
-
-5. **`/sources`** — add a real ATS source. Live-verified slugs (as
+4. **Sources screen** — add a real ATS source. Live-verified slugs (as
    of 2026-05-22, see `docs/supported-ats.md`):
    * `greenhouse / anthropic` → 392 jobs
    * `lever / palantir` → 222 jobs
@@ -108,23 +114,23 @@ points, in order:
    Click **Test the slug** before saving. Then **Scan all enabled**.
 
    Have a LinkedIn link or a job from a non-polled vendor? Use
-   **Add a job by hand** on `/inbox` (see step 6).
+   **Add a job by hand** on the Inbox screen (see step 5).
 
-6. **`/inbox`** — scanned jobs ranked by the 5-dimension rubric. Per
+5. **Inbox screen** — scanned jobs ranked by the 5-dimension rubric. Per
    row: Skip (not now), Reject (no), or include in a run. The **Add
    a job by hand** card lets you paste a JD URL + JD text for jobs
    that did not come from a poller.
 
-7. **Start tailoring** — pick palette/font, tick CV / cover per row,
+6. **Start tailoring** — pick palette/font, tick CV / cover per row,
    click Start. Paste `process run <id>` into Claude Code.
 
-8. **`/review-run/<id>`** — polls `status.json`. Each card embeds the
+7. **Run review screen** — polls `status.json`. Each card embeds the
    rendered PDF. "What changed" links to the per-job `changes.md`
    (selected/skipped diff, gaps, ATS keyword misses with polish
    candidates). Apply ↗ opens the JD's apply URL; **Mark applied**
    records it.
 
-9. **`/runs`** — Abandon a stuck run (only while queued/running),
+8. **Runs screen** — Abandon a stuck run (only while queued/running),
    Delete a finished one (also clears the on-disk PDFs).
 
 ## What to look for / common failures
@@ -132,9 +138,11 @@ points, in order:
 * **First `matchbox-assemble` hangs ~15 seconds.** `fastembed` is
   downloading `BAAI/bge-small-en-v1.5` (~30 MB). Only happens once.
   Cached under `~/.cache/fastembed/`.
-* **Typst not found.** Check `which typst`. Install via
-  `brew install typst` or your package manager.
-* **`/sources` scan returns 404.** The slug is wrong or the company
+* **weasyprint can't find Pango/Cairo.** The renderer imports
+  `weasyprint`, which needs the system Pango/Cairo libraries at runtime.
+  macOS: `brew install pango`. Debian/Ubuntu: the libpango/libcairo
+  packages (see `.github/workflows/ci.yml`'s apt step).
+* **Sources scan returns 404.** The slug is wrong or the company
   moved off that ATS. `docs/supported-ats.md` has verified examples.
 * **Brain wrote a bad `status.json`.** The review-run page renders
   anyway with a warning banner listing the schema errors. Fix the
@@ -159,8 +167,9 @@ points, in order:
 * **Vendor drift** (an ATS endpoint stops returning 200). Update
   `docs/supported-ats.md` with the new verified slug or mark the
   vendor deferred. The poller often does not need changes.
-* **UI confusion.** Copy is in `src/matchbox/web/templates/`. The
-  voice rules are at `shared/voice-rules.json`.
+* **UI confusion.** Copy lives in `frontend/src/` now (the legacy
+  Jinja pages are archived under `archive/jinja/`). The voice rules
+  are at `shared/voice-rules.json`.
 * **Brain not following CLAUDE.md.** The schemas under `schemas/`
   validate the brain's output. The page surfaces validation errors;
   the brain side is a prompt issue, not a code issue.

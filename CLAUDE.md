@@ -62,8 +62,8 @@ When the user runs `ingest` (typically: "ingest my files"):
    python -m matchbox.onboarding.ingest_cli --file runs/ingest-<timestamp>.json
    ```
 
-   Rows land with `facts_verified = false`. Tell the user to review at
-   `/review` and confirm.
+   Rows land with `facts_verified = false`. Tell the user to review in
+   the Review screen and confirm.
 
 ## Tailoring mode
 
