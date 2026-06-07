@@ -53,12 +53,28 @@ def test_remote_scope() -> None:
     assert enrich.parse_remote_scope("Remote role, work from anywhere") is None
 
 
+def test_role_family_specific_wins_and_unknown_stays_none() -> None:
+    assert enrich.parse_role_family("Senior Machine Learning Engineer") == "ml"
+    assert enrich.parse_role_family("Data Scientist") == "data"
+    assert enrich.parse_role_family("React Native Developer") == "mobile"  # before frontend
+    assert enrich.parse_role_family("Full-Stack Engineer") == "fullstack"  # before either side
+    assert enrich.parse_role_family("Senior Frontend Engineer") == "frontend"
+    assert enrich.parse_role_family("Backend Engineer") == "backend"
+    assert enrich.parse_role_family("Site Reliability Engineer") == "devops"
+    assert enrich.parse_role_family("Product Manager") == "pm"
+    # A generic title with no stated specialism is not guessed.
+    assert enrich.parse_role_family("Software Engineer") is None
+    # Falls back to the JD when the title is generic.
+    assert enrich.parse_role_family("Engineer", "You will own our React frontend.") == "frontend"
+
+
 def test_enrich_record_shape() -> None:
-    rec = enrich.enrich_record("Senior Engineer", "5+ years. We will sponsor.")
+    rec = enrich.enrich_record("Senior ML Engineer", "5+ years. We will sponsor.")
     assert rec["seniority"] == "senior"
     assert rec["min_years_exp"] == 5
     assert rec["sponsorship"] == "offered"
+    assert rec["role_family"] == "ml"
     assert set(rec) == {
-        "seniority", "min_years_exp", "sponsorship",
+        "seniority", "min_years_exp", "role_family", "sponsorship",
         "citizenship_required", "clearance_required", "remote_scope",
     }

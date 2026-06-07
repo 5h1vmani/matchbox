@@ -90,6 +90,7 @@ def _row_params(source_id: int | None, j: JobRecord) -> dict[str, Any]:
         "dedup_key": enrich.dedup_key(j.url, j.company, j.title, j.location),
         "seniority": rec["seniority"],
         "min_years_exp": rec["min_years_exp"],
+        "role_family": rec["role_family"],
         "sponsorship": rec["sponsorship"],
         "citizenship_required": rec["citizenship_required"],
         "clearance_required": rec["clearance_required"],
@@ -127,13 +128,13 @@ def _upsert_jobs(conn: sqlite3.Connection, source_id: int | None, jobs: list[Job
         INSERT OR IGNORE INTO job (
             source, company, title, location, url, apply_url,
             jd_text, posted_at, fetched_at, status, country, remote,
-            dedup_key, seniority, min_years_exp, sponsorship,
+            dedup_key, seniority, min_years_exp, role_family, sponsorship,
             citizenship_required, clearance_required, remote_scope,
             salary_min, salary_max, salary_currency, salary_period, employment_type
         ) VALUES (
             :source, :company, :title, :location, :url, :apply_url,
             :jd_text, :posted_at, :fetched_at, 'new', :country, :remote,
-            :dedup_key, :seniority, :min_years_exp, :sponsorship,
+            :dedup_key, :seniority, :min_years_exp, :role_family, :sponsorship,
             :citizenship_required, :clearance_required, :remote_scope,
             :salary_min, :salary_max, :salary_currency, :salary_period, :employment_type
         )
@@ -156,21 +157,24 @@ def backfill_enrichment(conn: sqlite3.Connection) -> int:
     """One-time pass: enrich jobs that predate Tier-2 (sponsorship still NULL).
 
     Idempotent -- enrichment always sets `sponsorship` to a non-null value, so a
-    re-run skips already-enriched rows. (dedup_key/company_id were filled by the
-    007 migration backfill.) Returns the number of rows enriched."""
+    re-run skips already-enriched rows. Rows enriched before the `role_family`
+    tagger existed have it NULL, so we also catch those. (dedup_key/company_id
+    were filled by the 007 migration backfill.) Returns the number of rows
+    enriched."""
     rows = conn.execute(
-        "SELECT id, title, jd_text FROM job WHERE sponsorship IS NULL"
+        "SELECT id, title, jd_text FROM job WHERE sponsorship IS NULL OR role_family IS NULL"
     ).fetchall()
     with transaction(conn):
         for r in rows:
             rec = enrich.enrich_record(r["title"], r["jd_text"])
             conn.execute(
-                "UPDATE job SET seniority = ?, min_years_exp = ?, sponsorship = ?, "
-                "citizenship_required = ?, clearance_required = ?, remote_scope = ? "
-                "WHERE id = ?",
+                "UPDATE job SET seniority = ?, min_years_exp = ?, role_family = ?, "
+                "sponsorship = ?, citizenship_required = ?, clearance_required = ?, "
+                "remote_scope = ? WHERE id = ?",
                 (
                     rec["seniority"],
                     rec["min_years_exp"],
+                    rec["role_family"],
                     rec["sponsorship"],
                     rec["citizenship_required"],
                     rec["clearance_required"],

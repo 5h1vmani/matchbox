@@ -13,7 +13,6 @@ from matchbox.core.migrations import migrate
 from matchbox.offers import repo
 from matchbox.offers.benchmark import benchmark
 
-
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _db(tmp_path: Path):  # noqa: ANN202 - test helper
@@ -214,6 +213,10 @@ def test_benchmark_with_jobs(tmp_path: Path) -> None:
     assert 0 <= result["percentile"] <= 100
     assert result["median"] is not None
     assert result["currency"] == "USD"
+    # v1.2: an honest interquartile range + a basis line drawn from the own pool.
+    assert result["range"]["low"] < result["median"] < result["range"]["high"]
+    assert "10 roles in your own pool" in result["basis"]
+    assert "USD" in result["basis"]
 
     conn.close()
 

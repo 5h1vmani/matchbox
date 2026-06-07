@@ -2,8 +2,39 @@
 
 from __future__ import annotations
 
-from matchbox.matching.coverage import check_keyword_presence, expand_aliases
+from matchbox.matching.coverage import (
+    check_keyword_presence,
+    coverage_band,
+    expand_aliases,
+    summarize_coverage,
+)
 from matchbox.matching.select import Requirement
+
+
+def test_coverage_band_three_states() -> None:
+    f = 0.5
+    assert coverage_band(selected_best=0.7, library_best=0.7, floor=f) == "covered"
+    # nothing selected clears it, but the library does -> partial
+    assert coverage_band(selected_best=0.2, library_best=0.6, floor=f) == "partial"
+    assert coverage_band(selected_best=0.1, library_best=0.2, floor=f) == "uncovered"
+
+
+def test_summarize_coverage_counts_only_covered_band() -> None:
+    cov = {
+        "semantic": {
+            "must_haves": [
+                {"text": "a", "band": "covered"},
+                {"text": "b", "band": "partial"},
+                {"text": "c", "band": "uncovered"},
+            ]
+        }
+    }
+    assert summarize_coverage(cov) == {"covered": 1, "total": 3}
+    # Pre-band artifacts (bare boolean) still summarize.
+    legacy = {"semantic": {"must_haves": [{"text": "a", "covered": True}]}}
+    assert summarize_coverage(legacy) == {"covered": 1, "total": 1}
+    assert summarize_coverage({"semantic": {"must_haves": []}}) is None
+    assert summarize_coverage(None) is None
 
 
 def _req(text: str, keywords: list[str] | None = None) -> Requirement:

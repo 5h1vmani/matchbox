@@ -215,6 +215,15 @@ def test_smoke_assemble_produces_valid_pdf_with_keywords(
     assert len(must_haves) == 2
     covered_count = sum(1 for r in must_haves if r["covered"])
     assert covered_count >= 1
+    # Every must-have carries the v1.2 band + evidence fields.
+    for m in must_haves:
+        assert m["band"] in {"covered", "partial", "uncovered"}
+        assert (m["band"] == "covered") == m["covered"]
+        if m["band"] == "covered":
+            assert isinstance(m["evidence_bullet_id"], int)
+            assert m["evidence_verified"] is True
+        elif m["band"] == "uncovered":
+            assert m["evidence_bullet_id"] is None
 
     # ATS keyword presence: the rendered text should literally contain
     # 'kubernetes' (we picked a Kubernetes bullet)
@@ -232,6 +241,101 @@ def test_smoke_assemble_produces_valid_pdf_with_keywords(
     assert cv_json["schema_version"] == 1
     assert cv_json["profile"]["name"] == "Shiva Padakanti"
     assert len(cv_json["experiences"]) >= 1
+
+
+def test_coverage_partial_band_keys_off_facts_verified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A must-have matched only by an UNVERIFIED bullet reads `partial`, with
+    that bullet as evidence -- never a false `uncovered`, never a fabricated
+    `covered`. The verified bullet that is actually on the CV reads `covered`."""
+    conn = connect(tmp_path / "matchbox.db")
+    migrate(conn)
+    conn.execute("INSERT INTO profile (full_name, links_json) VALUES (?, '[]')", ("Dev One",))
+    exp = lib.add_experience(conn, company="Acme", role="Engineer", start_date="2023-01")
+    verified = lib.add_bullet(
+        conn,
+        experience_id=exp.id,
+        text="Built ETL pipelines processing 30M rows per day in Python.",
+        facts_verified=True,
+    )
+    unverified = lib.add_bullet(
+        conn,
+        experience_id=exp.id,
+        text="Operated Kubernetes clusters across three regions.",
+        facts_verified=False,  # in the library, not yet verified
+    )
+    conn.execute(
+        "INSERT INTO job (company, title, url, jd_text, status, requirements_json) "
+        "VALUES (?, ?, ?, ?, 'selected', ?)",
+        (
+            "Anthropic",
+            "FDE",
+            "https://x/partial",
+            "JD",
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "job_id": 1,
+                    "model_version": "t",
+                    "requirements": [
+                        {
+                            "type": "must-have",
+                            "text": "Build and operate data pipelines.",
+                            "keywords": ["pipelines", "etl"],
+                            "variants": [],
+                        },
+                        {
+                            "type": "must-have",
+                            "text": "Operate Kubernetes clusters in production.",
+                            "keywords": ["kubernetes"],
+                            "variants": ["k8s"],
+                        },
+                    ],
+                }
+            ),
+        ),
+    )
+    vocab = sorted(
+        set(
+            w
+            for src in [
+                "Built ETL pipelines processing 30M rows per day in Python.",
+                "Operated Kubernetes clusters across three regions.",
+                "Build and operate data pipelines. pipelines etl",
+                "Operate Kubernetes clusters in production. kubernetes k8s",
+            ]
+            for w in tokenize(src)
+        )
+    )
+    from matchbox import assemble as assemble_mod
+
+    monkeypatch.setattr(assemble_mod, "RUNS_DIR", tmp_path / "runs")
+    (tmp_path / "runs").mkdir(exist_ok=True)
+
+    result = assemble_one(
+        conn=conn,
+        run_id="2026-06-05-001",
+        job_id=1,
+        palette="slate",
+        font="atkinson-hyperlegible",
+        embedder=FakeEmbedder(vocab=vocab),
+        coverage_floor=0.3,
+    )
+    coverage = json.loads(result.coverage_report_path.read_text())
+    by_text = {m["text"]: m for m in coverage["semantic"]["must_haves"]}
+
+    pipelines = by_text["Build and operate data pipelines."]
+    assert pipelines["band"] == "covered"
+    assert pipelines["evidence_bullet_id"] == verified.id
+    assert pipelines["evidence_verified"] is True
+
+    k8s = by_text["Operate Kubernetes clusters in production."]
+    assert k8s["band"] == "partial"
+    assert k8s["evidence_bullet_id"] == unverified.id
+    assert k8s["evidence_verified"] is False
+    # `gaps` keeps its original meaning: anything not fully covered (partial too).
+    assert "Operate Kubernetes clusters in production." in coverage["semantic"]["gaps"]
 
 
 def test_smoke_fails_loud_when_no_verified_bullets(tmp_path: Path) -> None:

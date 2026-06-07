@@ -14,18 +14,24 @@ import sqlite3
 from datetime import date
 from typing import Any
 
-from matchbox.core.db import transaction
+from matchbox.core.db import PROJECT_ROOT, transaction
 from matchbox.discovery_api import rules
+from matchbox.matching.coverage import summarize_coverage
+from matchbox.tracker import rules as tracker_rules
 from matchbox.tracker.rules import mono_for
 
-# Scored jobs only, with the ATS source for the display label. `requirements_json`
-# is reserved for a future coverage match; it is not populated today so coverage
-# serializes to null.
+_RUNS_DIR = PROJECT_ROOT / "runs"
+
+# Scored jobs only, with the ATS source for the display label. Salary columns
+# (added in 007_sota.sql) are serialized when the ad reported them; coverage is
+# read from the tailoring artifact when a run exists for the job (see
+# `_coverage_for_job`).
 _ROLE_SELECT = """
   SELECT j.id, j.company, j.title, j.location, j.url, j.apply_url, j.jd_text,
          j.posted_at, j.score, j.score_breakdown_json,
          j.remote, j.discovery_decision, j.skipped_on, j.freshness, j.closes_at,
          j.sponsorship, j.citizenship_required, j.clearance_required, j.remote_scope,
+         j.salary_min, j.salary_max, j.salary_currency, j.salary_period,
          s.ats_type AS ats_type
     FROM job j
     LEFT JOIN ats_source s ON s.id = j.source
@@ -39,12 +45,15 @@ def serialize(
     *,
     jd_preview: bool = False,
     work_auth: dict[str, Any] | None = None,
+    coverage: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """One scored `job` row -> the design's `Role` shape.
 
     `jd_preview` trims the JD to a short pulled line for the list surface (the JD
     drawer fetches the full text via load_one). `work_auth` (the user's target
-    work-authorization) feeds the deterministic eligibility pre-filter."""
+    work-authorization) feeds the deterministic eligibility pre-filter.
+    `coverage` (`{covered, total}`) is supplied by the caller when a tailoring
+    run has produced a coverage report for this job; None means no run yet."""
     today = today or date.today()
     breakdown = rules.load_breakdown(row["score_breakdown_json"])
 
@@ -68,21 +77,44 @@ def serialize(
         "title": row["title"],
         "location": row["location"] or "",
         "remote": bool(row["remote"]),
-        # Salary is not stored on `job` -> undisclosed (the UI shows the fallback).
-        "salary": None,
+        "salary": rules.salary_display(
+            row["salary_min"], row["salary_max"], row["salary_currency"], row["salary_period"]
+        ),
         "source": rules.source_label(row["ats_type"]),
         "postedDaysAgo": rules.days_since(row["posted_at"], today),
         "link": row["apply_url"] or row["url"],
         "fit": fit,
         "eligibility": elig,
-        # No requirement-match data persisted yet -> no coverage bar.
-        "coverage": None,
+        # Coverage is real only once a tailoring run has matched this job's
+        # requirements against the verified library; null until then.
+        "coverage": coverage,
         "freshness": fresh,
         "closingInDays": closing_in,
         "mono": mono_for(row["company"]),
         "jd": jd,
         "decision": row["discovery_decision"],
     }
+
+
+def _coverage_for_job(conn: sqlite3.Connection, job_id: int) -> dict[str, int] | None:
+    """`{covered, total}` from the most recent tailoring run's coverage.json for
+    this job, or None when no run has produced one yet. Honest: the bar appears
+    only once the requirements were actually matched against the verified
+    library -- never inferred."""
+    row = conn.execute(
+        "SELECT run_id FROM run_job WHERE job_id = ? ORDER BY run_id DESC LIMIT 1",
+        (job_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    path = _RUNS_DIR / row["run_id"] / "output" / str(job_id) / "coverage.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return summarize_coverage(data)
 
 
 def _skipped_today(skipped_on: str | None, today: date) -> bool:
@@ -114,7 +146,9 @@ def load_roles(conn: sqlite3.Connection, today: date | None = None) -> list[dict
     wa = _work_auth(conn)
     rows = conn.execute(_ROLE_SELECT).fetchall()
     return [
-        serialize(r, today, jd_preview=True, work_auth=wa)
+        serialize(
+            r, today, jd_preview=True, work_auth=wa, coverage=_coverage_for_job(conn, r["id"])
+        )
         for r in rows
         if not _skipped_today(r["skipped_on"], today)
     ]
@@ -167,7 +201,11 @@ def raw(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:
 
 def load_one(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] | None:
     row = raw(conn, job_id)
-    return serialize(row, work_auth=_work_auth(conn)) if row else None
+    if row is None:
+        return None
+    return serialize(
+        row, work_auth=_work_auth(conn), coverage=_coverage_for_job(conn, job_id)
+    )
 
 
 def job_facts(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:
@@ -211,7 +249,11 @@ def create_application(
 
     Inserts with the legacy `status='draft'` (the table's CHECK), and the
     tracker's `stage` (what the tracker SPA reads). Seeds `updated_at` and a
-    'saved' history event so the timeline is not empty.
+    history event so the timeline is not empty.
+
+    When created at the `applied` stage (the Apply-packet submit), it stamps
+    `applied_at` and seeds the stage's default next action -- the +7d follow-up
+    "reminder" (a due-date computed on read, not a scheduled task).
     """
     existing = existing_application(conn, job_id)
     if existing is not None:
@@ -233,20 +275,33 @@ def create_application(
         if job and job["score_breakdown_json"]
         else None
     )
+
+    applied_at = tracker_rules.today().isoformat() if stage == "applied" else None
+    action = tracker_rules.default_action_for(stage)
+    na_kind, na_label, na_due, na_time = action if action else (None, None, None, None)
+    na_at = tracker_rules.date_in(na_due) if action else None
+    ev_kind, ev_text = (
+        ("applied", "Applied from packet") if stage == "applied" else ("saved", "Saved from discovery")
+    )
+
     with transaction(conn):
         cur = conn.execute(
             """
             INSERT INTO application (job_id, run_id, status, stage, has_draft,
-                                     updated_at, predicted_band, predicted_score)
-            VALUES (?, ?, 'draft', ?, 0,
-                    strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, ?)
+                                     applied_at, updated_at, predicted_band, predicted_score,
+                                     next_action, next_action_kind, next_action_at, next_action_time)
+            VALUES (?, ?, 'draft', ?, 0, ?,
+                    strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, ?, ?, ?, ?, ?)
             """,
-            (job_id, run_id, stage, predicted_band, predicted_score),
+            (
+                job_id, run_id, stage, applied_at, predicted_band, predicted_score,
+                na_label, na_kind, na_at, na_time,
+            ),
         )
         app_id = int(cur.lastrowid or 0)
         conn.execute(
-            "INSERT INTO app_event (application_id, kind, text) VALUES (?, 'saved', 'Saved from discovery')",
-            (app_id,),
+            "INSERT INTO app_event (application_id, kind, text) VALUES (?, ?, ?)",
+            (app_id, ev_kind, ev_text),
         )
     return app_id
 

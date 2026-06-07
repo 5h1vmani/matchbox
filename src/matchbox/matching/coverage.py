@@ -16,8 +16,10 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from matchbox.matching.select import Requirement
+if TYPE_CHECKING:
+    from matchbox.matching.select import Requirement
 
 _ALIASES_PATH = Path(__file__).resolve().parents[3] / "shared" / "keyword-aliases.json"
 
@@ -53,6 +55,46 @@ def expand_aliases(term: str) -> list[str]:
     if group is None:
         return [t]
     return [t, *(m for m in sorted(group) if m != t)]
+
+
+# ── semantic coverage bands (SSOT for the three-state read) ───────────────────
+
+# Bands, strongest first. `partial` is the honest middle ground: the evidence
+# exists in the library, it just is not on this tailored CV (or is not yet
+# verified). It is never a gap-filler -- the band keys off real similarity and
+# the real `facts_verified` flag, never off invented content.
+BAND_COVERED = "covered"
+BAND_PARTIAL = "partial"
+BAND_UNCOVERED = "uncovered"
+
+
+def coverage_band(*, selected_best: float, library_best: float, floor: float) -> str:
+    """Classify one must-have's coverage from its best similarities.
+
+    - covered:   a *selected* (verified, on-CV) bullet clears the floor.
+    - partial:   nothing selected clears it, but some library bullet does --
+                 the evidence exists, it just is not on this CV or is unverified.
+    - uncovered: nothing in the library reaches the floor.
+    """
+    if selected_best >= floor:
+        return BAND_COVERED
+    if library_best >= floor:
+        return BAND_PARTIAL
+    return BAND_UNCOVERED
+
+
+def summarize_coverage(coverage: dict[str, Any] | None) -> dict[str, int] | None:
+    """Collapse a coverage.json's semantic must-haves into the discovery Role
+    bar's `{covered, total}`. Only the `covered` band counts as covered (partial
+    is honestly not on the CV yet). None when there are no must-haves to report.
+
+    Tolerates the pre-band shape (a bare `covered` boolean) for old artifacts."""
+    sem = (coverage or {}).get("semantic") or {}
+    must = sem.get("must_haves") or []
+    if not must:
+        return None
+    covered = sum(1 for m in must if m.get("band") == BAND_COVERED or m.get("covered"))
+    return {"covered": covered, "total": len(must)}
 
 
 @dataclass(slots=True)

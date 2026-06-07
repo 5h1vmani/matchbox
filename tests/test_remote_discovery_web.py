@@ -1,4 +1,4 @@
-"""Web wiring for aggregator discovery: scan-remote, Adzuna config, filters."""
+"""Aggregator discovery over the JSON sources API (the React replacement)."""
 
 from __future__ import annotations
 
@@ -14,58 +14,71 @@ from matchbox.web.app import create_app
 @pytest.fixture()
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     monkeypatch.setenv("MATCHBOX_DB", str(tmp_path / "matchbox.db"))
-    app = create_app()
-    with TestClient(app) as c:
+    with TestClient(create_app()) as c:
         yield c
 
 
-def test_scan_remote_button(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_scan_remote_returns_per_aggregator_results(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from matchbox.discovery.runner import AggregatorResult
-    from matchbox.web.routes import sources as sources_mod
+    from matchbox.web.routes import sources_api
 
     monkeypatch.setattr(
-        sources_mod,
+        sources_api,
         "scan_aggregators",
         lambda conn, **kw: [
             AggregatorResult("himalayas", True, 3, 3, None),
             AggregatorResult("remotive", True, 2, 2, None),
         ],
     )
-    r = client.post("/sources/scan-remote")
-    assert r.status_code == 200
-    assert "added 5" in r.text
+    body = client.post("/api/sources/scan-remote").json()
+    assert {r["name"] for r in body["results"]} == {"himalayas", "remotive"}
+    assert sum(r["inserted"] for r in body["results"]) == 5
 
 
-def test_save_and_prefill_adzuna(client: TestClient) -> None:
+def test_save_and_read_adzuna(client: TestClient) -> None:
     r = client.post(
-        "/sources/adzuna",
-        data={"app_id": "myid", "app_key": "mykey", "country": "in", "what": "backend"},
+        "/api/sources/adzuna",
+        json={"app_id": "myid", "app_key": "mykey", "country": "in", "what": "backend"},
     )
-    assert r.status_code == 200
-    assert "saved" in r.text.lower()
-    page = client.get("/sources").text
-    assert 'value="myid"' in page  # the saved key prefilled into the form
+    assert r.status_code == 200 and r.json()["ok"] == "true"
+    # The saved config is read back via the sources view-model.
+    adzuna = client.get("/api/sources").json()["adzuna"]
+    assert adzuna["app_id"] == "myid"
+    assert adzuna["queries"][0]["what"] == "backend"
+    # The secret app_key is write-only: it must NOT be echoed to the browser;
+    # the UI learns only that a key is set (mirrors the BYOK key pattern).
+    assert "app_key" not in adzuna
+    assert adzuna["configured"] is True
 
 
-def test_inbox_remote_and_country_filters(client: TestClient) -> None:
-    client.get("/sources")  # trigger lazy migrate
-    from matchbox.core.db import connect
+def test_sources_adzuna_unconfigured_by_default(client: TestClient) -> None:
+    adzuna = client.get("/api/sources").json()["adzuna"]
+    assert adzuna["configured"] is False
+    assert "app_key" not in adzuna
 
-    conn = connect()
-    conn.execute(
-        "INSERT INTO job (company, title, url, jd_text, status, remote, country) "
-        "VALUES ('R', 'Remote Eng', 'https://x/r', 'jd', 'new', 1, NULL)"
+
+def test_targets_comp_round_trips(client: TestClient) -> None:
+    # Compensation target must persist on first insert (regression: it was
+    # hard-coded to '{}') and survive an update.
+    body = {
+        "role_families": ["Backend"],
+        "comp": {"currency": "GBP", "min": 90000, "max": 130000},
+        "work_auth": {"citizenships": ["UK"], "needs_sponsorship": False, "has_clearance": False},
+    }
+    saved = client.post("/api/targets", json=body)
+    assert saved.status_code == 200
+    assert saved.json()["comp"] == {"currency": "GBP", "min": 90000, "max": 130000}
+    # Re-read from a fresh GET (not just the POST echo) to prove it was stored.
+    reread = client.get("/api/targets").json()
+    assert reread["comp"] == {"currency": "GBP", "min": 90000, "max": 130000}
+    # An update that omits comp leaves the other fields intact and keeps comp editable.
+    client.post(
+        "/api/targets", json={**body, "comp": {"currency": "USD", "min": None, "max": 200000}}
     )
-    conn.execute(
-        "INSERT INTO job (company, title, url, jd_text, status, remote, country) "
-        "VALUES ('O', 'Onsite Eng', 'https://x/o', 'jd', 'new', 0, 'in')"
-    )
-    conn.close()
-
-    remote_page = client.get("/inbox?remote=true").text
-    assert "Remote Eng" in remote_page
-    assert "Onsite Eng" not in remote_page
-
-    country_page = client.get("/inbox?country=in").text
-    assert "Onsite Eng" in country_page
-    assert "Remote Eng" not in country_page
+    assert client.get("/api/targets").json()["comp"] == {
+        "currency": "USD",
+        "min": None,
+        "max": 200000,
+    }

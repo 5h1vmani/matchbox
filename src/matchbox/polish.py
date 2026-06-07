@@ -67,9 +67,17 @@ def _validator() -> Draft202012Validator:
     return Draft202012Validator(json.loads(POLISH_SCHEMA_PATH.read_text(encoding="utf-8")))
 
 
-def validate_voice(text: str, rules: dict[str, Any] | None = None) -> list[VoiceViolation]:
+def validate_voice(
+    text: str, rules: dict[str, Any] | None = None, *, scope: str = "cv_bullet"
+) -> list[VoiceViolation]:
     """Run every voice check against `text`. Returns the list of failures
-    (empty list = clean)."""
+    (empty list = clean).
+
+    `scope` selects which word-count tier in `quality_gates` applies:
+    `cv_bullet` (default, the polish path), `cover`, or `answer`. The CV-bullet
+    tier (max 25 words) is a bullet rule and rejects all free prose, so BYOK
+    cover paragraphs / screening answers must pass their own scope. This is a
+    FORM gate only -- it never checks factual grounding (see module docstring)."""
     rules = rules or load_voice_rules()
     out: list[VoiceViolation] = []
     lower = text.lower()
@@ -111,8 +119,8 @@ def validate_voice(text: str, rules: dict[str, Any] | None = None) -> list[Voice
         )
 
     gates = rules.get("quality_gates", {})
-    min_w = int(gates.get("min_word_count_cv_bullet", 0))
-    max_w = int(gates.get("max_word_count_cv_bullet", 10_000))
+    min_w = int(gates.get(f"min_word_count_{scope}", 0))
+    max_w = int(gates.get(f"max_word_count_{scope}", 10_000))
     wc = len(text.split())
     if wc < min_w:
         out.append(VoiceViolation(rule="too_short", detail=f"{wc} words, min {min_w}"))

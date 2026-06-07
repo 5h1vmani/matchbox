@@ -95,6 +95,21 @@
           }
         }
       }
+    },
+    "answers": {
+      "type": "array",
+      "description": "Reusable Q&A the brain found in the inbox (cover notes, screening answers). Lands unverified; the user confirms at /review.",
+      "items": {
+        "type": "object",
+        "required": ["question", "answer"],
+        "additionalProperties": false,
+        "properties": {
+          "question": { "type": "string", "minLength": 1 },
+          "answer": { "type": "string", "minLength": 1 },
+          "category": { "type": ["string", "null"] },
+          "source_file": { "type": ["string", "null"] }
+        }
+      }
     }
   },
   "$defs": {

@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+* **v1.2 honest core (backend).** Discovery serializes real salary and reads coverage from the tailoring artifact; a deterministic `role_family` tagger un-deads salary role-scoping. `coverage.json` gains a three-state `band` (covered/partial/uncovered, partial keying off `facts_verified`) and an `evidence_bullet_id`.
+* **BYOK live layer (optional, additive to the manual handoff).** `GET /api/library/facts` (verified grounding), `POST /api/voice-check` (form only, prose-scoped tiers), `POST /api/ai/stream` (localhost SSE proxy to the user's Anthropic/OpenAI key — the app still holds no LLM client), `GET/POST/DELETE /api/ai/{config,key}`. The provider key lives in a `0600` file beside the profile DB, never in the browser.
+* **Answer library** (migration 008): reusable Q&A with the `facts_verified` gate and `used_count`, `/api/answers`, and ingest support.
+* **Interview loop** (migration 009): `interview_round` + `debrief`, `/api/applications/{id}/rounds` + `/api/rounds/{id}` + one-tap debrief; prep agent-tasks carry prior debriefs as assisted context.
+* **Momentum coach + rejection learning**: `/api/insights/momentum` (real weekly pace + rest/healthy/push threshold) and structured `close_reason` (migration 010) with a deterministic category rollup (`/api/insights/rejection-reasons`).
+* **Offers**: own-pool benchmark gains an honest p25–p75 `range` and a `basis` line.
+* **Frontend**: ⌘K command palette, BYOK Settings, momentum/rejection panels, and Library Answers / Workspace (interview loop) / Offers screens.
+* **All-React UI.** The Jinja/HTMX pages (Library, Profile, Sources, onboarding/Intake, Review, Apply packet, run progress) are now React screens over a JSON-only API; a SPA catch-all serves the app for every non-`/api` route. The retired Jinja routes + templates are moved to `archive/jinja/`.
 * Documentation overhaul for open-source release: README badges, full `docs/` index, decision records (ADRs), troubleshooting guide, development guide, CLI reference.
 * `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
 * `SECURITY.md` with vulnerability-reporting policy and threat model.

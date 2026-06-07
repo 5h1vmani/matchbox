@@ -217,6 +217,69 @@ def source_label(ats_type: str | None) -> str:
     return "Careers page"
 
 
+# ── salary (honest display string from the stored ad-data columns) ──────────────
+
+# ISO-4217 -> symbol for the common currencies the pollers see. Unknown codes
+# fall back to "<CODE> " so we never drop the currency entirely.
+_CURRENCY_SYMBOL = {
+    "USD": "$",
+    "EUR": "€",
+    "GBP": "£",
+    "INR": "₹",
+    "CAD": "C$",
+    "AUD": "A$",
+    "SGD": "S$",
+}
+# Non-annual periods get an explicit suffix; "year" (the common case) reads bare,
+# matching the design's "$150–185k".
+_PERIOD_SUFFIX = {"hour": "/hr", "day": "/day", "month": "/mo", "week": "/wk"}
+
+
+def _compact_parts(value: float, currency: str | None) -> tuple[str, str]:
+    """Round to a compact figure, returned as (number, unit): lakhs for INR,
+    thousands otherwise. Splitting the unit out lets a range share one suffix
+    ("$150–185k" rather than "$150k–185k")."""
+    n = round(float(value))
+    if (currency or "").upper() == "INR" and n >= 100_000:
+        lakhs = n / 100_000
+        return (f"{lakhs:.0f}" if lakhs == int(lakhs) else f"{lakhs:.1f}"), "L"
+    if n >= 1000:
+        thousands = n / 1000
+        return (f"{thousands:.0f}" if thousands == int(thousands) else f"{thousands:.1f}"), "k"
+    return str(n), ""
+
+
+def salary_display(
+    salary_min: float | None,
+    salary_max: float | None,
+    currency: str | None = None,
+    period: str | None = None,
+) -> str | None:
+    """The design's `Role.salary` display string from the stored columns.
+
+    Honest by construction: returns None (undisclosed) unless the ad actually
+    reported a figure -- never a guess. A range renders "$150–185k"; a single
+    bound renders "$150k"; non-annual periods carry a "/hr"-style suffix.
+    """
+    if salary_min is None and salary_max is None:
+        return None
+    sym = _CURRENCY_SYMBOL.get(
+        (currency or "").upper(), f"{currency} " if currency else ""
+    )
+    suffix = _PERIOD_SUFFIX.get((period or "").lower(), "")
+    if salary_min is not None and salary_max is not None and salary_min != salary_max:
+        lo_num, lo_unit = _compact_parts(salary_min, currency)
+        hi_num, hi_unit = _compact_parts(salary_max, currency)
+        # Share the unit when both bounds land in the same band; keep both
+        # otherwise (e.g. a sub-thousand low vs a thousands high).
+        lo = lo_num if lo_unit == hi_unit else f"{lo_num}{lo_unit}"
+        return f"{sym}{lo}–{hi_num}{hi_unit}{suffix}"
+    value = salary_min if salary_min is not None else salary_max
+    assert value is not None
+    num, unit = _compact_parts(value, currency)
+    return f"{sym}{num}{unit}{suffix}"
+
+
 def jd_paragraphs(jd_text: str | None) -> list[str]:
     """Split a JD blob into display paragraphs (blank-line separated; falls back
     to single newlines; never empty when there is any text)."""

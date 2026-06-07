@@ -48,8 +48,6 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-import pytest
-
 from matchbox.core.db import connect
 from matchbox.core.migrations import migrate
 from matchbox.insights.metrics import (
@@ -60,7 +58,6 @@ from matchbox.insights.metrics import (
     summary,
     whats_working,
 )
-
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -324,4 +321,10 @@ def test_summary_has_all_keys(tmp_path: Path) -> None:
     conn = _db(tmp_path)
     _seed(conn)
     result = summary(conn)
-    assert set(result.keys()) == {"totals", "funnel", "calibration", "whatsWorking"}
+    assert set(result.keys()) == {
+        "totals",
+        "funnel",
+        "calibration",
+        "whatsWorking",
+        "rejectionReasons",
+    }

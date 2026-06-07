@@ -20,6 +20,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from matchbox.answers import repo as answers_repo
 from matchbox.core import library as lib
 from matchbox.core.db import connect, transaction
 from matchbox.core.migrations import migrate
@@ -89,6 +90,7 @@ def ingest(payload: dict[str, Any], conn: sqlite3.Connection) -> dict[str, int]:
         "projects": 0,
         "skills": 0,
         "summaries": 0,
+        "answers": 0,
         "tags": 0,
     }
 
@@ -164,6 +166,17 @@ def ingest(payload: dict[str, Any], conn: sqlite3.Connection) -> dict[str, int]:
             tags = sm_in.get("tags", [])
             _apply_tags(conn, item_type="summary_variant", item_id=sm.id, tags=tags)
             counts["tags"] += len(tags)
+
+        for a_in in payload.get("answers", []):
+            answers_repo.create(
+                conn,
+                question=a_in["question"],
+                answer=a_in["answer"],
+                category=a_in.get("category"),
+                facts_verified=False,  # confirmed at /review, like every other row
+                source_file=a_in.get("source_file"),
+            )
+            counts["answers"] += 1
 
     return counts
 

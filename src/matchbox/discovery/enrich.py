@@ -13,7 +13,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 # ── dedup key (mirrors the SQL backfill in migration 007) ─────────────────────
 
 
@@ -43,6 +42,53 @@ def parse_seniority(title: str, jd_text: str | None = None) -> str | None:
     for level, pat in _SENIORITY_PATTERNS:
         if pat.search(text):
             return level
+    return None
+
+
+# ── role family (title is the strong signal; checked most-specific first) ──────
+
+# Ordered so a more specific family wins: "Machine Learning Engineer" is `ml`
+# not `backend`; "React Native" is `mobile` not `frontend`; "Full-Stack" beats
+# either single side. CONSERVATIVE -- a generic "Software Engineer" stays None
+# (we do not guess a specialism the title does not state). This un-deads the
+# salary role-scoping, which silently matches zero rows without a family.
+_ROLE_FAMILY_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("ml", re.compile(
+        r"\b(machine[- ]learning|ml\s*engineer|ai\s*engineer|deep[- ]learning|"
+        r"\bnlp\b|computer\s*vision|mlops|research\s*scientist|applied\s*scientist)\b", re.I)),
+    ("data", re.compile(
+        r"\b(data\s*engineer|data\s*scientist|data\s*analyst|data\s*science|"
+        r"analytics\s*engineer|\banalytics\b|\betl\b|business\s*intelligence)\b", re.I)),
+    ("mobile", re.compile(
+        r"\b(ios|android|mobile|react\s*native|flutter|swift|kotlin)\b", re.I)),
+    ("devops", re.compile(
+        r"\b(devops|\bsre\b|site\s*reliability|infrastructure|platform\s*engineer|"
+        r"cloud\s*engineer)\b", re.I)),
+    ("security", re.compile(
+        r"\b(security|appsec|infosec|penetration|cyber\s*security|cybersecurity)\b", re.I)),
+    ("design", re.compile(
+        r"\b(designer|\bux\b|\bui/ux\b|product\s*design|user\s*experience)\b", re.I)),
+    ("pm", re.compile(
+        r"\b(product\s*manager|product\s*owner|program\s*manager|technical\s*product)\b", re.I)),
+    ("qa", re.compile(r"\b(\bqa\b|quality\s*assurance|test\s*engineer|\bsdet\b)\b", re.I)),
+    ("fullstack", re.compile(r"\b(full[- ]?stack)\b", re.I)),
+    ("frontend", re.compile(
+        r"\b(frontend|front[- ]end|front\s+end|\breact\b|\bvue\b|\bangular\b|"
+        r"ui\s*engineer|web\s*developer)\b", re.I)),
+    ("backend", re.compile(
+        r"\b(backend|back[- ]end|back\s+end|server[- ]side|api\s*engineer)\b", re.I)),
+]
+
+
+def parse_role_family(title: str, jd_text: str | None = None) -> str | None:
+    """Best-guess role family from the title, falling back to the JD. Returns
+    None when nothing explicit matches (absence is not a guess)."""
+    for text in (title or "", jd_text or ""):
+        if not text:
+            continue
+        for family, pat in _ROLE_FAMILY_PATTERNS:
+            if pat.search(text):
+                return family
     return None
 
 
@@ -120,5 +166,6 @@ def enrich_record(title: str, jd_text: str | None) -> dict[str, Any]:
     return {
         "seniority": parse_seniority(title, jd_text),
         "min_years_exp": parse_min_years(jd_text),
+        "role_family": parse_role_family(title, jd_text),
         **parse_eligibility(jd_text),
     }

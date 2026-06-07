@@ -7,9 +7,10 @@ pure-function analytics.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from matchbox.insights import metrics
 from matchbox.web.deps import ConnDep
@@ -39,3 +40,23 @@ def get_calibration(conn: ConnDep) -> dict[str, Any]:
 def get_whats_working(conn: ConnDep) -> dict[str, Any]:
     """Interview conversion broken down by source and role family."""
     return metrics.whats_working(conn)
+
+
+@router.get("/momentum")
+def get_momentum(
+    conn: ConnDep, target: int = 5, week_start: str | None = None
+) -> dict[str, Any]:
+    """Real weekly pace + a healthy/push/rest threshold on the applied count."""
+    start: date | None = None
+    if week_start:
+        try:
+            start = date.fromisoformat(week_start)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="week_start must be YYYY-MM-DD") from e
+    return metrics.momentum(conn, week_start=start, target=target)
+
+
+@router.get("/rejection-reasons")
+def get_rejection_reasons(conn: ConnDep) -> dict[str, int]:
+    """Captured close-reason categories (uncaptured reads as 'unknown')."""
+    return metrics.rejection_reasons(conn)

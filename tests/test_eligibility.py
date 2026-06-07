@@ -94,8 +94,37 @@ def test_snapshot_predicted_fit_on_application(tmp_path: Path) -> None:
     jid = _seed(conn, score=0.83, score_breakdown_json='{"band": "strong"}')
     app_id = repo.create_application(conn, jid, stage="saved")
     row = conn.execute(
-        "SELECT predicted_band, predicted_score FROM application WHERE id = ?", (app_id,)
+        "SELECT predicted_band, predicted_score, applied_at, next_action FROM application WHERE id = ?",
+        (app_id,),
     ).fetchone()
     assert row["predicted_band"] == "strong"
     assert row["predicted_score"] == 0.83
+    # Saved (not applied): no applied_at, no follow-up reminder yet.
+    assert row["applied_at"] is None
+    assert row["next_action"] is None
+    conn.close()
+
+
+def test_create_application_at_applied_stamps_followup_reminder(tmp_path: Path) -> None:
+    """The Apply-packet submit creates at `applied` with applied_at + a +7d
+    follow-up reminder (a due-date computed on read, not a scheduled task)."""
+    from datetime import date, timedelta
+
+    conn = connect(tmp_path / "e.db")
+    migrate(conn)
+    jid = _seed(conn, score=0.7, score_breakdown_json='{"band": "stretch"}')
+    app_id = repo.create_application(conn, jid, stage="applied")
+    row = conn.execute(
+        "SELECT stage, applied_at, next_action, next_action_kind, next_action_at "
+        "FROM application WHERE id = ?",
+        (app_id,),
+    ).fetchone()
+    assert row["stage"] == "applied"
+    assert row["applied_at"] == date.today().isoformat()
+    assert row["next_action_kind"] == "followup"
+    assert row["next_action_at"] == (date.today() + timedelta(days=7)).isoformat()
+    ev = conn.execute(
+        "SELECT kind FROM app_event WHERE application_id = ?", (app_id,)
+    ).fetchone()
+    assert ev["kind"] == "applied"
     conn.close()

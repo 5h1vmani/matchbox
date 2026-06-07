@@ -104,54 +104,9 @@ def test_re_render_cv_missing_cv_json_raises(tmp_path: Path) -> None:
         re_render_cv(run_id="no-such", job_id=1, palette="slate", font="source-serif")
 
 
-def test_restyle_route_re_renders(client: TestClient, tmp_path: Path) -> None:
-    run_id, job_id = _seed_run_with_finished_cv(tmp_path)
-    # Write a status.json so the card thinks cv is done.
-    (tmp_path / "runs" / run_id / "status.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "run_id": run_id,
-                "status": "done",
-                "jobs": [
-                    {
-                        "job_id": job_id,
-                        "cv_status": "done",
-                        "cover_status": "skipped",
-                        "cv_path": f"runs/{run_id}/output/{job_id}/cv.pdf",
-                        "cover_path": None,
-                    }
-                ],
-            }
-        )
-    )
-    r = client.post(
-        f"/review-run/{run_id}/jobs/{job_id}/restyle",
-        data={"palette": "forest", "font": "inter"},
-    )
-    assert r.status_code == 200
-    assert (tmp_path / "runs" / run_id / "output" / str(job_id) / "cv.pdf").exists()
-
-    # The run_job row was updated
-    import os
-
-    conn = connect(Path(os.environ["MATCHBOX_DB"]))
-    row = conn.execute(
-        "SELECT palette, font FROM run_job WHERE run_id = ? AND job_id = ?",
-        (run_id, job_id),
-    ).fetchone()
-    assert row["palette"] == "forest"
-    assert row["font"] == "inter"
-    conn.close()
-
-
-def test_restyle_route_rejects_unknown_palette(client: TestClient, tmp_path: Path) -> None:
-    run_id, job_id = _seed_run_with_finished_cv(tmp_path)
-    r = client.post(
-        f"/review-run/{run_id}/jobs/{job_id}/restyle",
-        data={"palette": "rainbow", "font": "inter"},
-    )
-    assert r.status_code == 400
+# The Jinja restyle route was archived in the all-React migration; the palette/
+# font re-render lives in assemble.re_render_cv, covered by test_drift_detection
+# and test_re_render_cv_changes_palette below.
 
 
 def test_assemble_cover_renders_pdf(tmp_path: Path) -> None:
