@@ -173,7 +173,7 @@ def select_components(
         scores = bm25.score(_query_for_requirement(r))
         order = sorted(
             range(len(components)),
-            key=lambda i: (scores[i] if i < len(scores) else 0.0),
+            key=lambda i: scores[i] if i < len(scores) else 0.0,
             reverse=True,
         )
         sparse_rankings_by_req.append(order)
