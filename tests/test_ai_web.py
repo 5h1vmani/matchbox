@@ -58,8 +58,13 @@ def test_voice_check_passes_clean_prose_and_flags_banned_word(client: TestClient
 def test_voice_check_word_count_is_scope_specific(client: TestClient) -> None:
     text = "Led the migration of our billing system to a new ledger."  # 11 words
     # The CV-bullet tier accepts 8-25 words; the cover tier requires 40+.
-    assert client.post("/api/voice-check", json={"text": text, "scope": "cover"}).json()["ok"] is False
-    assert client.post("/api/voice-check", json={"text": text, "scope": "cv_bullet"}).json()["ok"] is True
+    assert (
+        client.post("/api/voice-check", json={"text": text, "scope": "cover"}).json()["ok"] is False
+    )
+    assert (
+        client.post("/api/voice-check", json={"text": text, "scope": "cv_bullet"}).json()["ok"]
+        is True
+    )
 
 
 # ── library facts: verified grounding ────────────────────────────────────────────
@@ -164,7 +169,7 @@ class _FakeClient:
 async def test_relay_normalizes_anthropic_sse(monkeypatch: pytest.MonkeyPatch) -> None:
     lines = [
         'data: {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "Hello "}}',
-        'event: ping',
+        "event: ping",
         'data: {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "world"}}',
         "data: [DONE]",
     ]

@@ -33,7 +33,9 @@ def test_sponsorship_is_high_precision() -> None:
     assert enrich.parse_eligibility("We are unable to sponsor visas")["sponsorship"] == "none"
     assert enrich.parse_eligibility("No visa sponsorship available")["sponsorship"] == "none"
     assert enrich.parse_eligibility("Visa sponsorship is available")["sponsorship"] == "offered"
-    assert enrich.parse_eligibility("We will sponsor the right candidate")["sponsorship"] == "offered"
+    assert (
+        enrich.parse_eligibility("We will sponsor the right candidate")["sponsorship"] == "offered"
+    )
     # Silent JD -> unknown, never 'none' (would wrongly hide a viable job).
     assert enrich.parse_eligibility("Great team, great mission.")["sponsorship"] == "unknown"
 
@@ -75,6 +77,11 @@ def test_enrich_record_shape() -> None:
     assert rec["sponsorship"] == "offered"
     assert rec["role_family"] == "ml"
     assert set(rec) == {
-        "seniority", "min_years_exp", "role_family", "sponsorship",
-        "citizenship_required", "clearance_required", "remote_scope",
+        "seniority",
+        "min_years_exp",
+        "role_family",
+        "sponsorship",
+        "citizenship_required",
+        "clearance_required",
+        "remote_scope",
     }

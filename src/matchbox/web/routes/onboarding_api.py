@@ -45,7 +45,9 @@ async def upload(files: Annotated[list[UploadFile], File(...)]) -> list[dict[str
             continue
         ext = Path(upload_file.filename).suffix.lower()
         if ext not in ALLOWED_EXTS:
-            raise HTTPException(status_code=415, detail=f"file type not accepted: {ext or '<none>'}")
+            raise HTTPException(
+                status_code=415, detail=f"file type not accepted: {ext or '<none>'}"
+            )
         target = onboarding.INBOX_DIR / _sanitize(upload_file.filename)
         written = 0
         with target.open("wb") as fh:

@@ -36,7 +36,7 @@ So the executor does not re-discover it.
 
 ## 1. Target architecture
 
-```
+```text
                          ┌──────────────────────────────────────────────┐
                          │   FastAPI (localhost, single process)         │
    Browser               │                                              │
@@ -148,6 +148,7 @@ CREATE TABLE app_event (   -- the history timeline; every action appends one
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 ```
+
 * Keep the old `status`/`notes` columns through v5 for rollback safety; drop in a later migration once the SPA is the only writer.
 * **Derive, never persist:** `stale`, due-buckets, Today selection, monogram colors — computed exactly as the prototype does (porting `data.js`/`ui.jsx` logic to the client or a shared util). Production stores **ISO timestamps**; the API derives `daysAgo` (or the client does).
 * **Business rules** to port verbatim from the handoff §07: `FLOW`, `isStale` (active stage ∧ no action due ≤3 ∧ `updated ≥ 11d`), due buckets, Today ranking. Put them in **one shared module** reused by API and client so they cannot drift.
@@ -182,14 +183,15 @@ CREATE TABLE job_state (        -- per-user view of a shared job posting
 
 New `src/matchbox/web/routes/api.py` (prefix `/api`). Returns JSON, not HTML. Active user from `request.state.profile`.
 
-**Reads**
+**Reads:**
+
 * `GET /api/applications` → `Application[]` (joined posting + pipeline + notes/contacts/events, ISO dates). Client derives `stale`/Today/Insights per the shared rules module.
 * `GET /api/profile` → `{name, initials}` for the greeting + user chip.
 * `GET /api/users`, `POST /api/users/switch` (§3).
 
 **Mutations — one per store action (handoff §06). Each: update row, set `updated_at=now`, append an `app_event`, return the updated `Application`.**
 
-```
+```text
 POST /api/applications/{id}/advance            advanceStage → next in FLOW
 POST /api/applications/{id}/stage   {stage}    setStage (incl. close/reopen)
 POST /api/applications/{id}/snooze  {days=2}    push the action's due out
@@ -216,7 +218,7 @@ The largest net-new backend piece. Removes the manual copy-paste while **preserv
 1. `POST /api/runs` → existing `create_run()` writes `work-queue.json` + `run`/`run_job` rows (status `queued`). Persist the **theme** alongside `palette/font` (§10).
 2. **AgentRunner** (new `src/matchbox/agent/runner.py`) picks it up and spawns Claude Code **headless**:
 
-   ```
+   ```bash
    claude -p "process run <run-id>"  \
      --output-format stream-json --permission-mode acceptEdits \
      --add-dir <project_root>
@@ -228,6 +230,7 @@ The largest net-new backend piece. Removes the manual copy-paste while **preserv
 4. The runner tails `status.json` (and/or the stream), updates `run.status`, and streams progress to the SPA via **SSE** `GET /api/runs/{id}/events`; the Today/Tracker show live run state.
 
 **Must address (call out in PR):**
+
 * **BYOK key** management (a `setting` row or env); fail clearly if absent.
 * **Permissions/sandbox** — headless Claude runs tools unattended. Scope `--allowedTools` to the matchbox CLIs + file writes under `runs/`; avoid blanket `--dangerously-skip-permissions`. This is a **security surface** — review before merge.
 * **Single-flight queue** — one run at a time per process; queue the rest; surface `queued|running|done|error`.
@@ -274,6 +277,7 @@ Revive themeability in the **HTML/weasyprint** path (the one we ship), modelled 
 ## 11. Scope gaps (v1 polish phase) & out-of-scope
 
 Designers flagged as **not built** (handoff §11/§15) — schedule, don't assume:
+
 * **Add / import application** form (manual + paste-URL parse). Top of funnel; bridges discovery → `saved`.
 * **First-run (zero apps) / loading / error** states for every surface.
 * **Dark mode** — tokens support `light-dark()` but screens weren't designed dark; schedule a dark pass if it ships.

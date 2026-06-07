@@ -21,7 +21,10 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
 
 def test_library_crud_roundtrip(client: TestClient) -> None:
     assert client.get("/api/library").json() == {
-        "experiences": [], "projects": [], "skills": [], "summaries": []
+        "experiences": [],
+        "projects": [],
+        "skills": [],
+        "summaries": [],
     }
     exp = client.post("/api/library/experiences", json={"company": "Acme", "role": "Eng"}).json()
     b = client.post(
@@ -33,12 +36,20 @@ def test_library_crud_roundtrip(client: TestClient) -> None:
         f"/api/library/tags/bullet/{b['id']}", json={"facet": "tech", "value": "python"}
     ).json()
     assert tag["facet"] == "tech"
-    assert client.post(
-        f"/api/library/tags/bullet/{b['id']}", json={"facet": "bogus", "value": "x"}
-    ).status_code == 400
+    assert (
+        client.post(
+            f"/api/library/tags/bullet/{b['id']}", json={"facet": "bogus", "value": "x"}
+        ).status_code
+        == 400
+    )
     assert client.delete(f"/api/library/tags/bullet/{b['id']}/{tag['id']}").status_code == 200
     # Patch + verify the bullet.
-    assert client.patch(f"/api/library/bullets/{b['id']}", json={"facts_verified": True}).json()["verified"] is True
+    assert (
+        client.patch(f"/api/library/bullets/{b['id']}", json={"facts_verified": True}).json()[
+            "verified"
+        ]
+        is True
+    )
     # Skills uniqueness.
     client.post("/api/library/skills", json={"name": "Python"})
     assert client.post("/api/library/skills", json={"name": "Python"}).status_code == 409
@@ -71,13 +82,22 @@ def test_sources_add_toggle_delete(client: TestClient) -> None:
     ).json()
     assert src["enabled"] == 1
     # Duplicate slug -> 409; unsupported type -> 400.
-    assert client.post(
-        "/api/sources", json={"ats_type": "greenhouse", "slug": "acme", "company": "Acme"}
-    ).status_code == 409
-    assert client.post(
-        "/api/sources", json={"ats_type": "nope", "slug": "x", "company": "Y"}
-    ).status_code == 400
+    assert (
+        client.post(
+            "/api/sources", json={"ats_type": "greenhouse", "slug": "acme", "company": "Acme"}
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            "/api/sources", json={"ats_type": "nope", "slug": "x", "company": "Y"}
+        ).status_code
+        == 400
+    )
     assert client.post(f"/api/sources/{src['id']}/toggle").json()["enabled"] == 0
-    assert client.post("/api/sources/adzuna", json={"app_id": "a", "app_key": "k"}).json()["ok"] == "true"
+    assert (
+        client.post("/api/sources/adzuna", json={"app_id": "a", "app_key": "k"}).json()["ok"]
+        == "true"
+    )
     assert client.delete(f"/api/sources/{src['id']}").status_code == 200
     assert client.get("/api/sources").json()["sources"] == []

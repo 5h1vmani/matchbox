@@ -29,7 +29,9 @@ def _app(conn: sqlite3.Connection, app_id: int, stage: str = "applied") -> None:
         "INSERT INTO job (id, company, title, url, jd_text) VALUES (?, ?, 'R', ?, 'jd')",
         (app_id, f"Co{app_id}", f"http://x/{app_id}"),
     )
-    conn.execute("INSERT INTO application (id, job_id, stage) VALUES (?, ?, ?)", (app_id, app_id, stage))
+    conn.execute(
+        "INSERT INTO application (id, job_id, stage) VALUES (?, ?, ?)", (app_id, app_id, stage)
+    )
 
 
 def _event(conn: sqlite3.Connection, app_id: int, kind: str, when: date) -> None:

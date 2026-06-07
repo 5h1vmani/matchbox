@@ -18,18 +18,18 @@ End goal: a job that fits the user's goals. Not more applications. More
 
 ## Locked decisions (this session)
 
-- **Generic, not personal.** Will be open-sourced.
-- **Engine first on the current CLI + agent model.** Build and prove the
+* **Generic, not personal.** Will be open-sourced.
+* **Engine first on the current CLI + agent model.** Build and prove the
   backend on what we have. Package a one-click **desktop app with a
   BYO-API-key** screen for non-technical users **only once the engine is
   proven and consistent.** "Average user" is a packaging phase, not a
   constraint on the engine.
-- **India first**, then global-remote, then EU, then US. But the data
+* **India first**, then global-remote, then EU, then US. But the data
   model is **country-agnostic**: every job carries a `country` and a
   `remote` flag, and the user filters ("Remote — India", "On-site
   Bangalore", "Remote — US"). Only the source integrations are sequenced.
-- **Full-time roles first.** Freelance/gig later.
-- **Local-first, BYO-intelligence.** The app holds no model and no key by
+* **Full-time roles first.** Freelance/gig later.
+* **Local-first, BYO-intelligence.** The app holds no model and no key by
   default. The LLM is the user's agent now; their pasted API key later.
 
 ## Target user
@@ -59,21 +59,21 @@ The expensive, naive design calls an LLM to draft a CV per job. Two
 backend-engineer CVs are ~90% identical, so that is mostly wasted spend.
 Instead:
 
-- **Draft a stable pool of truthful sentences once** (at onboarding, and
+* **Draft a stable pool of truthful sentences once** (at onboarding, and
   incrementally as the user adds history). Each fact is a `claim`; each
   claim has one or more pre-drafted **phrasings** (`rendering` rows) —
   e.g. one leading with "AWS", one with "infrastructure as code", one
   tighter for space. This is the `claim -> rendering` graph already in the
   schema (migration 002); the reuse model is the use case it was built
   for.
-- **Per job: no LLM.** An algorithm selects the matching phrasings and
+* **Per job: no LLM.** An algorithm selects the matching phrasings and
   aligns keywords. Cost per job is fractions of a cent.
-- **Truth-constrained keyword alignment.** Safe synonym swaps only
+* **Truth-constrained keyword alignment.** Safe synonym swaps only
   (`k8s` = `kubernetes`, `postgres` = `postgresql`). A different cloud is
   **not** a synonym: if a JD wants Azure and the user has only AWS, that
   is a reported **gap**, never an injected keyword. The user's verified
   facts are the truth boundary.
-- **LLM only on a genuine gap** — when a verified fact truly matches a JD
+* **LLM only on a genuine gap** — when a verified fact truly matches a JD
   term but no phrasing carries it, call the LLM **once** to draft a new
   truthful phrasing, which then joins the pool forever.
 
@@ -87,22 +87,23 @@ A pluggable `source` layer. Every job normalized to: company, title,
 2026-05-29:
 
 **Integrate first (clean ToS):**
-- **ATS pollers** (Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee)
+
+* **ATS pollers** (Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee)
   — public, no auth, built. India *tech/startup* + global. The spine.
   Add **curated company seed lists** so it returns jobs without the user
   naming companies.
-- **Himalayas** — public no-auth remote board; terms explicitly permit
+* **Himalayas** — public no-auth remote board; terms explicitly permit
   powering search experiences and AI agents; has an India filter. Best
   terms of the remote group. Honor attribution + rate limits.
-- **Adzuna** — free **BYO-key**; strongest verified **India** coverage
+* **Adzuna** — free **BYO-key**; strongest verified **India** coverage
   (`in`, INR) plus EU/US/remote. Requires "Jobs by Adzuna" attribution
   and a link back. (See licence note below.)
-- **Careerjet** — free BYO affiliate key; broad India + global; official
+* **Careerjet** — free BYO affiliate key; broad India + global; official
   Python client. Affiliate model aligns with link-back behavior.
-- **Remotive** — public no-auth remote backfill; **<=4 calls/day**,
+* **Remotive** — public no-auth remote backfill; **<=4 calls/day**,
   attribution required, no re-publishing (fine for a local single-user
   tool).
-- Optional 6th: **The Muse** (free key, curated, has India).
+* Optional 6th: **The Muse** (free key, curated, has India).
 
 **Universal paste-a-link / paste-a-JD** — first-class. The catch-all for
 everything without a legal API: LinkedIn, Indeed, Google for Jobs,
@@ -139,19 +140,19 @@ Weights live in `rubric.json`, tuned on the eval harness.
 
 ## Deferred / non-goals
 
-- Desktop packaging + BYO-key UI — after the engine is proven.
-- Full evidence graph (STAR, evidence, defensibility) — only `claim` +
+* Desktop packaging + BYO-key UI — after the engine is proven.
+* Full evidence graph (STAR, evidence, defensibility) — only `claim` +
   `rendering` are needed now.
-- MCP / agent-native surface — after the core loop works.
-- Gig/freelance platforms (Upwork/Contra/Toptal) — OAuth-gated or no API;
+* MCP / agent-native surface — after the core loop works.
+* Gig/freelance platforms (Upwork/Contra/Toptal) — OAuth-gated or no API;
   later. Paste-a-link covers them meanwhile.
-- Scraping anything that forbids it. Permanent non-goal.
-- Learning-to-rank / auto-apply. Permanent non-goals (measurement only).
+* Scraping anything that forbids it. Permanent non-goal.
+* Learning-to-rank / auto-apply. Permanent non-goals (measurement only).
 
 ## Open verification items
 
-- **Jooble** and **Findwork** — ToS and India coverage unverified
+* **Jooble** and **Findwork** — ToS and India coverage unverified
   (signup/bot-gated). Do not integrate until someone reads the terms.
-- **Adzuna licence** — free/personal use is fine for a local OSS tool; if
+* **Adzuna licence** — free/personal use is fine for a local OSS tool; if
   Matchbox is ever monetized, their "commercial aggregation" clause may
   require a licence. Revisit only on monetization.

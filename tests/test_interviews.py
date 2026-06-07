@@ -21,9 +21,7 @@ def _app(conn: sqlite3.Connection) -> int:
         "INSERT INTO job (id, company, title, url, jd_text) "
         "VALUES (1, 'Acme', 'Engineer', 'http://x/1', 'jd')"
     )
-    conn.execute(
-        "INSERT INTO application (id, job_id, stage) VALUES (1, 1, 'phone')"
-    )
+    conn.execute("INSERT INTO application (id, job_id, stage) VALUES (1, 1, 'phone')")
     return 1
 
 
@@ -64,7 +62,14 @@ def test_round_and_debrief_roundtrip(conn: sqlite3.Connection) -> None:
 
     # prior_debriefs is the assisted context for the next prep.
     pri = repo.prior_debriefs(conn, app_id)
-    assert pri == [{"kind": "recruiter", "focus": "comp + logistics", "sentiment": "mixed", "notes": "revised read"}]
+    assert pri == [
+        {
+            "kind": "recruiter",
+            "focus": "comp + logistics",
+            "sentiment": "mixed",
+            "notes": "revised read",
+        }
+    ]
 
 
 def test_invalid_kind_and_sentiment_rejected(conn: sqlite3.Connection) -> None:
@@ -77,9 +82,7 @@ def test_invalid_kind_and_sentiment_rejected(conn: sqlite3.Connection) -> None:
 
 
 def test_routes_and_prep_carries_prior_debrief(client: TestClient) -> None:
-    client.post(
-        "/api/agent-tasks", json={"kind": "noop"}
-    )  # warm the lazy migrate
+    client.post("/api/agent-tasks", json={"kind": "noop"})  # warm the lazy migrate
     # Seed an application directly through the same DB the client uses.
     import os
 
@@ -88,12 +91,16 @@ def test_routes_and_prep_carries_prior_debrief(client: TestClient) -> None:
     _app(conn)
     conn.close()
 
-    rid = client.post("/api/applications/1/rounds", json={"kind": "hm", "focus": "system design"}).json()["id"]
+    rid = client.post(
+        "/api/applications/1/rounds", json={"kind": "hm", "focus": "system design"}
+    ).json()["id"]
     assert client.get("/api/applications/1/rounds").json()[0]["kind"] == "hm"
     # Bad kind -> 400.
     assert client.post("/api/applications/1/rounds", json={"kind": "bogus"}).status_code == 400
 
-    deb = client.post(f"/api/rounds/{rid}/debrief", json={"sentiment": "tough", "notes": "deep dive"})
+    deb = client.post(
+        f"/api/rounds/{rid}/debrief", json={"sentiment": "tough", "notes": "deep dive"}
+    )
     assert deb.json()["status"] == "done"
     assert deb.json()["debrief"]["sentiment"] == "tough"
     assert client.post("/api/rounds/9999/debrief", json={"sentiment": "good"}).status_code == 404

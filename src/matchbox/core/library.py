@@ -442,8 +442,6 @@ def verified_facts(conn: sqlite3.Connection, *, verified: bool = True) -> dict[s
     return {
         "verified_only": verified,
         "experiences": experiences,
-        "projects": [
-            {"id": p.id, "name": p.name, "text": p.text, "url": p.url} for p in projects
-        ],
+        "projects": [{"id": p.id, "name": p.name, "text": p.text, "url": p.url} for p in projects],
         "skills": [{"name": s.name, "category": s.category} for s in list_skills(conn)],
     }

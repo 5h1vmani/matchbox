@@ -70,9 +70,7 @@ def create(
 
 def get(conn: sqlite3.Connection, artifact_id: int) -> dict[str, Any] | None:
     """Fetch a single artifact by id, or None if not found."""
-    row = conn.execute(
-        "SELECT * FROM artifact WHERE id = ?", (artifact_id,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM artifact WHERE id = ?", (artifact_id,)).fetchone()
     return serialize(row) if row else None
 
 

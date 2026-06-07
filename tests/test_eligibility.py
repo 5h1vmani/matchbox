@@ -123,8 +123,6 @@ def test_create_application_at_applied_stamps_followup_reminder(tmp_path: Path) 
     assert row["applied_at"] == date.today().isoformat()
     assert row["next_action_kind"] == "followup"
     assert row["next_action_at"] == (date.today() + timedelta(days=7)).isoformat()
-    ev = conn.execute(
-        "SELECT kind FROM app_event WHERE application_id = ?", (app_id,)
-    ).fetchone()
+    ev = conn.execute("SELECT kind FROM app_event WHERE application_id = ?", (app_id,)).fetchone()
     assert ev["kind"] == "applied"
     conn.close()

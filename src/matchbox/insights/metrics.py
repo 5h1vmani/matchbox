@@ -102,11 +102,7 @@ def reached_stage_for(conn: sqlite3.Connection) -> dict[int, str]:
             best[app_id] = max(best[app_id], idx)
 
     # Translate back to stage names; drop apps that never reached any rung.
-    return {
-        app_id: STAGE_LADDER[idx]
-        for app_id, idx in best.items()
-        if idx >= 0
-    }
+    return {app_id: STAGE_LADDER[idx] for app_id, idx in best.items() if idx >= 0}
 
 
 # ── public analytics functions ────────────────────────────────────────────────
@@ -168,9 +164,7 @@ def calibration(conn: sqlite3.Connection) -> dict[str, Any]:
         totals[band] = totals.get(band, 0) + 1
         # Did this app ever reach phone or beyond?
         furthest = stage_map.get(app_id)
-        reached_interview = (
-            furthest is not None and _LADDER_IDX.get(furthest, -1) >= phone_idx
-        )
+        reached_interview = furthest is not None and _LADDER_IDX.get(furthest, -1) >= phone_idx
         if reached_interview:
             interviews[band] = interviews.get(band, 0) + 1
 
@@ -209,9 +203,7 @@ def whats_working(conn: sqlite3.Connection) -> dict[str, Any]:
         """
     ).fetchall()
 
-    def _tally(
-        groups: dict[str, dict[str, int]], key: str, app_id: int
-    ) -> None:
+    def _tally(groups: dict[str, dict[str, int]], key: str, app_id: int) -> None:
         g = groups.setdefault(key, {"total": 0, "interviews": 0})
         g["total"] += 1
         furthest = stage_map.get(app_id)
@@ -328,21 +320,9 @@ def summary(conn: sqlite3.Connection) -> dict[str, Any]:
     accepted_idx = _LADDER_IDX["accepted"]
 
     total_apps = conn.execute("SELECT COUNT(*) FROM application").fetchone()[0] or 0
-    n_interviews = sum(
-        1
-        for s in stage_map.values()
-        if _LADDER_IDX.get(s, -1) >= phone_idx
-    )
-    n_offers = sum(
-        1
-        for s in stage_map.values()
-        if _LADDER_IDX.get(s, -1) >= offer_idx
-    )
-    n_accepted = sum(
-        1
-        for s in stage_map.values()
-        if _LADDER_IDX.get(s, -1) >= accepted_idx
-    )
+    n_interviews = sum(1 for s in stage_map.values() if _LADDER_IDX.get(s, -1) >= phone_idx)
+    n_offers = sum(1 for s in stage_map.values() if _LADDER_IDX.get(s, -1) >= offer_idx)
+    n_accepted = sum(1 for s in stage_map.values() if _LADDER_IDX.get(s, -1) >= accepted_idx)
 
     return {
         "totals": {

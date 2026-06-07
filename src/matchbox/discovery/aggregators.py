@@ -136,10 +136,23 @@ def _as_list(data: Any, key: str, source: str) -> list[dict[str, Any]]:
 
 
 _ADZUNA_CURRENCY = {
-    "in": "INR", "gb": "GBP", "us": "USD", "au": "AUD", "ca": "CAD",
-    "nz": "NZD", "sg": "SGD", "za": "ZAR", "pl": "PLN", "br": "BRL",
-    "mx": "MXN", "de": "EUR", "fr": "EUR", "nl": "EUR", "at": "EUR",
-    "it": "EUR", "es": "EUR",
+    "in": "INR",
+    "gb": "GBP",
+    "us": "USD",
+    "au": "AUD",
+    "ca": "CAD",
+    "nz": "NZD",
+    "sg": "SGD",
+    "za": "ZAR",
+    "pl": "PLN",
+    "br": "BRL",
+    "mx": "MXN",
+    "de": "EUR",
+    "fr": "EUR",
+    "nl": "EUR",
+    "at": "EUR",
+    "it": "EUR",
+    "es": "EUR",
 }
 
 

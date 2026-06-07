@@ -156,9 +156,7 @@ def load_roles(conn: sqlite3.Connection, today: date | None = None) -> list[dict
 
 def load_watchlist(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     """Watched companies + a live count of their open, eligible, scored roles."""
-    rows = conn.execute(
-        "SELECT company, note, status FROM watchlist ORDER BY id DESC"
-    ).fetchall()
+    rows = conn.execute("SELECT company, note, status FROM watchlist ORDER BY id DESC").fetchall()
     out: list[dict[str, Any]] = []
     for w in rows:
         open_roles = _open_eligible_count(conn, w["company"])
@@ -193,9 +191,7 @@ def _open_eligible_count(conn: sqlite3.Connection, company: str) -> int:
 
 
 def raw(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:
-    row: sqlite3.Row | None = conn.execute(
-        _ROLE_SELECT + " AND j.id = ?", (job_id,)
-    ).fetchone()
+    row: sqlite3.Row | None = conn.execute(_ROLE_SELECT + " AND j.id = ?", (job_id,)).fetchone()
     return row
 
 
@@ -203,9 +199,7 @@ def load_one(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] | None:
     row = raw(conn, job_id)
     if row is None:
         return None
-    return serialize(
-        row, work_auth=_work_auth(conn), coverage=_coverage_for_job(conn, job_id)
-    )
+    return serialize(row, work_auth=_work_auth(conn), coverage=_coverage_for_job(conn, job_id))
 
 
 def job_facts(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:
@@ -221,9 +215,7 @@ def job_facts(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row | None:
 
 def set_decision(conn: sqlite3.Connection, job_id: int, decision: str | None) -> None:
     with transaction(conn):
-        conn.execute(
-            "UPDATE job SET discovery_decision = ? WHERE id = ?", (decision, job_id)
-        )
+        conn.execute("UPDATE job SET discovery_decision = ? WHERE id = ?", (decision, job_id))
 
 
 def set_skipped(conn: sqlite3.Connection, job_id: int, when: str) -> None:
@@ -281,7 +273,9 @@ def create_application(
     na_kind, na_label, na_due, na_time = action if action else (None, None, None, None)
     na_at = tracker_rules.date_in(na_due) if action else None
     ev_kind, ev_text = (
-        ("applied", "Applied from packet") if stage == "applied" else ("saved", "Saved from discovery")
+        ("applied", "Applied from packet")
+        if stage == "applied"
+        else ("saved", "Saved from discovery")
     )
 
     with transaction(conn):
@@ -294,8 +288,16 @@ def create_application(
                     strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, ?, ?, ?, ?, ?)
             """,
             (
-                job_id, run_id, stage, applied_at, predicted_band, predicted_score,
-                na_label, na_kind, na_at, na_time,
+                job_id,
+                run_id,
+                stage,
+                applied_at,
+                predicted_band,
+                predicted_score,
+                na_label,
+                na_kind,
+                na_at,
+                na_time,
             ),
         )
         app_id = int(cur.lastrowid or 0)

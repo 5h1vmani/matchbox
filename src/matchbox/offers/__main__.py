@@ -57,7 +57,9 @@ def main(argv: list[str] | None = None) -> int:
     # benchmark
     pb = sub.add_parser("benchmark", help="Benchmark a base salary against your job pool.")
     pb.add_argument("--base", type=float, required=True, help="Base salary to benchmark.")
-    pb.add_argument("--role-family", dest="role_family", default=None, help="Filter by role family.")
+    pb.add_argument(
+        "--role-family", dest="role_family", default=None, help="Filter by role family."
+    )
     pb.add_argument("--currency", default=None, help="Filter by currency.")
 
     args = p.parse_args(argv)

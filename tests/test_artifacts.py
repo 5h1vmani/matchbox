@@ -55,9 +55,7 @@ def test_create_prep_body_and_list(tmp_path: Path) -> None:
     assert a["status"] == "draft"
 
     # has_draft must NOT be set for 'prep'
-    row = conn.execute(
-        "SELECT has_draft FROM application WHERE id = ?", (app_id,)
-    ).fetchone()
+    row = conn.execute("SELECT has_draft FROM application WHERE id = ?", (app_id,)).fetchone()
     assert row["has_draft"] == 0
 
     conn.close()
@@ -70,9 +68,7 @@ def test_create_followup_sets_has_draft(tmp_path: Path) -> None:
 
     repo.create(conn, app_id, "followup", body="Thanks for the chat.")
 
-    row = conn.execute(
-        "SELECT has_draft FROM application WHERE id = ?", (app_id,)
-    ).fetchone()
+    row = conn.execute("SELECT has_draft FROM application WHERE id = ?", (app_id,)).fetchone()
     assert row["has_draft"] == 1
 
     conn.close()
@@ -85,9 +81,7 @@ def test_create_thankyou_sets_has_draft(tmp_path: Path) -> None:
 
     repo.create(conn, app_id, "thankyou", body="Thank you for your time.")
 
-    row = conn.execute(
-        "SELECT has_draft FROM application WHERE id = ?", (app_id,)
-    ).fetchone()
+    row = conn.execute("SELECT has_draft FROM application WHERE id = ?", (app_id,)).fetchone()
     assert row["has_draft"] == 1
 
     conn.close()
@@ -174,9 +168,7 @@ def test_create_cv_path_artifact(tmp_path: Path) -> None:
     assert a["body"] is None
     assert a["status"] == "final"
 
-    row = conn.execute(
-        "SELECT has_draft FROM application WHERE id = ?", (app_id,)
-    ).fetchone()
+    row = conn.execute("SELECT has_draft FROM application WHERE id = ?", (app_id,)).fetchone()
     assert row["has_draft"] == 0
 
     conn.close()

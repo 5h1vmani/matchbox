@@ -44,9 +44,7 @@ def test_007_backfills_company_and_dedup_key(tmp_path: Path) -> None:
         "VALUES ('Modal', 'FDE', 'Remote', 'https://j/1', 'jd')"
     )
     migrate(conn)
-    row = conn.execute(
-        "SELECT company_id, dedup_key FROM job WHERE company = 'Modal'"
-    ).fetchone()
+    row = conn.execute("SELECT company_id, dedup_key FROM job WHERE company = 'Modal'").fetchone()
     assert row[0] is not None, "company_id backfilled"
     assert row[1] == "https://j/1", "dedup_key = canonical url"
     name = conn.execute("SELECT name FROM company WHERE id = ?", (row[0],)).fetchone()[0]

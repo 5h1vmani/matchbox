@@ -263,9 +263,7 @@ def salary_display(
     """
     if salary_min is None and salary_max is None:
         return None
-    sym = _CURRENCY_SYMBOL.get(
-        (currency or "").upper(), f"{currency} " if currency else ""
-    )
+    sym = _CURRENCY_SYMBOL.get((currency or "").upper(), f"{currency} " if currency else "")
     suffix = _PERIOD_SUFFIX.get((period or "").lower(), "")
     if salary_min is not None and salary_max is not None and salary_min != salary_max:
         lo_num, lo_unit = _compact_parts(salary_min, currency)

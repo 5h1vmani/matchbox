@@ -44,7 +44,9 @@ def conn(tmp_path):
             _breakdown(
                 "strong",
                 elig={"status": "eligible", "reason": "India-based, no coding gate."},
-                dims=[{"name": "semantic_fit", "score": 0.8, "weight": 0.35, "reason": "great match"}],
+                dims=[
+                    {"name": "semantic_fit", "score": 0.8, "weight": 0.35, "reason": "great match"}
+                ],
             ),
         ),
     )
@@ -69,7 +71,7 @@ def conn(tmp_path):
 
 def test_fit_level_prefers_band_then_score():
     assert rules.fit_level(0.1, "strong") == "strong"
-    assert rules.fit_level(0.1, "stretch") == "good"   # band stretch -> design "good"
+    assert rules.fit_level(0.1, "stretch") == "good"  # band stretch -> design "good"
     assert rules.fit_level(0.1, "weak") == "stretch"
     assert rules.fit_level(0.1, "skip") == "stretch"
     # No band -> numeric thresholds.
@@ -147,10 +149,10 @@ def test_serialize_shape_and_only_scored_enter(conn):
     assert r1["fit"]["reason"] == "great match"
     assert r1["eligibility"]["status"] == "eligible"
     assert r1["remote"] is True
-    assert r1["salary"] is None             # this fixture job reported no salary
-    assert r1["coverage"] is None           # no tailoring run yet
+    assert r1["salary"] is None  # this fixture job reported no salary
+    assert r1["coverage"] is None  # no tailoring run yet
     assert r1["source"] == "Greenhouse"
-    assert r1["freshness"] == "open"        # default until verify_open runs
+    assert r1["freshness"] == "open"  # default until verify_open runs
     assert r1["mono"]["bg"].startswith("#")
     assert r1["jd"] == ["Line one."]  # the list trims the JD to the card's pulled line
     assert r1["decision"] is None
@@ -222,7 +224,10 @@ def test_tailoring_creates_run_and_application_and_returns_prompt(conn):
     assert res["run"]["prompt"] == f"process run {run_id}"
     # A run row + run_job + a tracked application linked to the run exist.
     assert conn.execute("SELECT 1 FROM run WHERE id = ?", (run_id,)).fetchone() is not None
-    assert conn.execute("SELECT 1 FROM run_job WHERE run_id = ? AND job_id = 1", (run_id,)).fetchone() is not None
+    assert (
+        conn.execute("SELECT 1 FROM run_job WHERE run_id = ? AND job_id = 1", (run_id,)).fetchone()
+        is not None
+    )
     app = conn.execute("SELECT run_id, stage FROM application WHERE job_id = 1").fetchone()
     assert app["run_id"] == run_id
     assert app["stage"] == "saved"
@@ -233,9 +238,17 @@ def test_dismiss_marks_and_dedupes_future_jobs(conn):
     service.decide(conn, 1, "dismissed")
     assert repo.load_one(conn, 1)["decision"] == "dismissed"
     # A new job at the same url (or company+title) is a dismissed duplicate.
-    assert repo.is_dismissed_duplicate(conn, url="http://x/1", company="Acme", title="Staff Engineer") is True
-    assert repo.is_dismissed_duplicate(conn, url=None, company="Acme", title="Staff Engineer") is True
-    assert repo.is_dismissed_duplicate(conn, url="http://other", company="Other", title="Role") is False
+    assert (
+        repo.is_dismissed_duplicate(conn, url="http://x/1", company="Acme", title="Staff Engineer")
+        is True
+    )
+    assert (
+        repo.is_dismissed_duplicate(conn, url=None, company="Acme", title="Staff Engineer") is True
+    )
+    assert (
+        repo.is_dismissed_duplicate(conn, url="http://other", company="Other", title="Role")
+        is False
+    )
 
 
 def test_watch_upserts_company_into_watchlist(conn):

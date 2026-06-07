@@ -106,7 +106,10 @@ def test_delete_run_removes_rows_and_dir(client: TestClient, tmp_path: Path) -> 
     assert conn.execute("SELECT 1 FROM run WHERE id = ?", (run_id,)).fetchone() is None
     assert conn.execute("SELECT 1 FROM run_job WHERE run_id = ?", (run_id,)).fetchone() is None
     # The job row stays, but its status falls back to 'scored'.
-    assert conn.execute("SELECT status FROM job WHERE id = ?", (job_id,)).fetchone()["status"] == "scored"
+    assert (
+        conn.execute("SELECT status FROM job WHERE id = ?", (job_id,)).fetchone()["status"]
+        == "scored"
+    )
     conn.close()
 
 

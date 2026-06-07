@@ -42,11 +42,7 @@ def benchmark(
         currency    str or None
         confidence  "none" | "low" | "medium"
     """
-    sql = (
-        "SELECT salary_min, salary_max, salary_currency "
-        "FROM job "
-        "WHERE salary_min IS NOT NULL"
-    )
+    sql = "SELECT salary_min, salary_max, salary_currency FROM job WHERE salary_min IS NOT NULL"
     params: list[Any] = []
     if role_family is not None:
         sql += " AND role_family = ?"

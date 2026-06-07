@@ -41,14 +41,14 @@ still failed.
 
 For every role, the system can provide:
 
-- company, title, location, remote, country, salary (sometimes), source, how
+* company, title, location, remote, country, salary (sometimes), source, how
   recently it was posted, a link to the posting, and the full job description;
-- a **fit** read — how well it matches the student's experience and targets, with
+* a **fit** read — how well it matches the student's experience and targets, with
   a one-line reason;
-- an **eligibility** read — whether they can realistically apply (geo / visa /
+* an **eligibility** read — whether they can realistically apply (geo / visa /
   lane), with an honest reason; *ineligible is common*;
-- a **freshness** read — open, closing soon (with a date), or closed;
-- optionally, how much of the role's must-haves the student's CV library already
+* a **freshness** read — open, closing soon (with a date), or closed;
+* optionally, how much of the role's must-haves the student's CV library already
   covers.
 
 You decide what to show, when, and how. Nothing here is a required field on a
@@ -60,37 +60,37 @@ Discovery does not write CVs. The student triages here, then **delegates the
 tailoring to an AI assistant** they run separately. So whatever you design, the
 student must be able to:
 
-- move a role into their **tracker** (it becomes a tracked item),
-- **dismiss** roles they will not pursue (reversibly),
-- hand a role, or a batch, to the **assistant** to tailor a CV.
+* move a role into their **tracker** (it becomes a tracked item),
+* **dismiss** roles they will not pursue (reversibly),
+* hand a role, or a batch, to the **assistant** to tailor a CV.
 
 How those are expressed is yours. The point: triage ends in a *decision* per
 role, and one of those decisions is a hand-off.
 
 ## What good looks like
 
-- A student opens this and within a couple of minutes knows what is worth
+* A student opens this and within a couple of minutes knows what is worth
   pursuing today — without feeling behind or buried.
-- They **trust the fit and eligibility calls** enough to act on them.
-- An honest "you are probably not eligible" lands as *a kindness that saved them
+* They **trust the fit and eligibility calls** enough to act on them.
+* An honest "you are probably not eligible" lands as *a kindness that saved them
   effort*, not a rejection.
-- It feels calm, honest, and unmistakably the same hand that made the tracker.
+* It feels calm, honest, and unmistakably the same hand that made the tracker.
 
 ## The hard problems — yours to solve
 
 The interesting questions. This is where your expertise is worth the most:
 
-- How should a student face a day's worth of incoming roles **without
+* How should a student face a day's worth of incoming roles **without
   overwhelm**? (A feed? A queue? Something else entirely?)
-- How do you present **fit and eligibility together, honestly** — so a role the
+* How do you present **fit and eligibility together, honestly** — so a role the
   student cannot get *saves* them time instead of discouraging them? This is the
   crux of the whole thing.
-- How does a **closing or closed** role change its treatment?
-- How does someone go from "this looks interesting" to "tailor this" with the
+* How does a **closing or closed** role change its treatment?
+* How does someone go from "this looks interesting" to "tailor this" with the
   least friction — and how does choosing a batch feel?
-- How do they **explore and filter** (fit, eligibility, geo, freshness) without
+* How do they **explore and filter** (fit, eligibility, geo, freshness) without
   it turning into a database query — and never re-see what they dismissed?
-- Is reading the full job description part of triage, or a separate, deeper
+* Is reading the full job description part of triage, or a separate, deeper
   moment?
 
 ## Voice
@@ -104,11 +104,11 @@ not "INELIGIBLE — location mismatch."
 
 ## Realities to design for
 
-- A day where almost everything is ineligible (must not feel hopeless).
-- A closed or expired role (truthful, not alarming).
-- Nothing new today.
-- First run, before any sources are connected.
-- Roles missing a salary or a clean description.
+* A day where almost everything is ineligible (must not feel hopeless).
+* A closed or expired role (truthful, not alarming).
+* Nothing new today.
+* First run, before any sources are connected.
+* Roles missing a salary or a clean description.
 
 ## Out of scope
 

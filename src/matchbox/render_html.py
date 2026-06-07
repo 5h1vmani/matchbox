@@ -84,7 +84,7 @@ def _experience_html(experiences: list[dict[str, Any]]) -> str:
         bullets = "".join(f"<li>{_esc(b)}</li>" for b in e.get("bullets", []))
         loc = e.get("location")
         loc_html = f'<div class="entry-location">{_esc(loc)}</div>' if loc else ""
-        dates = f'{_esc(e.get("start_date", ""))} to {_esc(e.get("end_date", ""))}'
+        dates = f"{_esc(e.get('start_date', ''))} to {_esc(e.get('end_date', ''))}"
         blocks.append(
             '<div class="entry"><div class="entry-header">'
             f'<div class="entry-title">{_esc(e.get("role", ""))}'
@@ -94,12 +94,14 @@ def _experience_html(experiences: list[dict[str, Any]]) -> str:
         )
     if earlier:
         parts = [
-            f'{_esc(e.get("company", ""))}, {_esc(e.get("role", ""))} '
-            f'({_esc(e.get("location", ""))}, {_esc(e.get("start_date", ""))} '
-            f'to {_esc(e.get("end_date", ""))}).'
+            f"{_esc(e.get('company', ''))}, {_esc(e.get('role', ''))} "
+            f"({_esc(e.get('location', ''))}, {_esc(e.get('start_date', ''))} "
+            f"to {_esc(e.get('end_date', ''))})."
             for e in earlier
         ]
-        blocks.append('<div class="earlier"><strong>Earlier:</strong> ' + " ".join(parts) + "</div>")
+        blocks.append(
+            '<div class="earlier"><strong>Earlier:</strong> ' + " ".join(parts) + "</div>"
+        )
     return "".join(blocks)
 
 
@@ -119,7 +121,7 @@ def cv_json_to_html(cv: dict[str, Any], *, palette: str = "slate", font: str = "
     if parts["github"]:
         links.append(f'<a href="https://{_esc(parts["github"])}">{_esc(parts["github"])}</a>')
     sep = '<span class="sep">/</span>'
-    line2 = _esc(location) + (f' {sep} {_esc(visa)}' if visa else "")
+    line2 = _esc(location) + (f" {sep} {_esc(visa)}" if visa else "")
     header = (
         '<header class="header">'
         f'<div class="name">{_esc(prof.get("name", ""))}</div>'
@@ -166,7 +168,7 @@ def cv_json_to_html(cv: dict[str, Any], *, palette: str = "slate", font: str = "
 
     skills_html = "".join(
         f'<div class="skills-row"><span class="label">{_esc(s.get("category", ""))}:</span> '
-        f'{_esc(", ".join(s.get("items", [])))}</div>'
+        f"{_esc(', '.join(s.get('items', [])))}</div>"
         for s in cv.get("skills", [])
     )
     skills = _section("Skills", skills_html)
@@ -191,7 +193,7 @@ def render_cv_pdf(
     font: str = "ibm-plex",
 ) -> None:
     """Render cv.json to a PDF via the HTML template + weasyprint."""
-    from weasyprint import HTML  # type: ignore[import-untyped]
+    from weasyprint import HTML
 
     cv = json.loads(cv_json_path.read_text(encoding="utf-8"))
     html_str = cv_json_to_html(cv, palette=palette, font=font)
@@ -288,9 +290,7 @@ def cover_data_to_html(
     # Split body on blank lines → paragraphs
     paragraphs = [p.strip() for p in body_text.split("\n\n") if p.strip()]
     body_html = (
-        '<div class="body">'
-        + "".join(f"<p>{_esc(para)}</p>" for para in paragraphs)
-        + "</div>"
+        '<div class="body">' + "".join(f"<p>{_esc(para)}</p>" for para in paragraphs) + "</div>"
     )
 
     closing = _esc(profile.get("closing", "Sincerely,"))
@@ -348,7 +348,7 @@ def render_cover_pdf(
 
     A sibling cover.html is written beside out_path for inspection.
     """
-    from weasyprint import HTML  # type: ignore[import-untyped]
+    from weasyprint import HTML
 
     if isinstance(cover_txt_path_or_text, Path):
         body_text = cover_txt_path_or_text.read_text(encoding="utf-8")

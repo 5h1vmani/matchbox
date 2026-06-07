@@ -49,7 +49,8 @@ must, in priority order:
 This is a finished identity (the user's CV, cover letter, and LinkedIn banner
 already use it). Do not invent a new palette.
 
-**Typography**
+**Typography:**
+
 * **IBM Plex Sans** — headings and body (weights 400, 500, 600).
 * **IBM Plex Mono** — eyebrows, dates, numerals, status labels (400, 600).
 * The signature treatment: **mono eyebrows** (uppercase, letter-spaced, small)
@@ -70,6 +71,7 @@ already use it). Do not invent a new palette.
 | Chip bg / text | `#f4f4f5` / `#52525b` | border `#e4e4e7` |
 
 **Semantic accents — used sparingly, as small dots/chips, never large fills:**
+
 * Offer / positive: `#15803d`
 * Needs-action / stale / overdue: `#a16207`
 * Rejected / error: `#b91c1c`
@@ -99,6 +101,7 @@ Real fields (use these names so it maps cleanly when we wire it later):
   Shown as a chip. This is the honest fit assessment for the role.
 
 **Derived fields (compute in the mockup from the above):**
+
 * `days_in_stage` — days since `applied_at`.
 * `needs_followup` — `next_action_at` is today or earlier.
 * `is_stale` — status is `applied`, no response, and `applied_at` > 14 days ago.
@@ -182,6 +185,7 @@ group empty to show that empty state honestly.
 
 Read these for the live tokens and data model, then still deliver the standalone
 mockup:
+
 * `src/matchbox/web/templates/base.html.j2` — Tailwind theme tokens, fonts.
 * `src/matchbox/templates/html/cv.html` — the CV's exact design tokens (the look
   to match).

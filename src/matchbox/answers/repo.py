@@ -49,9 +49,7 @@ def get(conn: sqlite3.Connection, answer_id: int) -> dict[str, Any] | None:
     return serialize(row) if row else None
 
 
-def list_all(
-    conn: sqlite3.Connection, *, verified: bool | None = None
-) -> list[dict[str, Any]]:
+def list_all(conn: sqlite3.Connection, *, verified: bool | None = None) -> list[dict[str, Any]]:
     """All answers, newest first. `verified` filters by the gate when set."""
     sql = "SELECT * FROM answer"
     params: list[Any] = []

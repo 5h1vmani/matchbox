@@ -35,7 +35,9 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
 
 
 def test_dal_crud_verify_and_usage(conn: sqlite3.Connection) -> None:
-    aid = repo.create(conn, question="Why us?", answer="I admire the ledger work.", category="why-us")
+    aid = repo.create(
+        conn, question="Why us?", answer="I admire the ledger work.", category="why-us"
+    )
     row = repo.get(conn, aid)
     assert row is not None
     assert row["verified"] is False  # lands unverified, like a bullet
@@ -66,8 +68,12 @@ def test_ingest_answers_land_unverified(conn: sqlite3.Connection) -> None:
     payload = {
         "schema_version": 1,
         "answers": [
-            {"question": "Why us?", "answer": "The mission fits.", "category": "why-us",
-             "source_file": "inbox/notes.md"},
+            {
+                "question": "Why us?",
+                "answer": "The mission fits.",
+                "category": "why-us",
+                "source_file": "inbox/notes.md",
+            },
         ],
     }
     counts = ingest(payload, conn)

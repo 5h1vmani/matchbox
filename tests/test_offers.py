@@ -15,6 +15,7 @@ from matchbox.offers.benchmark import benchmark
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+
 def _db(tmp_path: Path):  # noqa: ANN202 - test helper
     conn = connect(tmp_path / "offers_test.db")
     migrate(conn)
@@ -58,6 +59,7 @@ def _seed_application(conn, job_id: int) -> int:
 
 
 # ── lifecycle tests ───────────────────────────────────────────────────────────
+
 
 def test_create_list_set_status(tmp_path: Path) -> None:
     conn = _db(tmp_path)
@@ -157,6 +159,7 @@ def test_set_status_invalid_raises(tmp_path: Path) -> None:
     oid = repo.create(conn, app_id, base=80_000.0)
 
     import pytest
+
     with pytest.raises(ValueError, match="invalid status"):
         repo.set_status(conn, oid, "pending")  # not a valid offer status
 
@@ -164,6 +167,7 @@ def test_set_status_invalid_raises(tmp_path: Path) -> None:
 
 
 # ── benchmark: empty pool ─────────────────────────────────────────────────────
+
 
 def test_benchmark_empty(tmp_path: Path) -> None:
     conn = _db(tmp_path)
@@ -195,12 +199,23 @@ def test_benchmark_no_salary_rows(tmp_path: Path) -> None:
 
 # ── benchmark: seeded pool ────────────────────────────────────────────────────
 
+
 def test_benchmark_with_jobs(tmp_path: Path) -> None:
     conn = _db(tmp_path)
 
     # Seed 10 jobs with salary_min required; vary the midpoints
-    midpoints = [80_000, 90_000, 100_000, 110_000, 120_000,
-                 130_000, 140_000, 150_000, 160_000, 170_000]
+    midpoints = [
+        80_000,
+        90_000,
+        100_000,
+        110_000,
+        120_000,
+        130_000,
+        140_000,
+        150_000,
+        160_000,
+        170_000,
+    ]
     for mid in midpoints:
         _seed_job(conn, salary_min=mid - 5_000, salary_max=mid + 5_000, currency="USD")
 
@@ -226,9 +241,13 @@ def test_benchmark_role_family_filter(tmp_path: Path) -> None:
 
     # 5 backend jobs + 3 frontend jobs
     for _ in range(5):
-        _seed_job(conn, salary_min=100_000, salary_max=120_000, currency="USD", role_family="backend")
+        _seed_job(
+            conn, salary_min=100_000, salary_max=120_000, currency="USD", role_family="backend"
+        )
     for _ in range(3):
-        _seed_job(conn, salary_min=90_000, salary_max=110_000, currency="USD", role_family="frontend")
+        _seed_job(
+            conn, salary_min=90_000, salary_max=110_000, currency="USD", role_family="frontend"
+        )
 
     result = benchmark(conn, base=110_000.0, role_family="backend", currency="USD")
     assert result["sampleSize"] == 5
@@ -245,8 +264,7 @@ def test_benchmark_percentile_correctness(tmp_path: Path) -> None:
     """All midpoints below base -> percentile 100; all above -> percentile 0."""
     conn = _db(tmp_path)
 
-    for mn in [50_000, 60_000, 70_000, 80_000, 90_000,
-               95_000, 97_000, 98_000, 99_000]:
+    for mn in [50_000, 60_000, 70_000, 80_000, 90_000, 95_000, 97_000, 98_000, 99_000]:
         _seed_job(conn, salary_min=mn, salary_max=mn + 2_000, currency="USD")
 
     # base above all midpoints

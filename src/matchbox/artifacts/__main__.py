@@ -46,7 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     src = ps.add_mutually_exclusive_group(required=True)
     src.add_argument("--file", type=Path, default=None, help="Read text body from a file.")
     src.add_argument("--body", default=None, help="Inline text body.")
-    src.add_argument("--path", default=None, help="Filesystem path to a file artifact (e.g. cv.pdf).")
+    src.add_argument(
+        "--path", default=None, help="Filesystem path to a file artifact (e.g. cv.pdf)."
+    )
     ps.add_argument(
         "--final",
         action="store_true",

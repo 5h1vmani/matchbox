@@ -12,13 +12,13 @@ Ported and adapted from the Atma identity layer
 
 Direct, grounded, sharp. First-person. Specific numbers, no fluff.
 
-- Short sentences next to longer explanation. Vary length deliberately —
+* Short sentences next to longer explanation. Vary length deliberately —
   sameness reads as AI.
-- "I tried X. It broke at Y. Here is the fix." Not "one might consider."
-- Specific numbers, never qualifiers: "250K CCU", "7 to 10 minutes", "50K
+* "I tried X. It broke at Y. Here is the fix." Not "one might consider."
+* Specific numbers, never qualifiers: "250K CCU", "7 to 10 minutes", "50K
   throttle" — never "large scale" or "optimized".
-- Blunt. Willing to name a limitation or a past wrong call.
-- Rough edges are a feature. Real tangents and uneven structure are
+* Blunt. Willing to name a limitation or a past wrong call.
+* Rough edges are a feature. Real tangents and uneven structure are
   authenticity signals.
 
 ## Core rule: reformulate, never regenerate
@@ -27,9 +27,9 @@ Start from a **verified fact** the candidate already has. Reword it to carry the
 JD's vocabulary only where the new wording is a truthful description of the same
 fact. Never generate a new achievement.
 
-- Fact: "Built LLM workflows with retrieval-augmented generation."
-- JD says: "RAG pipeline design."
-- Write: "RAG pipeline design and deployment" — a reformulation of what is true.
+* Fact: "Built LLM workflows with retrieval-augmented generation."
+* JD says: "RAG pipeline design."
+* Write: "RAG pipeline design and deployment" — a reformulation of what is true.
 
 If the JD needs something the library lacks, leave it uncovered. Never invent.
 
@@ -56,26 +56,26 @@ If the JD needs something the library lacks, leave it uncovered. Never invent.
 
 ## Structure
 
-- Lead with the point, not setup. First sentence delivers.
-- Concrete anchor first: a person, a place, a number, a specific event.
-- One idea per paragraph. Move on.
-- Never open with a question. Never use symmetrical bullet lists. Never use
+* Lead with the point, not setup. First sentence delivers.
+* Concrete anchor first: a person, a place, a number, a specific event.
+* One idea per paragraph. Move on.
+* Never open with a question. Never use symmetrical bullet lists. Never use
   predictable connectors (first/second/third, moreover/furthermore).
 
 ## Authenticity signals (require 3+ per drafted piece)
 
-- A named, specific experience (a real person, place, or moment).
-- A specific number tied to the point ("at 50K throttle, Cognito died").
-- A line admitting a limitation or a past error.
-- An opinion someone could disagree with.
-- A named tool, place, or person — not a generic category.
+* A named, specific experience (a real person, place, or moment).
+* A specific number tied to the point ("at 50K throttle, Cognito died").
+* A line admitting a limitation or a past error.
+* An opinion someone could disagree with.
+* A named tool, place, or person — not a generic category.
 
 ## Honest-limitation move
 
 Name the weakest evidence before the reader does, then reframe to the strength
 that matters for this role. (Example pattern: "No formal sales-team experience.
 What I have instead: I have run demos and POCs end to end, and I know the CFO
-office from the inside.") This builds trust and pre-empts the obvious objection.
+office from the inside.") This builds trust and preempts the obvious objection.
 
 ## Cover letters (when drafted)
 

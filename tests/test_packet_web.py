@@ -30,16 +30,22 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
 def _seed(tmp_path: Path) -> None:
     conn: sqlite3.Connection = connect(Path(os.environ["MATCHBOX_DB"]))
     migrate(conn)
-    conn.execute("INSERT INTO job (id, company, title, url, jd_text) VALUES (1,'Acme','Eng','http://x/1','jd')")
+    conn.execute(
+        "INSERT INTO job (id, company, title, url, jd_text) VALUES (1,'Acme','Eng','http://x/1','jd')"
+    )
     conn.execute("INSERT INTO run (id, status) VALUES ('2026-06-06-001','done')")
     conn.execute("INSERT INTO run_job (run_id, job_id) VALUES ('2026-06-06-001', 1)")
-    conn.execute("INSERT INTO application (id, job_id, run_id, stage) VALUES (1, 1, '2026-06-06-001', 'saved')")
+    conn.execute(
+        "INSERT INTO application (id, job_id, run_id, stage) VALUES (1, 1, '2026-06-06-001', 'saved')"
+    )
     conn.close()
     out = tmp_path / "runs" / "2026-06-06-001" / "output" / "1"
     out.mkdir(parents=True)
     (out / "cv.pdf").write_bytes(b"%PDF-1.4 fake")
     (out / "changes.md").write_text("# changes")
-    (out / "coverage.json").write_text(json.dumps({"semantic": {"must_haves": [{"text": "a", "band": "covered"}]}}))
+    (out / "coverage.json").write_text(
+        json.dumps({"semantic": {"must_haves": [{"text": "a", "band": "covered"}]}})
+    )
 
 
 def test_packet_view_model_and_submit(client: TestClient, tmp_path: Path) -> None:
@@ -76,9 +82,13 @@ def test_onboarding_upload_paste_and_remove(client: TestClient) -> None:
     names = [f["name"] for f in r.json()]
     assert "cv.txt" in names
     # Rejected extension.
-    assert client.post(
-        "/api/onboarding/upload", files={"files": ("x.exe", b"nope", "application/octet-stream")}
-    ).status_code == 415
+    assert (
+        client.post(
+            "/api/onboarding/upload",
+            files={"files": ("x.exe", b"nope", "application/octet-stream")},
+        ).status_code
+        == 415
+    )
     # Paste -> a notes-*.md staged.
     staged = client.post("/api/onboarding/paste", data={"text": "some notes"}).json()
     assert any(f["name"].startswith("notes-") for f in staged)
@@ -106,8 +116,12 @@ def test_review_verify_flow(client: TestClient, tmp_path: Path) -> None:
     conn = connect(Path(os.environ["MATCHBOX_DB"]))
     migrate(conn)
     conn.execute("INSERT INTO experience (id, company, role) VALUES (1, 'Acme', 'Eng')")
-    conn.execute("INSERT INTO bullet (id, experience_id, text, facts_verified) VALUES (1, 1, 'Did a thing.', 0)")
-    conn.execute("INSERT INTO bullet (id, experience_id, text, facts_verified) VALUES (2, 1, 'Did another.', 0)")
+    conn.execute(
+        "INSERT INTO bullet (id, experience_id, text, facts_verified) VALUES (1, 1, 'Did a thing.', 0)"
+    )
+    conn.execute(
+        "INSERT INTO bullet (id, experience_id, text, facts_verified) VALUES (2, 1, 'Did another.', 0)"
+    )
     conn.close()
 
     state = client.get("/api/review").json()
@@ -117,5 +131,3 @@ def test_review_verify_flow(client: TestClient, tmp_path: Path) -> None:
     # Verify-all clears the rest.
     client.post("/api/review/verify-all")
     assert client.get("/api/review").json()["unverifiedBullets"] == 0
-
-

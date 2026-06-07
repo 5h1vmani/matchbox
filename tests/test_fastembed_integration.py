@@ -65,9 +65,9 @@ def test_real_embedder_separates_related_and_unrelated() -> None:
     # Related text should clear the matcher's semantic floor comfortably.
     from matchbox.matching.select import SEMANTIC_COVERAGE_FLOOR
 
-    assert sim_related > max(
-        SEMANTIC_COVERAGE_FLOOR, 0.6
-    ), f"related cosine {sim_related:.3f} is below 0.6 floor; check the model"
+    assert sim_related > max(SEMANTIC_COVERAGE_FLOOR, 0.6), (
+        f"related cosine {sim_related:.3f} is below 0.6 floor; check the model"
+    )
     assert sim_related > sim_unrelated + 0.15, (
         f"related {sim_related:.3f} vs unrelated {sim_unrelated:.3f} "
         "is not separated enough; re-tune SEMANTIC_COVERAGE_FLOOR"

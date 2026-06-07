@@ -132,9 +132,7 @@ def upsert_debrief(
             "notes = excluded.notes",
             (round_id, sentiment, notes),
         )
-        conn.execute(
-            "UPDATE interview_round SET status = 'done' WHERE id = ?", (round_id,)
-        )
+        conn.execute("UPDATE interview_round SET status = 'done' WHERE id = ?", (round_id,))
     return get_round(conn, round_id)
 
 

@@ -74,9 +74,10 @@ def _provider(conn: Any) -> str:
 
 
 def _model(conn: Any, provider: str) -> str:
-    return get_setting(conn, f"ai_model_{provider}", _DEFAULT_MODEL[provider]) or _DEFAULT_MODEL[
-        provider
-    ]
+    return (
+        get_setting(conn, f"ai_model_{provider}", _DEFAULT_MODEL[provider])
+        or _DEFAULT_MODEL[provider]
+    )
 
 
 def _ai_on(conn: Any) -> bool:

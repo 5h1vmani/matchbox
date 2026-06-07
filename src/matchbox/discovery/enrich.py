@@ -31,7 +31,10 @@ _SENIORITY_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("staff", re.compile(r"\bstaff\b", re.I)),
     ("senior", re.compile(r"\b(senior|sr\.?)\b", re.I)),
     ("lead", re.compile(r"\b(lead|head\s+of)\b", re.I)),
-    ("junior", re.compile(r"\b(junior|jr\.?|entry[- ]level|new[- ]?grad|graduate|associate)\b", re.I)),
+    (
+        "junior",
+        re.compile(r"\b(junior|jr\.?|entry[- ]level|new[- ]?grad|graduate|associate)\b", re.I),
+    ),
 ]
 
 
@@ -53,30 +56,61 @@ def parse_seniority(title: str, jd_text: str | None = None) -> str | None:
 # (we do not guess a specialism the title does not state). This un-deads the
 # salary role-scoping, which silently matches zero rows without a family.
 _ROLE_FAMILY_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("ml", re.compile(
-        r"\b(machine[- ]learning|ml\s*engineer|ai\s*engineer|deep[- ]learning|"
-        r"\bnlp\b|computer\s*vision|mlops|research\s*scientist|applied\s*scientist)\b", re.I)),
-    ("data", re.compile(
-        r"\b(data\s*engineer|data\s*scientist|data\s*analyst|data\s*science|"
-        r"analytics\s*engineer|\banalytics\b|\betl\b|business\s*intelligence)\b", re.I)),
-    ("mobile", re.compile(
-        r"\b(ios|android|mobile|react\s*native|flutter|swift|kotlin)\b", re.I)),
-    ("devops", re.compile(
-        r"\b(devops|\bsre\b|site\s*reliability|infrastructure|platform\s*engineer|"
-        r"cloud\s*engineer)\b", re.I)),
-    ("security", re.compile(
-        r"\b(security|appsec|infosec|penetration|cyber\s*security|cybersecurity)\b", re.I)),
-    ("design", re.compile(
-        r"\b(designer|\bux\b|\bui/ux\b|product\s*design|user\s*experience)\b", re.I)),
-    ("pm", re.compile(
-        r"\b(product\s*manager|product\s*owner|program\s*manager|technical\s*product)\b", re.I)),
+    (
+        "ml",
+        re.compile(
+            r"\b(machine[- ]learning|ml\s*engineer|ai\s*engineer|deep[- ]learning|"
+            r"\bnlp\b|computer\s*vision|mlops|research\s*scientist|applied\s*scientist)\b",
+            re.I,
+        ),
+    ),
+    (
+        "data",
+        re.compile(
+            r"\b(data\s*engineer|data\s*scientist|data\s*analyst|data\s*science|"
+            r"analytics\s*engineer|\banalytics\b|\betl\b|business\s*intelligence)\b",
+            re.I,
+        ),
+    ),
+    ("mobile", re.compile(r"\b(ios|android|mobile|react\s*native|flutter|swift|kotlin)\b", re.I)),
+    (
+        "devops",
+        re.compile(
+            r"\b(devops|\bsre\b|site\s*reliability|infrastructure|platform\s*engineer|"
+            r"cloud\s*engineer)\b",
+            re.I,
+        ),
+    ),
+    (
+        "security",
+        re.compile(
+            r"\b(security|appsec|infosec|penetration|cyber\s*security|cybersecurity)\b", re.I
+        ),
+    ),
+    (
+        "design",
+        re.compile(r"\b(designer|\bux\b|\bui/ux\b|product\s*design|user\s*experience)\b", re.I),
+    ),
+    (
+        "pm",
+        re.compile(
+            r"\b(product\s*manager|product\s*owner|program\s*manager|technical\s*product)\b", re.I
+        ),
+    ),
     ("qa", re.compile(r"\b(\bqa\b|quality\s*assurance|test\s*engineer|\bsdet\b)\b", re.I)),
     ("fullstack", re.compile(r"\b(full[- ]?stack)\b", re.I)),
-    ("frontend", re.compile(
-        r"\b(frontend|front[- ]end|front\s+end|\breact\b|\bvue\b|\bangular\b|"
-        r"ui\s*engineer|web\s*developer)\b", re.I)),
-    ("backend", re.compile(
-        r"\b(backend|back[- ]end|back\s+end|server[- ]side|api\s*engineer)\b", re.I)),
+    (
+        "frontend",
+        re.compile(
+            r"\b(frontend|front[- ]end|front\s+end|\breact\b|\bvue\b|\bangular\b|"
+            r"ui\s*engineer|web\s*developer)\b",
+            re.I,
+        ),
+    ),
+    (
+        "backend",
+        re.compile(r"\b(backend|back[- ]end|back\s+end|server[- ]side|api\s*engineer)\b", re.I),
+    ),
 ]
 
 

@@ -43,9 +43,7 @@ def get_whats_working(conn: ConnDep) -> dict[str, Any]:
 
 
 @router.get("/momentum")
-def get_momentum(
-    conn: ConnDep, target: int = 5, week_start: str | None = None
-) -> dict[str, Any]:
+def get_momentum(conn: ConnDep, target: int = 5, week_start: str | None = None) -> dict[str, Any]:
     """Real weekly pace + a healthy/push/rest threshold on the applied count."""
     start: date | None = None
     if week_start:

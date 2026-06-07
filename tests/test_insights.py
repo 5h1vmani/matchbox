@@ -184,7 +184,7 @@ def test_funnel_counts_monotone(tmp_path: Path) -> None:
     for i in range(len(STAGE_LADDER) - 1):
         assert counts[STAGE_LADDER[i]] >= counts[STAGE_LADDER[i + 1]], (
             f"counts[{STAGE_LADDER[i]}]={counts[STAGE_LADDER[i]]} < "
-            f"counts[{STAGE_LADDER[i+1]}]={counts[STAGE_LADDER[i+1]]}"
+            f"counts[{STAGE_LADDER[i + 1]}]={counts[STAGE_LADDER[i + 1]]}"
         )
 
 
@@ -278,7 +278,7 @@ def test_whats_working_by_source(tmp_path: Path) -> None:
 
     li = by_source["linkedin"]
     assert li["total"] == 3
-    assert li["interviews"] == 1   # only app1 (phone)
+    assert li["interviews"] == 1  # only app1 (phone)
     assert abs(li["rate"] - 1 / 3) < 0.01
 
     ref = by_source["referral"]
@@ -294,13 +294,13 @@ def test_whats_working_by_role_family(tmp_path: Path) -> None:
     assert set(by_rf.keys()) == {"backend", "frontend"}
 
     be = by_rf["backend"]
-    assert be["total"] == 3          # app1, app2, app3 all on job1=backend
-    assert be["interviews"] == 2     # app1 phone + app3 onsite
+    assert be["total"] == 3  # app1, app2, app3 all on job1=backend
+    assert be["interviews"] == 2  # app1 phone + app3 onsite
     assert abs(be["rate"] - 2 / 3) < 0.01
 
     fe = by_rf["frontend"]
-    assert fe["total"] == 2          # app4, app5 on job2=frontend
-    assert fe["interviews"] == 1     # app4 offer
+    assert fe["total"] == 2  # app4, app5 on job2=frontend
+    assert fe["interviews"] == 1  # app4 offer
     assert fe["rate"] == 0.5
 
 
@@ -312,7 +312,7 @@ def test_summary_totals(tmp_path: Path) -> None:
     _seed(conn)
     totals = summary(conn)["totals"]
     assert totals["applications"] == 5
-    assert totals["interviews"] == 3   # phone+
+    assert totals["interviews"] == 3  # phone+
     assert totals["offers"] == 1
     assert totals["accepted"] == 0
 

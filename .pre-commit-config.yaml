@@ -25,7 +25,7 @@ repos:
         args: [--maxkb=500]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.7.4
+    rev: v0.14.13  # keep in lockstep with pyproject [dev] ruff pin
     hooks:
       - id: ruff
         args: [--fix]

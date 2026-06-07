@@ -1,9 +1,9 @@
 """JSON API for artifact storage (prefix /api/applications).
 
-    GET  /api/applications/{application_id}/artifacts          -> list
-    GET  /api/applications/{application_id}/artifacts?kind=cv  -> filtered list
-    POST /api/applications/{application_id}/artifacts/{artifact_id}/status
-         body: {"status": "sent"} -> updated artifact (404 if not found)
+GET  /api/applications/{application_id}/artifacts          -> list
+GET  /api/applications/{application_id}/artifacts?kind=cv  -> filtered list
+POST /api/applications/{application_id}/artifacts/{artifact_id}/status
+     body: {"status": "sent"} -> updated artifact (404 if not found)
 """
 
 from __future__ import annotations

@@ -51,15 +51,33 @@ def test_add_job_by_hand_enriches_and_scores(client: TestClient) -> None:
     assert r.status_code == 200 and r.json()["status"] == "new"
 
     conn = _conn()
-    row = conn.execute("SELECT role_family, seniority, sponsorship FROM job WHERE id = ?", (r.json()["id"],)).fetchone()
+    row = conn.execute(
+        "SELECT role_family, seniority, sponsorship FROM job WHERE id = ?", (r.json()["id"],)
+    ).fetchone()
     conn.close()
     assert row["role_family"] == "backend"  # enriched deterministically
     assert row["seniority"] == "senior"
     assert row["sponsorship"] == "none"
 
     # Duplicate url -> 409; missing fields -> 400.
-    assert client.post("/api/jobs", json={"company": "Acme", "title": "BE", "url": "https://acme.example/jobs/be", "jd_text": "x"}).status_code == 409
-    assert client.post("/api/jobs", json={"company": " ", "title": "", "url": "", "jd_text": ""}).status_code == 400
+    assert (
+        client.post(
+            "/api/jobs",
+            json={
+                "company": "Acme",
+                "title": "BE",
+                "url": "https://acme.example/jobs/be",
+                "jd_text": "x",
+            },
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            "/api/jobs", json={"company": " ", "title": "", "url": "", "jd_text": ""}
+        ).status_code
+        == 400
+    )
 
     # Score-new lifts it into Discover (offline/lexical: MATCHBOX_DISABLE_SEMANTIC is set by conftest).
     scored = client.post("/api/jobs/score-new").json()["scored"]
@@ -77,11 +95,19 @@ def test_targets_roundtrip_with_work_auth(client: TestClient) -> None:
         json={
             "role_families": ["backend", " ml "],
             "locations": ["Remote"],
-            "work_auth": {"citizenships": ["IN"], "needs_sponsorship": True, "has_clearance": False},
+            "work_auth": {
+                "citizenships": ["IN"],
+                "needs_sponsorship": True,
+                "has_clearance": False,
+            },
         },
     ).json()
     assert saved["role_families"] == ["backend", "ml"]
-    assert saved["work_auth"] == {"citizenships": ["IN"], "needs_sponsorship": True, "has_clearance": False}
+    assert saved["work_auth"] == {
+        "citizenships": ["IN"],
+        "needs_sponsorship": True,
+        "has_clearance": False,
+    }
     # Persisted to the column the eligibility filter reads.
     conn = _conn()
     wa = json.loads(conn.execute("SELECT work_auth_json FROM target LIMIT 1").fetchone()[0])
@@ -94,17 +120,32 @@ def test_targets_roundtrip_with_work_auth(client: TestClient) -> None:
 
 def test_restyle_re_renders_and_validates(client: TestClient, tmp_path: Path) -> None:
     conn = _conn()
-    conn.execute("INSERT INTO job (id, company, title, url, jd_text) VALUES (1,'Acme','Eng','http://x/1','jd')")
+    conn.execute(
+        "INSERT INTO job (id, company, title, url, jd_text) VALUES (1,'Acme','Eng','http://x/1','jd')"
+    )
     conn.execute("INSERT INTO run (id, status) VALUES ('2026-06-06-001','done')")
-    conn.execute("INSERT INTO run_job (run_id, job_id, palette, font) VALUES ('2026-06-06-001',1,'slate','source-serif')")
-    conn.execute("INSERT INTO application (id, job_id, run_id, stage) VALUES (1,1,'2026-06-06-001','saved')")
+    conn.execute(
+        "INSERT INTO run_job (run_id, job_id, palette, font) VALUES ('2026-06-06-001',1,'slate','source-serif')"
+    )
+    conn.execute(
+        "INSERT INTO application (id, job_id, run_id, stage) VALUES (1,1,'2026-06-06-001','saved')"
+    )
     conn.close()
     out = tmp_path / "runs" / "2026-06-06-001" / "output" / "1"
     out.mkdir(parents=True)
-    (out / "cv.json").write_text(json.dumps({
-        "schema_version": 1, "profile": {"name": "Dev", "contact": []}, "summary": "",
-        "experiences": [], "projects": [], "skills": [], "education": [],
-    }))
+    (out / "cv.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "profile": {"name": "Dev", "contact": []},
+                "summary": "",
+                "experiences": [],
+                "projects": [],
+                "skills": [],
+                "education": [],
+            }
+        )
+    )
 
     r = client.post("/api/applications/1/restyle", json={"palette": "forest", "font": "inter"})
     assert r.status_code == 200
@@ -116,4 +157,9 @@ def test_restyle_re_renders_and_validates(client: TestClient, tmp_path: Path) ->
     assert rj["palette"] == "forest" and rj["font"] == "inter"
 
     # Unknown palette -> 400.
-    assert client.post("/api/applications/1/restyle", json={"palette": "rainbow", "font": "inter"}).status_code == 400
+    assert (
+        client.post(
+            "/api/applications/1/restyle", json={"palette": "rainbow", "font": "inter"}
+        ).status_code
+        == 400
+    )

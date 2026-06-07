@@ -12,10 +12,10 @@ guarantees do not depend on which model you are.
 
 Matchbox is split in two on purpose:
 
-- **The deterministic core** (Python CLIs + SQLite) owns every guarantee:
+* **The deterministic core** (Python CLIs + SQLite) owns every guarantee:
   component selection, PDF rendering, scoring, schema validation, the voice
   gate. It is the same regardless of which model you are.
-- **You** supply judgment the code cannot: reading a JD into structured
+* **You** supply judgment the code cannot: reading a JD into structured
   requirements, drafting truthful prose, deciding what to elicit. Your output is
   always validated by the core before it touches a document.
 
@@ -66,50 +66,59 @@ A task carries `kind`, an optional `jobId`/`applicationId`, and a `payload`.
 
 ### task.kind → what you do
 
-- **`extract_reqs`** — read `job.jd_text`; decompose into typed requirements
+* **`extract_reqs`** — read `job.jd_text`; decompose into typed requirements
   (`must` / `nice` / `responsibility`), each with verbatim `keywords` an ATS
   would search and optional `variants` (e.g. `k8s` for `kubernetes`). Save:
+
   ```bash
   python -m matchbox.jobreqs save --job <job_id> --file reqs.json
   ```
 
-- **`tailor`** — render the CV (the assembler selects components; you do not):
+* **`tailor`** — render the CV (the assembler selects components; you do not):
+
   ```bash
   python -m matchbox.assemble --run <run-id> --job <job_id>
   ```
+
   Then read `runs/<run-id>/output/<job-id>/coverage.json`. For each
   `keyword_presence` entry with `present: false`, find the selected bullet (in
   `changes.md`) and propose a **truthful** rewording that carries the missing
   keyword. Write `polish.json` (per `schemas/polish.v1.json`) and apply:
+
   ```bash
   python -m matchbox.assemble --run <run-id> --job <job_id> --polish polish.json
   ```
+
   Uncovered must-haves are expected — record them as gaps; never invent. If
   `want_cover`, write the body to `cover.txt` and render with `--cover`.
 
-- **`prep`** (interview prep) — read the JD + the user's verified library + the
+* **`prep`** (interview prep) — read the JD + the user's verified library + the
   application's stage (phone/onsite). Write a prep brief: likely questions, the
   user's **real** matching stories (from the library — STAR if present in
   `claim`), the gaps they will probe and an honest way to address each, and
   questions to ask back. Store it:
+
   ```bash
   python -m matchbox.artifacts save --app <application_id> --kind prep --file prep.md
   ```
 
-- **`draft_followup`** / **`thankyou`** — draft a short, voice-bounded follow-up
+* **`draft_followup`** / **`thankyou`** — draft a short, voice-bounded follow-up
   or thank-you note grounded in what actually happened. Store it (this lights the
   tracker's draft badge):
+
   ```bash
   python -m matchbox.artifacts save --app <application_id> --kind followup --file note.txt
   ```
 
-- **`negotiate`** — read the `offer` rows and the salary benchmark, then draft a
+* **`negotiate`** — read the `offer` rows and the salary benchmark, then draft a
   voice-bounded counter. Benchmark first (truthful, from the user's own pool):
+
   ```bash
   python -m matchbox.offers list --app <application_id>
   python -m matchbox.offers benchmark --base <amount> [--role-family <rf>]
   python -m matchbox.artifacts save --app <application_id> --kind counter --file counter.txt
   ```
+
   The benchmark returns `confidence: none` when there is no comparable data —
   say so plainly; do not invent market numbers.
 

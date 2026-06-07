@@ -62,7 +62,9 @@ def test_ats_records_leave_salary_null(tmp_path: Path) -> None:
         posted_at=None,
     )
     assert _upsert_jobs(conn, None, [rec]) == 1
-    row = conn.execute("SELECT salary_min, employment_type FROM job WHERE url='https://j/2'").fetchone()
+    row = conn.execute(
+        "SELECT salary_min, employment_type FROM job WHERE url='https://j/2'"
+    ).fetchone()
     assert row["salary_min"] is None
     assert row["employment_type"] is None
     conn.close()

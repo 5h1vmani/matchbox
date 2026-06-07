@@ -81,7 +81,9 @@ def main(argv: list[str] | None = None) -> int:
             _emit(task)
         elif args.cmd == "enqueue":
             payload = json.loads(args.payload.read_text(encoding="utf-8")) if args.payload else None
-            tid = repo.enqueue(conn, args.kind, job_id=args.job, application_id=args.app, payload=payload)
+            tid = repo.enqueue(
+                conn, args.kind, job_id=args.job, application_id=args.app, payload=payload
+            )
             _emit(repo.get(conn, tid))
         return 0
     finally:
