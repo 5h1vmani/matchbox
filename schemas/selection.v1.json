@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matchbox.local/schemas/selection.v1.json",
+  "title": "Matchbox CV selection (brain -> core)",
+  "description": "Written by the brain to pick which verified bullets go on the CV and in what order, plus a JD-tailored summary. The deterministic core validates that every id is a real verified library bullet (the no-fabrication guarantee lives in that check, not in selection being an algorithm), voice-gates the summary, enforces the one-page budget, then renders. When no selection file is supplied, assemble falls back to the deterministic matcher (offline / no-key path).",
+  "type": "object",
+  "required": ["schema_version", "run_id", "job_id", "selected_bullet_ids", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "run_id": { "type": "string" },
+    "job_id": { "type": "integer", "minimum": 1 },
+    "selected_bullet_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "integer", "minimum": 1 },
+      "description": "Verified bullet ids, in the order the brain wants them rendered (within each role). Each MUST be a verified library bullet; the core rejects any unknown or unverified id. Trailing ids past the one-page budget are dropped, lowest-priority first."
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "JD-tailored summary paragraph. Voice-gated by the core (no em-dashes, no contractions, no banned words, word count). Truthfulness is the brain's responsibility, exactly like a cover letter -- only verified facts may appear."
+    },
+    "headline": {
+      "type": "string",
+      "description": "Optional JD-tailored headline (the line under the name). Voice-gated (hard rules only, no word cap). When omitted, the profile's default headline is used. Truthfulness is the brain's responsibility."
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Optional one-line note on why this selection. Surfaced in changes.md for the user's audit; never rendered on the CV."
+    }
+  }
+}

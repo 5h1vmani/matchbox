@@ -93,6 +93,8 @@
     "min_word_count_cover": 40,
     "max_word_count_cover": 400,
     "min_word_count_answer": 10,
-    "max_word_count_answer": 300
+    "max_word_count_answer": 300,
+    "min_word_count_summary": 20,
+    "max_word_count_summary": 90
   }
 }

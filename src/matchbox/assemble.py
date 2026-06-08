@@ -3,14 +3,19 @@
 The brain invokes this once per job in a run:
 
     python -m matchbox.assemble --run <run_id> --job <job_id>
+    python -m matchbox.assemble --run <run_id> --job <job_id> --selection sel.json
     python -m matchbox.assemble --run <run_id> --job <job_id> --cover
 
-The first form builds the CV (selects components, renders cv.pdf, runs
-the coverage checks). The second form renders a cover letter from text
-the brain has already written into runs/<run>/output/<job>/cover.txt.
+Selection is judgment, so the brain may make it: with --selection the brain
+supplies the chosen verified-bullet ids (ordered) and a JD-tailored summary
+(per schemas/selection.v1.json), and this module VALIDATES them -- every id
+must be a real verified library bullet, the summary must pass the voice gate --
+then renders. The no-fabrication guarantee lives in that validation, not in
+selection being an algorithm.
 
-This module is the single place selection lives — the brain does not
-pick component ids. That keeps the path reproducible and unit-testable.
+Without --selection, the deterministic matcher picks (BM25 + embeddings + MMR);
+that is the offline / no-key fallback, still reproducible and unit-testable.
+The --cover form renders a cover letter from runs/<run>/output/<job>/cover.txt.
 """
 
 from __future__ import annotations
@@ -18,6 +23,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sqlite3
 import sys
 from dataclasses import dataclass
@@ -26,6 +32,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
+from jsonschema import Draft202012Validator
 from pypdf import PdfReader
 
 from matchbox.core.db import PROJECT_ROOT, connect
@@ -44,6 +51,7 @@ from matchbox.matching.embed import (
     cosine_matrix,
 )
 from matchbox.matching.select import (
+    DEFAULT_WORD_BUDGET,
     SEMANTIC_COVERAGE_FLOOR,
     Component,
     Requirement,
@@ -52,7 +60,9 @@ from matchbox.matching.select import (
 from matchbox.polish import (
     BulletPolish,
     apply_polish,
+    load_voice_rules,
     validate_polish_payload,
+    validate_voice,
 )
 
 RUNS_DIR = PROJECT_ROOT / "runs"
@@ -193,6 +203,71 @@ def _semantic_coverage(
             }
         )
     return out, gaps
+
+
+_SCHEMAS_DIR = PROJECT_ROOT / "schemas"
+
+
+def _selection_validator() -> Draft202012Validator:
+    schema = json.loads((_SCHEMAS_DIR / "selection.v1.json").read_text(encoding="utf-8"))
+    return Draft202012Validator(schema)
+
+
+def validate_selection_payload(payload: dict[str, Any]) -> list[str]:
+    """Schema-validate a brain selection payload. Returns human-readable errors
+    (empty when valid)."""
+    return [e.message for e in _selection_validator().iter_errors(payload)]
+
+
+def _apply_selection(
+    selection: dict[str, Any], components: list[Component]
+) -> tuple[list[int], dict[int, float], str]:
+    """Validate the brain's selection against the verified library and the voice
+    gate; return (ordered_ids, rank_relevance, summary).
+
+    The no-fabrication guarantee is enforced HERE, not by selection being an
+    algorithm: every id must be a verified library bullet, or we reject loudly.
+    The brain emits ids only (never bullet text), so the selected text is
+    unmodified by construction. The summary is voice-gated like a cover letter;
+    its truthfulness is the brain's responsibility.
+    """
+    valid = {c.id for c in components}
+    ids = [int(i) for i in selection["selected_bullet_ids"]]
+    unknown = [i for i in ids if i not in valid]
+    if unknown:
+        raise ValueError(
+            "selection references ids that are not verified library bullets: "
+            + ", ".join(map(str, unknown))
+        )
+    seen: set[int] = set()
+    ordered: list[int] = []
+    for i in ids:
+        if i not in seen:
+            seen.add(i)
+            ordered.append(i)
+
+    summary = str(selection["summary"]).strip()
+    violations = validate_voice(summary, load_voice_rules(), scope="summary")
+    if violations:
+        raise ValueError(
+            "summary failed the voice gate: "
+            + "; ".join(f"{v.rule}: {v.detail}" for v in violations)
+        )
+
+    # Rank-relevance: earlier in the brain's order = more important (drives the
+    # changes.md display). One-page safety belt: keep the brain's order, drop the
+    # lowest-priority (trailing) bullets once the body exceeds the word budget.
+    relevance = {cid: float(len(ordered) - rank) for rank, cid in enumerate(ordered)}
+    text_by_id = {c.id: c.text for c in components}
+    kept: list[int] = []
+    used = 0
+    for cid in ordered:
+        words = len(text_by_id[cid].split())
+        if kept and used + words > DEFAULT_WORD_BUDGET:
+            break
+        kept.append(cid)
+        used += words
+    return kept, relevance, summary
 
 
 def _load_requirements(conn: sqlite3.Connection, job_id: int) -> list[Requirement]:
@@ -348,17 +423,70 @@ def _write_changes_md(
     return out_path
 
 
+_MONTHS = {
+    m: i
+    for i, m in enumerate(
+        ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"],
+        start=1,
+    )
+}
+
+# A role that names a degree -> the row is education, not work. Disambiguates the
+# common case where one institution holds both a degree and a job (e.g. an MSc and
+# a Research Assistant role at the same university): the ROLE decides, not the
+# employer. Deliberately strict so job titles like "Senior Associate" do not match.
+_DEGREE_RE = re.compile(
+    r"(?i)\b("
+    r"bachelor|master|doctor(?:ate)?|ph\.?d|mba|"
+    r"b\.?(?:sc|com|tech|a|e|ed|arch)|m\.?(?:sc|com|tech|a|e|ed|arch|phil)|"
+    r"ll\.?[bm]|diploma|associate of (?:arts|science)"
+    r")\b"
+)
+
+
+def _is_degree_role(role: str | None) -> bool:
+    return bool(_DEGREE_RE.search(role or ""))
+
+
+def _exp_date_key(date_str: str | None) -> tuple[int, int]:
+    """Sortable (year, month) from a free-text experience date.
+
+    "present"/"" -> (9999, 13) so an ongoing role sorts newest. "Aug 2025" ->
+    (2025, 8); a bare "2014" -> (2014, 0). Unparsable text sinks to (0, 0) rather
+    than corrupting the order. Tolerant of month name + year in either position.
+    """
+    s = (date_str or "").strip().lower()
+    if not s or s == "present":
+        return (9999, 13)
+    month = 0
+    year = 0
+    for tok in s.replace(",", " ").split():
+        if tok[:3] in _MONTHS:
+            month = _MONTHS[tok[:3]]
+        elif tok.isdigit() and len(tok) == 4:
+            year = int(tok)
+    return (year, month)
+
+
 def _experiences_in_order(
     components: list[Component], raw_bullets: dict[int, dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Group selected components back into experiences for the CV JSON."""
+    """Group selected components into experiences, ordered reverse-chronologically
+    and grouped by employer.
+
+    Reverse-chronological (newest first, "present" on top) is the CV standard:
+    ATS parsers map the first dated block as the current role, and recruiters scan
+    top-down expecting recency. Grouping by employer keeps a company's roles
+    adjacent and newest-first, so a promotion reads as progression instead of
+    scattering across the page. Bullet order within a role is left as the brain
+    chose it (impact-first).
+    """
     by_exp: dict[int, dict[str, Any]] = {}
     for c in components:
         b = raw_bullets[c.id]
         ex_id = c.experience_id
         if ex_id not in by_exp:
             by_exp[ex_id] = {
-                "_sort_order": b["sort_order"],
                 "_exp_id": ex_id,
                 "company": b["company"],
                 "role": b["role"],
@@ -368,10 +496,25 @@ def _experiences_in_order(
                 "bullets": [],
             }
         cast(list[str], by_exp[ex_id]["bullets"]).append(b["text"])
-    ordered = sorted(by_exp.values(), key=lambda x: (x["_sort_order"], x["_exp_id"]))
+
+    rows = list(by_exp.values())
+    role_key = {
+        x["_exp_id"]: (_exp_date_key(x["end_date"]), _exp_date_key(x["start_date"])) for x in rows
+    }
+    # Each company sorts by its most-recent role, so every role at one employer
+    # stays together (newest first) rather than scattering between other companies.
+    company_key: dict[str, tuple[tuple[int, int], tuple[int, int]]] = {}
+    for x in rows:
+        company_key[x["company"]] = max(
+            company_key.get(x["company"], ((0, 0), (0, 0))), role_key[x["_exp_id"]]
+        )
+    ordered = sorted(
+        rows,
+        key=lambda x: (company_key[x["company"]], role_key[x["_exp_id"]]),
+        reverse=True,
+    )
     for ex in ordered:
-        ex.pop("_sort_order")
-        ex.pop("_exp_id")
+        ex.pop("_exp_id", None)
     return ordered
 
 
@@ -401,6 +544,32 @@ def _build_cv_json(
     links = json.loads(str(profile.get("links_json") or "[]"))
     contact.extend(links)
 
+    # Education: degrees live in the `experience` table, so route the degree-roles
+    # into their own section (newest first). Shown on every CV regardless of
+    # bullet selection -- credentials are not bullets. Work experiences drop any
+    # degree-role for the same reason, so a degree never renders as a job.
+    work = [e for e in experiences if not _is_degree_role(e.get("role"))]
+    degree_rows = [
+        r
+        for r in conn.execute(
+            "SELECT company, role, start_date, end_date FROM experience"
+        ).fetchall()
+        if _is_degree_role(r["role"])
+    ]
+    degree_rows.sort(
+        key=lambda r: (_exp_date_key(r["end_date"]), _exp_date_key(r["start_date"])),
+        reverse=True,
+    )
+    education = [
+        {
+            "degree": r["role"],
+            "school": r["company"],
+            "dates": " to ".join(d for d in (r["start_date"], r["end_date"]) if d)
+            or (r["end_date"] or ""),
+        }
+        for r in degree_rows
+    ]
+
     return {
         "schema_version": 1,
         "profile": {
@@ -409,10 +578,10 @@ def _build_cv_json(
             "contact": contact,
         },
         "summary": summary_text,
-        "experiences": experiences,
+        "experiences": work,
         "projects": [],
         "skills": skills,
-        "education": [],
+        "education": education,
     }
 
 
@@ -450,6 +619,7 @@ def assemble_one(
     font: str,
     embedder: Embedder | None = None,
     coverage_floor: float = SEMANTIC_COVERAGE_FLOOR,
+    selection: dict[str, Any] | None = None,
 ) -> AssembleResult:
     """Selection + render path for a single job. Returns the artifact paths
     and the gaps / keyword-presence reports.
@@ -498,29 +668,55 @@ def assemble_one(
         for i, _ in enumerate(requirements)
     ]
 
-    result = select_components(
-        components=components,
-        component_embeddings=component_vecs,
-        requirements=requirements,
-        requirement_embeddings=requirement_vecs,
-        k=DEFAULT_K,
-        per_role_cap=4,
-        coverage_floor=coverage_floor,
-    )
+    if selection is not None:
+        # Brain-made selection (judgment). Validate ids against the verified
+        # library and voice-gate the summary; the deterministic guarantee is the
+        # validation, not the picking.
+        selected_ids, relevance, summary_text = _apply_selection(selection, components)
+        sim = (
+            cosine_matrix(component_vecs, requirement_vecs)
+            if requirements
+            else np.zeros((len(components), 0), dtype=np.float32)
+        )
+    else:
+        # Deterministic fallback (offline / no key): BM25 + embeddings + MMR.
+        result = select_components(
+            components=components,
+            component_embeddings=component_vecs,
+            requirements=requirements,
+            requirement_embeddings=requirement_vecs,
+            k=DEFAULT_K,
+            per_role_cap=4,
+            coverage_floor=coverage_floor,
+        )
+        selected_ids = result.selected_ids
+        relevance = result.relevance_by_component
+        sim = result.similarity_matrix
+        summary_text = _pick_summary(conn)
 
-    # Build the CV JSON with only the selected bullets.
-    selected_set = set(result.selected_ids)
-    chosen = [c for c in components if c.id in selected_set]
+    # Build the CV JSON, bullets in the chosen order (the brain's order when
+    # supplied, library order otherwise).
+    comp_by_id = {c.id: c for c in components}
+    chosen = [comp_by_id[i] for i in selected_ids]
     experiences = _experiences_in_order(chosen, raw_bullets)
     cv_json = _build_cv_json(
         profile=profile,
         experiences=experiences,
-        summary_text=_pick_summary(conn),
+        summary_text=summary_text,
         conn=conn,
     )
     # Fingerprint the selected bullets so re_render_cv can warn when the
     # DB has drifted (the user edited a bullet after this render).
     cv_json["_selected_bullets"] = [{"id": c.id, "text_hash": _bullet_hash(c.text)} for c in chosen]
+
+    if selection is not None and selection.get("headline"):
+        headline = str(selection["headline"]).strip()
+        hv = validate_voice(headline, load_voice_rules(), scope="headline")
+        if hv:
+            raise ValueError(
+                "headline failed the voice gate: " + "; ".join(f"{v.rule}: {v.detail}" for v in hv)
+            )
+        cv_json["profile"]["headline"] = headline
 
     out_dir = RUNS_DIR / run_id / "output" / str(job_id)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -549,8 +745,8 @@ def assemble_one(
     must_haves, semantic_gaps = _semantic_coverage(
         requirements=requirements,
         components=components,
-        selected_ids=result.selected_ids,
-        similarity_matrix=result.similarity_matrix,
+        selected_ids=selected_ids,
+        similarity_matrix=sim,
         unverified=unverified,
         unverified_sim=unverified_sim,
         floor=coverage_floor,
@@ -579,11 +775,11 @@ def assemble_one(
         out_dir=out_dir,
         job_company=str(job["company"]),
         job_title=str(job["title"]),
-        selected_ids=result.selected_ids,
+        selected_ids=selected_ids,
         components=components,
         requirements=requirements,
-        similarity_matrix=result.similarity_matrix,
-        relevance=result.relevance_by_component,
+        similarity_matrix=sim,
+        relevance=relevance,
         raw_bullets=raw_bullets,
         semantic_gaps=semantic_gaps,
         keyword_presence=keyword_presence,
@@ -599,7 +795,7 @@ def assemble_one(
             {"requirement": kp.requirement_text, "present": kp.present, "matched": kp.matched_term}
             for kp in keyword_presence
         ],
-        selected_component_ids=result.selected_ids,
+        selected_component_ids=selected_ids,
     )
 
 
@@ -905,6 +1101,14 @@ def main(argv: list[str] | None = None) -> int:
         metavar="POLISH_JSON",
         help="apply a polish payload (per schemas/polish.v1.json) to an already-rendered run",
     )
+    parser.add_argument(
+        "--selection",
+        type=Path,
+        default=None,
+        metavar="SELECTION_JSON",
+        help="use the brain's chosen verified-bullet ids + summary "
+        "(per schemas/selection.v1.json) instead of the deterministic matcher",
+    )
     parser.add_argument("--db", type=Path, default=None, help="override DB path")
     args = parser.parse_args(argv)
 
@@ -959,13 +1163,34 @@ def main(argv: list[str] | None = None) -> int:
             print(f"cover: {cover_path}")
             return 0
 
-        result = assemble_one(
-            conn=conn,
-            run_id=args.run,
-            job_id=args.job,
-            palette=palette,
-            font=font,
-        )
+        selection_payload: dict[str, Any] | None = None
+        if args.selection is not None:
+            try:
+                selection_payload = json.loads(args.selection.read_text(encoding="utf-8"))
+            except OSError as e:
+                print(f"error: cannot read {args.selection}: {e}", file=sys.stderr)
+                return 2
+            except json.JSONDecodeError as e:
+                print(f"error: invalid JSON in {args.selection}: {e}", file=sys.stderr)
+                return 2
+            errors = validate_selection_payload(selection_payload)
+            if errors:
+                print("schema error: selection.json: " + "; ".join(errors), file=sys.stderr)
+                return 3
+        try:
+            result = assemble_one(
+                conn=conn,
+                run_id=args.run,
+                job_id=args.job,
+                palette=palette,
+                font=font,
+                selection=selection_payload,
+            )
+        except ValueError as e:
+            # An id that is not a verified bullet, or a summary that fails the
+            # voice gate. Loud, never silently dropped.
+            print(f"selection rejected: {e}", file=sys.stderr)
+            return 3
     finally:
         conn.close()
 

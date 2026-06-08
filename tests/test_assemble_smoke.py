@@ -372,6 +372,125 @@ def test_smoke_fails_loud_when_no_verified_bullets(tmp_path: Path) -> None:
     assert "verified" in str(exc.value).lower()
 
 
+def _vocab_for(*texts: str) -> list[str]:
+    return sorted({w for t in texts for w in tokenize(t)})
+
+
+def test_selection_uses_brain_ids_summary_and_headline(
+    seeded_db_and_runs_dir: tuple[sqlite3.Connection, Path, int],
+) -> None:
+    """The brain-selection path: assemble renders exactly the brain's chosen
+    verified bullets, in its order, with its tailored summary and headline."""
+    conn, _tmp, job_id = seeded_db_and_runs_dir
+    embedder = FakeEmbedder(
+        vocab=_vocab_for(
+            "Built ETL pipelines processing 30M rows per day in Python.",
+            "Operated Kubernetes clusters across three regions.",
+            "Build and operate data pipelines. pipelines etl",
+            "Operate Kubernetes clusters in production. kubernetes k8s",
+        )
+    )
+    summary = (
+        "Infrastructure engineer who builds data pipelines and operates Kubernetes "
+        "in production, shipping reliable systems and mentoring the engineers around "
+        "me every single week of the year."
+    )
+    result = assemble_one(
+        conn=conn,
+        run_id="2026-05-22-002",
+        job_id=job_id,
+        palette="slate",
+        font="atkinson-hyperlegible",
+        embedder=embedder,
+        coverage_floor=0.3,
+        selection={
+            "schema_version": 1,
+            "run_id": "2026-05-22-002",
+            "job_id": job_id,
+            "selected_bullet_ids": [2, 1],  # Kubernetes then ETL — the brain's order
+            "summary": summary,
+            "headline": "Infrastructure engineer for data platforms",
+        },
+    )
+    cv = json.loads(result.cv_json_path.read_text())
+    assert cv["summary"] == summary
+    assert cv["profile"]["headline"] == "Infrastructure engineer for data platforms"
+    assert result.selected_component_ids == [2, 1]
+    rendered = [b for exp in cv["experiences"] for b in exp["bullets"]]
+    assert any("Kubernetes" in b for b in rendered)
+    assert any("ETL pipelines" in b for b in rendered)
+    assert not any("Rails" in b for b in rendered)  # an unselected bullet stays off
+
+
+def test_selection_rejects_unverified_or_unknown_id(
+    seeded_db_and_runs_dir: tuple[sqlite3.Connection, Path, int],
+) -> None:
+    conn, _tmp, job_id = seeded_db_and_runs_dir
+    with pytest.raises(ValueError) as exc:
+        assemble_one(
+            conn=conn,
+            run_id="r",
+            job_id=job_id,
+            palette="slate",
+            font="source-serif",
+            embedder=FakeEmbedder(vocab=["python", "kubernetes", "pipelines", "etl"]),
+            coverage_floor=0.3,
+            selection={
+                "schema_version": 1,
+                "run_id": "r",
+                "job_id": job_id,
+                "selected_bullet_ids": [1, 9999],  # 9999 is not a verified bullet
+                "summary": "A perfectly fine summary that comfortably clears the twenty word floor here.",
+            },
+        )
+    assert "verified" in str(exc.value).lower()
+
+
+def test_selection_rejects_summary_failing_voice(
+    seeded_db_and_runs_dir: tuple[sqlite3.Connection, Path, int],
+) -> None:
+    conn, _tmp, job_id = seeded_db_and_runs_dir
+    with pytest.raises(ValueError) as exc:
+        assemble_one(
+            conn=conn,
+            run_id="r",
+            job_id=job_id,
+            palette="slate",
+            font="source-serif",
+            embedder=FakeEmbedder(vocab=["python", "kubernetes", "pipelines", "etl"]),
+            coverage_floor=0.3,
+            selection={
+                "schema_version": 1,
+                "run_id": "r",
+                "job_id": job_id,
+                "selected_bullet_ids": [1],
+                "summary": (
+                    "This summary uses an em-dash — which the voice gate forbids, padded "
+                    "well past the twenty word minimum so the em-dash is the violation."
+                ),
+            },
+        )
+    assert "voice" in str(exc.value).lower()
+
+
+def test_validate_selection_payload_catches_missing_fields() -> None:
+    from matchbox.assemble import validate_selection_payload
+
+    assert validate_selection_payload({"schema_version": 1, "run_id": "r", "job_id": 1})
+    assert (
+        validate_selection_payload(
+            {
+                "schema_version": 1,
+                "run_id": "r",
+                "job_id": 1,
+                "selected_bullet_ids": [1],
+                "summary": "ok",
+            }
+        )
+        == []
+    )
+
+
 def test_smoke_fails_loud_when_requirements_missing(tmp_path: Path) -> None:
     conn = connect(tmp_path / "matchbox.db")
     migrate(conn)
