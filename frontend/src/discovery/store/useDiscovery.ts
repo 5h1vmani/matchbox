@@ -20,6 +20,8 @@ export interface LiveDiscoveryStore {
   roles: Role[];
   watch: WatchedCompany[];
   decide: (ids: string[], decision: DecisionInput) => LiveDecisionResult;
+  /** Stop watching a company. Optimistic; reconciles with the server list. */
+  unwatch: (company: string) => void;
 }
 
 export function useDiscovery(): LiveDiscoveryStore {
@@ -72,5 +74,10 @@ export function useDiscovery(): LiveDiscoveryStore {
     };
   }, [reconcile, refreshWatch]);
 
-  return useMemo(() => ({ roles, watch, decide }), [roles, watch, decide]);
+  const unwatch = useCallback((company: string) => {
+    setWatch((w) => w.filter((x) => x.company !== company)); // optimistic
+    void api.unwatch(company).then((list) => { if (list) setWatch(list); });
+  }, []);
+
+  return useMemo(() => ({ roles, watch, decide, unwatch }), [roles, watch, decide, unwatch]);
 }

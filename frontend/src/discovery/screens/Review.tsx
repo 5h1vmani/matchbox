@@ -9,6 +9,15 @@ import { Coverage, dcx, EligibilityRead, FitMeter, Freshness, fullLoc, Icon, Mon
 
 function fitRank(level: string): number { return ({ strong: 0, good: 1, stretch: 2 } as Record<string, number>)[level] ?? 3; }
 
+/* The set-aside row's secondary line: closed wins, then the visa/clearance
+   reason, then the geo (India) reason — so each row says why it was set aside. */
+function asideReason(role: Role): string {
+  if (role.freshness === "closed") return "Closed · " + (role.postedDaysAgo - 7) + "d ago";
+  if (role.eligibility.status === "ineligible" && role.eligibility.reason) return role.eligibility.reason;
+  if (role.indiaEligible === false) return "Outside India. You can only work from India.";
+  return role.eligibility.reason;
+}
+
 interface CardProps {
   role: Role;
   onDecide: (role: Role, decision: DecisionInput) => void;
@@ -90,20 +99,32 @@ interface ReviewProps {
 export function Review({ roles, onDecide, onOpenJD, onGoBrowse }: ReviewProps) {
   const [asideOpen, setAsideOpen] = useState(false);
 
+  // "India-eligible only" — default on (the user can work only in India).
+  // Persisted so the choice sticks across sessions. Off restores the old view.
+  const [indiaOnly, setIndiaOnly] = useState<boolean>(() => {
+    try { return localStorage.getItem("mb.review.indiaOnly") !== "0"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("mb.review.indiaOnly", indiaOnly ? "1" : "0"); } catch { /* ignore */ }
+  }, [indiaOnly]);
+
   // active queue: eligible/unclear + open, undecided. Closing-soon first, then fit.
+  // When the India filter is on, non-India roles drop to the set-aside group.
   const queue = useMemo(() =>
-    roles.filter((r) => !r.decision && r.eligibility.status !== "ineligible" && r.freshness !== "closed")
+    roles.filter((r) => !r.decision && r.eligibility.status !== "ineligible" && r.freshness !== "closed"
+        && !(indiaOnly && r.indiaEligible === false && !r.manual))
       .sort((a, b) => {
         const ac = a.freshness === "closing" ? 0 : 1, bc = b.freshness === "closing" ? 0 : 1;
         if (ac !== bc) return ac - bc;
         if (a.freshness === "closing" && b.freshness === "closing") return (a.closingInDays as number) - (b.closingInDays as number);
         return fitRank(a.fit.level) - fitRank(b.fit.level) || a.postedDaysAgo - b.postedDaysAgo;
-      }), [roles]);
+      }), [roles, indiaOnly]);
 
-  // set aside: ineligible or closed, undecided
+  // set aside: ineligible, closed, or (when the filter is on) not India-eligible.
   const aside = useMemo(() =>
-    roles.filter((r) => !r.decision && (r.eligibility.status === "ineligible" || r.freshness === "closed")),
-  [roles]);
+    roles.filter((r) => !r.decision && (r.eligibility.status === "ineligible" || r.freshness === "closed"
+        || (indiaOnly && r.indiaEligible === false && !r.manual))),
+  [roles, indiaOnly]);
 
   // tally of decisions made this session
   const tally = useMemo(() => {
@@ -133,13 +154,20 @@ export function Review({ roles, onDecide, onOpenJD, onGoBrowse }: ReviewProps) {
 
   return (
     <div className="review">
-      <div className="disc-head" style={{ maxWidth: "none" }}>
+      <div className="disc-head" style={{ maxWidth: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div>
           <h1>Today's roles</h1>
           <p className="sub">{total > 0
             ? <span>We found <b>{total}</b> fresh role{total > 1 ? "s" : ""} worth a look. Decide on each, or set it aside.</span>
             : <span>Nothing new to review right now.</span>}</p>
         </div>
+        <label
+          title="Show only roles you can work from India (in-country or India-remote). Others move to Set aside."
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--muted-foreground)", whiteSpace: "nowrap", cursor: "pointer", userSelect: "none", marginTop: 6 }}
+        >
+          <input type="checkbox" checked={indiaOnly} onChange={(e) => setIndiaOnly(e.target.checked)} />
+          India-eligible only
+        </label>
       </div>
 
       {current ? (
@@ -186,7 +214,7 @@ export function Review({ roles, onDecide, onOpenJD, onGoBrowse }: ReviewProps) {
                   <MonoLogo role={role} size={30} radius={7} />
                   <div className="info">
                     <div className="l">{role.title} · {role.company}</div>
-                    <div className="s">{role.freshness === "closed" ? "Closed · " + (role.postedDaysAgo - 7) + "d ago" : role.eligibility.reason}</div>
+                    <div className="s">{asideReason(role)}</div>
                   </div>
                   <div className="acts">
                     <button className="btn ghost small" onClick={() => onOpenJD(role)}>View</button>

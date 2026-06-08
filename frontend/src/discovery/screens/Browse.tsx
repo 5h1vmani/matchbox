@@ -2,7 +2,7 @@
    roles, and multi-select for the batch hand-off. "Eligible only" defaults on.
    Ported byte-identical from designs/v1.1/Browse.jsx; window.* globals swapped
    for ES imports, the unused `flash` prop dropped. */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DecisionInput, Role } from "../types";
 import { dcx, EligibilityRead, FIT_META, Freshness, fullLoc, Icon, MonoLogo } from "../dui";
 
@@ -67,6 +67,23 @@ const FIT_FILTERS: { id: string; label: string; tone?: string }[] = [
   { id: "good", label: "Good", tone: "#574747" },
   { id: "stretch", label: "Stretch", tone: "#8a5a1f" },
 ];
+const SORTS = [
+  { id: "fit", label: "Best fit" },
+  { id: "newest", label: "Newest" },
+  { id: "closing", label: "Closing soon" },
+  { id: "salary", label: "Salary disclosed" },
+];
+const FITRANK: Record<string, number> = { strong: 0, good: 1, stretch: 2 };
+const PAGE = 60; // render cap; "Show more" grows it (7k+ roles must not all mount at once)
+const SKEY = "mb.browse"; // session-persisted filter bundle
+const INDIA_KEY = "mb.review.indiaOnly"; // shared with Today's roles, kept in sync
+
+function loadBrowseState(): Record<string, unknown> {
+  try { return JSON.parse(sessionStorage.getItem(SKEY) || "{}"); } catch { return {}; }
+}
+function indiaDefault(): boolean {
+  try { return localStorage.getItem(INDIA_KEY) !== "0"; } catch { return true; }
+}
 
 interface BrowseProps {
   roles: Role[];
@@ -79,35 +96,107 @@ interface BrowseProps {
 }
 
 export function Browse({ roles, sel, onToggleSel, onClearSel, onOpen, onDecide, onBatch }: BrowseProps) {
-  const [eligibleOnly, setEligibleOnly] = useState(true);
-  const [fresh, setFresh] = useState("all");
-  const [fit, setFit] = useState("all");
-  const [remoteOnly, setRemoteOnly] = useState(false);
+  const saved = useRef(loadBrowseState()).current;
+  const [q, setQ] = useState<string>((saved.q as string) ?? "");
+  const [eligibleOnly, setEligibleOnly] = useState<boolean>((saved.eligibleOnly as boolean) ?? true);
+  const [fresh, setFresh] = useState<string>((saved.fresh as string) ?? "all");
+  const [fit, setFit] = useState<string>((saved.fit as string) ?? "all");
+  const [remoteOnly, setRemoteOnly] = useState<boolean>((saved.remoteOnly as boolean) ?? false);
+  const [sort, setSort] = useState<string>((saved.sort as string) ?? "fit");
+  const [indiaOnly, setIndiaOnly] = useState<boolean>(indiaDefault);
+  const [manualOnly, setManualOnly] = useState<boolean>((saved.manualOnly as boolean) ?? false);
+  const [visible, setVisible] = useState(PAGE);
+
+  // Persist the transient filters (session) and the India preference (localStorage,
+  // shared with Today's roles so the two screens stay in sync).
+  useEffect(() => {
+    try { sessionStorage.setItem(SKEY, JSON.stringify({ q, eligibleOnly, fresh, fit, remoteOnly, sort, manualOnly })); } catch { /* ignore */ }
+  }, [q, eligibleOnly, fresh, fit, remoteOnly, sort, manualOnly]);
+  useEffect(() => {
+    try { localStorage.setItem(INDIA_KEY, indiaOnly ? "1" : "0"); } catch { /* ignore */ }
+  }, [indiaOnly]);
+  // A changed filter/search resets paging back to the top.
+  useEffect(() => { setVisible(PAGE); }, [q, eligibleOnly, fresh, fit, remoteOnly, sort, indiaOnly, manualOnly]);
+
+  const terms = useMemo(() => q.toLowerCase().split(/\s+/).filter(Boolean), [q]);
 
   const list = useMemo(() => {
-    return roles.filter((r) => {
+    const out = roles.filter((r) => {
       if (r.decision === "dismissed" || r.decision === "tracked" || r.decision === "tailoring") return false;
       if (eligibleOnly && r.eligibility.status === "ineligible") return false;
       if (eligibleOnly && r.freshness === "closed") return false;
+      // A role you added by hand is exempt from the India filter -- you vouched for it.
+      if (indiaOnly && r.indiaEligible === false && !r.manual) return false;
+      if (manualOnly && !r.manual) return false;
       if (remoteOnly && !r.remote) return false;
       if (fit !== "all" && r.fit.level !== fit) return false;
       if (fresh === "new" && r.postedDaysAgo > 7) return false;
       if (fresh === "closing" && r.freshness !== "closing") return false;
+      // Tokenized search across company + role + location: every word must hit.
+      if (terms.length) {
+        const hay = `${r.company} ${r.title} ${r.location}`.toLowerCase();
+        if (!terms.every((t) => hay.includes(t))) return false;
+      }
       return true;
-    }).sort((a, b) => {
+    });
+    out.sort((a, b) => {
+      if (sort === "newest") return a.postedDaysAgo - b.postedDaysAgo;
+      if (sort === "salary") {
+        const av = a.salary ? 0 : 1, bv = b.salary ? 0 : 1;
+        if (av !== bv) return av - bv; // disclosed first, then best fit
+        return FITRANK[a.fit.level] - FITRANK[b.fit.level];
+      }
+      // "fit" (default) and "closing" both lead with closing-soon, as before.
       const ac = a.freshness === "closing" ? 0 : 1, bc = b.freshness === "closing" ? 0 : 1;
       if (ac !== bc) return ac - bc;
-      return (({ strong: 0, good: 1, stretch: 2 } as Record<string, number>)[a.fit.level]) - (({ strong: 0, good: 1, stretch: 2 } as Record<string, number>)[b.fit.level]);
+      if (sort === "closing" && a.freshness === "closing" && b.freshness === "closing") {
+        return (a.closingInDays ?? 1e9) - (b.closingInDays ?? 1e9);
+      }
+      return FITRANK[a.fit.level] - FITRANK[b.fit.level];
     });
-  }, [roles, eligibleOnly, fresh, fit, remoteOnly]);
+    return out;
+  }, [roles, eligibleOnly, fresh, fit, remoteOnly, indiaOnly, manualOnly, sort, terms]);
+
+  const shown = list.slice(0, visible);
+  const anyActive = !!q || fit !== "all" || fresh !== "all" || !eligibleOnly || remoteOnly || !indiaOnly || manualOnly || sort !== "fit";
+  const clearAll = () => {
+    setQ(""); setFit("all"); setFresh("all"); setEligibleOnly(true); setRemoteOnly(false); setIndiaOnly(true); setManualOnly(false); setSort("fit");
+  };
 
   return (
     <div>
       <div className="disc-head">
         <div>
           <h1>Browse roles</h1>
-          <p className="sub">Every open role we're tracking for you. Filter, then pick. Select a few to tailor at once.</p>
+          <p className="sub">Every open role we're tracking for you. Search or filter, then pick. Select a few to tailor at once.</p>
         </div>
+      </div>
+
+      {/* search + sort */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+        <div style={{ position: "relative", flex: "1 1 260px", minWidth: 200 }}>
+          <Icon name="search" size={15} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "var(--muted-foreground)", pointerEvents: "none" }} />
+          <input
+            className="inp"
+            style={{ width: "100%", paddingLeft: 32, paddingRight: q ? 30 : 11 }}
+            placeholder="Search company, role, or location"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            aria-label="Search roles by company, role, or location"
+          />
+          {q && (
+            <button className="iconbtn" title="Clear search" onClick={() => setQ("")}
+              style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}>
+              <Icon name="x" size={14} />
+            </button>
+          )}
+        </div>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--muted-foreground)", whiteSpace: "nowrap" }}>
+          Sort
+          <select className="inp" value={sort} onChange={(e) => setSort(e.target.value)} style={{ padding: "7px 10px" }}>
+            {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        </label>
       </div>
 
       <div className="filters">
@@ -131,6 +220,20 @@ export function Browse({ roles, sel, onToggleSel, onClearSel, onOpen, onDecide, 
         <button className={dcx("fchip", "toggle", remoteOnly && "active")} onClick={() => setRemoteOnly((v) => !v)}>
           <Icon name={remoteOnly ? "check" : "circle"} size={13} /> Remote
         </button>
+        <button className={dcx("fchip", "toggle", indiaOnly && "active")} onClick={() => setIndiaOnly((v) => !v)}
+          title="Roles you can work from India (in-country or India-remote)">
+          <Icon name={indiaOnly ? "check" : "circle"} size={13} /> India-eligible
+        </button>
+        <button className={dcx("fchip", "toggle", manualOnly && "active")} onClick={() => setManualOnly((v) => !v)}
+          title="Only roles you added by hand">
+          <Icon name={manualOnly ? "check" : "circle"} size={13} /> Added by me
+        </button>
+        {anyActive && (
+          <>
+            <span className="fsep" />
+            <button className="fchip" onClick={clearAll}><Icon name="x" size={13} /> Clear all</button>
+          </>
+        )}
       </div>
 
       <div className="fbar2">
@@ -140,15 +243,25 @@ export function Browse({ roles, sel, onToggleSel, onClearSel, onOpen, onDecide, 
 
       {list.length === 0 ? (
         <div className="quiet" style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
-          <div className="big">No roles match these filters.</div>Try widening fit or freshness.
+          <div className="big">No roles match {q ? `“${q}”` : "these filters"}.</div>
+          {anyActive ? (
+            <button className="btn ghost small" style={{ marginTop: 10 }} onClick={clearAll}>Clear all filters</button>
+          ) : "Try widening fit or freshness."}
         </div>
       ) : (
-        <div className="rgrid">
-          {list.map((role) => (
-            <RoleTile key={role.id} role={role} selected={sel.has(role.id)}
-              onToggleSel={onToggleSel} onOpen={onOpen} onDecide={onDecide} />
-          ))}
-        </div>
+        <>
+          <div className="rgrid">
+            {shown.map((role) => (
+              <RoleTile key={role.id} role={role} selected={sel.has(role.id)}
+                onToggleSel={onToggleSel} onOpen={onOpen} onDecide={onDecide} />
+            ))}
+          </div>
+          {list.length > visible && (
+            <button className="showmore" onClick={() => setVisible((v) => v + PAGE)}>
+              Show {Math.min(PAGE, list.length - visible)} more <Icon name="chevron-down" size={15} />
+            </button>
+          )}
+        </>
       )}
 
       {sel.size > 0 && (

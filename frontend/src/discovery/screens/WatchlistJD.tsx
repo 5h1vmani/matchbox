@@ -1,13 +1,38 @@
 /* Matchbox — Discovery: Watchlist + JD drawer (the deeper moment).
    Ported byte-identical from designs/v1.1/WatchlistJD.jsx; window.* globals
    swapped for ES imports. */
+import { Fragment } from "react";
 import type { DecisionInput, Role, WatchedCompany } from "../types";
 import { Coverage, dcx, EligibilityRead, FitMeter, Freshness, fullLoc, Icon, MonoLogo } from "../dui";
 import { useDialog } from "../../lib/useDialog";
 
 type Flash = (msg: string) => void;
 
-export function Watchlist({ watch, flash }: { watch: WatchedCompany[]; flash: Flash }) {
+/* Render one JD paragraph. Consecutive lines starting with "• " (or "- ") from
+   the HTML stripper become a real bullet list; other lines become paragraphs. */
+function JdBlock({ text }: { text: string }) {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const blocks: { bullet: boolean; items: string[] }[] = [];
+  for (const l of lines) {
+    const bullet = l.startsWith("• ") || l.startsWith("- ");
+    const last = blocks[blocks.length - 1];
+    if (last && last.bullet === bullet) last.items.push(l);
+    else blocks.push({ bullet, items: [l] });
+  }
+  return (
+    <>
+      {blocks.map((b, i) => (
+        <Fragment key={i}>
+          {b.bullet
+            ? <ul>{b.items.map((l, j) => <li key={j}>{l.replace(/^[•-]\s+/, "")}</li>)}</ul>
+            : b.items.map((l, j) => <p key={j}>{l}</p>)}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+export function Watchlist({ watch, flash, onUnwatch }: { watch: WatchedCompany[]; flash: Flash; onUnwatch: (company: string) => void }) {
   return (
     <div>
       <div className="disc-head">
@@ -29,7 +54,7 @@ export function Watchlist({ watch, flash }: { watch: WatchedCompany[]; flash: Fl
               </div>
               <div className="wnote">{w.note}</div>
             </div>
-            <button className="iconbtn bell" title="Stop watching" onClick={() => flash("Stopped watching " + w.company)}>
+            <button className="iconbtn bell" title="Stop watching" onClick={() => { onUnwatch(w.company); flash("Stopped watching " + w.company); }}>
               <Icon name="bell-ring" size={16} />
             </button>
           </div>
@@ -47,7 +72,7 @@ interface DrawerProps {
 }
 
 /* JD drawer — full description + the rationale alongside. Reuses .scrim/.drawer. */
-export function JDDrawer({ role, onDecide, onClose, flash }: DrawerProps) {
+export function JDDrawer({ role, onDecide, onClose }: DrawerProps) {
   const dialogRef = useDialog<HTMLDivElement>(onClose);
   const dimmed = role.eligibility.status === "ineligible" || role.freshness === "closed";
   return (
@@ -56,7 +81,11 @@ export function JDDrawer({ role, onDecide, onClose, flash }: DrawerProps) {
         <div className="drawer__top">
           <button className="iconbtn" onClick={onClose} title="Close"><Icon name="x" size={18} /></button>
           <span className="sp" style={{ marginLeft: "auto" }} />
-          <button className="iconbtn" title="Open original posting" onClick={() => flash("Would open the job posting")}><Icon name="external-link" size={16} /></button>
+          {role.link ? (
+            <a className="iconbtn" href={role.link} target="_blank" rel="noopener noreferrer" title="Open original posting" style={{ textDecoration: "none" }}><Icon name="external-link" size={16} /></a>
+          ) : (
+            <button className="iconbtn" title="No link available" disabled><Icon name="external-link" size={16} /></button>
+          )}
         </div>
         <div className="drawer__body">
           <div className="dhdr" style={{ marginBottom: 16 }}>
@@ -91,8 +120,14 @@ export function JDDrawer({ role, onDecide, onClose, flash }: DrawerProps) {
           <div className="jd-section">
             <h4>Full description</h4>
             <div className="jd-text">
-              {role.jd.map((para, i) => <p key={i}>{para}</p>)}
+              {role.jd.map((para, i) => <JdBlock key={i} text={para} />)}
             </div>
+            {role.link && (
+              <a className="jd-open" href={role.link} target="_blank" rel="noopener noreferrer"
+                 style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 12, fontSize: 13, fontWeight: 600, color: "var(--oat-600, #2f5d72)", textDecoration: "none" }}>
+                Open original posting <Icon name="external-link" size={14} />
+              </a>
+            )}
           </div>
 
           <div className="jd-section">

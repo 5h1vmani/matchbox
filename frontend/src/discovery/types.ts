@@ -40,6 +40,14 @@ export interface Role {
   link: string;
   fit: FitRead;
   eligibility: EligibilityRead;
+  /** Deterministic geo gate (backend rules.india_eligible): can this role be
+      worked from India? Drives the "India-eligible only" filter on Today's
+      roles. Optional: only the live API sets it, so the offline sample fixture
+      (a different persona) is unaffected — only an explicit `false` filters. */
+  indiaEligible?: boolean;
+  /** A role you added by hand (Sources → Add a role) rather than one discovery
+      found. Drives the "Added by me" filter; also exempt from the India filter. */
+  manual?: boolean;
   coverage: Coverage | null;
   freshness: Freshness;
   closingInDays: number | null;

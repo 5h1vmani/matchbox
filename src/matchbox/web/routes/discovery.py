@@ -31,6 +31,10 @@ class BatchBody(BaseModel):
     decision: str
 
 
+class WatchlistBody(BaseModel):
+    company: str
+
+
 def _job_id(raw: str) -> int:
     try:
         return int(raw)
@@ -59,6 +63,13 @@ def role_detail(job_id: int, conn: ConnDep) -> dict[str, Any]:
 
 @router.get("/watchlist")
 def watchlist(conn: ConnDep) -> list[dict[str, Any]]:
+    return repo.load_watchlist(conn)
+
+
+@router.post("/unwatch")
+def unwatch(body: WatchlistBody, conn: ConnDep) -> list[dict[str, Any]]:
+    """Stop watching a company; returns the updated watchlist."""
+    repo.remove_watchlist(conn, body.company)
     return repo.load_watchlist(conn)
 
 

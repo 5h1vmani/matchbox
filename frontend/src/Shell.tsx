@@ -180,7 +180,7 @@ export function Shell() {
   const [apps, actions] = useApps();
   const live = useDiscovery();
   const mem = useDiscoveryMemory();
-  const { roles, watch } = USE_SAMPLE ? mem : live;
+  const { roles, watch, unwatch } = USE_SAMPLE ? mem : live;
   type RunHandoff = { runId: string; prompt: string } | null;
   const decide = useCallback((ids: string[], decision: DecisionInput): { undo: () => void; run?: Promise<RunHandoff> } => {
     if (USE_SAMPLE) return { undo: mem.decide(ids, decision) };
@@ -302,7 +302,7 @@ export function Shell() {
   let screen: ReactNode;
   if (nav === "review") screen = <Review roles={reviewRoles} onDecide={onDecide} onOpenJD={(r) => setJd(r.id)} onGoBrowse={() => setNav("browse")} />;
   else if (nav === "browse") screen = <Browse roles={roles} sel={sel} onToggleSel={toggleSel} onClearSel={clearSel} onOpen={(r) => setJd(r.id)} onDecide={onDecide} onBatch={onBatch} />;
-  else if (nav === "watchlist") screen = <Watchlist watch={watch} flash={flash} />;
+  else if (nav === "watchlist") screen = <Watchlist watch={watch} flash={flash} onUnwatch={unwatch} />;
   else if (nav === "insights") screen = <Insights apps={apps} dir={DIR} />;
   else if (nav === "workspace") screen = <Workspace flash={flash} />;
   else if (nav === "offers") screen = <Offers flash={flash} />;

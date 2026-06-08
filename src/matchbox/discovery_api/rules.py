@@ -20,6 +20,7 @@ The crux is mapping our scoring artifacts onto the design's fixed `Role` reads:
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from typing import Any
 
@@ -167,6 +168,94 @@ def eligibility_status(
     return eligibility(breakdown)
 
 
+# ── geo eligibility (deterministic India filter) ────────────────────────────────
+#
+# The user can only work in India (in-country, or remote *from* India). The
+# scorer treats location as a soft 10%-weight signal, so a great-fit foreign role
+# still bands "strong" -- this hard, no-LLM predicate is what the Today's-roles
+# "India-eligible only" filter uses to set those roles aside. By the user's rule a
+# remote role qualifies only when India is actually named; a bare
+# "Worldwide"/"Anywhere" does not.
+
+# Country-column values (exact, after normalize) that mean India. Adzuna sends the
+# ISO-ish "in"; ATS pollers leave the column NULL and fold the country into the
+# location string instead, so the text match below carries those.
+_INDIA_COUNTRY = {"in", "ind", "india", "bharat"}
+
+# The country word -- word-bounded so "Indiana"/"Indianapolis" never match (the
+# 'n'/'a' that follows defeats the boundary). "Indian"/"Indians" do count.
+_INDIA_WORD = re.compile(r"\b(?:indian?s?|bharat)\b", re.I)
+
+# Major Indian metros. Matched in the location/remote-scope always, and in the JD
+# body too when the country is unknown -- many India roles state the city only in
+# the JD ("Location: Bengaluru/Hyderabad/..."). An explicit foreign country blocks
+# the JD-body match, so a US role that name-drops a Bangalore office is not pulled
+# in. Curated and tunable; a few names are shared with non-India places (e.g.
+# Delhi, Ontario) but the filter only *sets a role aside* -- visible, never lost.
+_INDIA_CITIES = (
+    "bengaluru",
+    "bangalore",
+    "mumbai",
+    "delhi",
+    "gurgaon",
+    "gurugram",
+    "noida",
+    "hyderabad",
+    "pune",
+    "chennai",
+    "kolkata",
+    "ahmedabad",
+    "jaipur",
+    "kochi",
+    "cochin",
+    "indore",
+    "chandigarh",
+    "coimbatore",
+    "nagpur",
+    "mysuru",
+    "mysore",
+    "trivandrum",
+    "thiruvananthapuram",
+    "visakhapatnam",
+    "vadodara",
+    "surat",
+    "lucknow",
+)
+_INDIA_CITY_RE = re.compile(r"\b(?:" + "|".join(_INDIA_CITIES) + r")\b", re.I)
+
+
+def india_eligible(
+    *,
+    country: str | None,
+    location: str | None,
+    remote_scope: str | None,
+    jd_text: str | None,
+) -> bool:
+    """Deterministic 'can this role be worked from India' test. No LLM.
+
+    True when the role is in India or names India (or a major Indian city) as a
+    place a candidate may sit. A bare 'Worldwide'/'Anywhere' remote does NOT pass.
+
+    * country in {in, ind, india, bharat}                  -> True
+    * 'India'/an Indian city in location or remote_scope   -> True
+    * ...or in the JD body, when the country is unknown
+      (many India roles state the city only in the JD)     -> True
+    * an explicit foreign country blocks the JD-body match, so a role that merely
+      name-drops an India office is not pulled in.
+    """
+    c = (country or "").strip().lower()
+    if c in _INDIA_COUNTRY:
+        return True
+    # An explicit foreign country is authoritative: only the stated location or
+    # remote scope can still make it India. Unknown country -> the JD body counts.
+    haystack = (
+        " ".join(p for p in (location, remote_scope) if p)
+        if c
+        else " ".join(p for p in (location, remote_scope, jd_text) if p)
+    )
+    return bool(_INDIA_WORD.search(haystack) or _INDIA_CITY_RE.search(haystack))
+
+
 # ── freshness ──────────────────────────────────────────────────────────────────
 
 
@@ -278,15 +367,114 @@ def salary_display(
     return f"{sym}{num}{unit}{suffix}"
 
 
+# Most historically-ingested JDs were stored by the old stripper as one
+# structureless block (no newlines, HTML gone, not re-fetchable). When the stored
+# text has nothing to split on, `_reparagraph` rebuilds readable paragraphs:
+# break before known section headers, then group the rest into sentence-sized
+# paragraphs, word-wrapping any run that has no sentence punctuation (a flattened
+# bullet list) so nothing renders as a wall of text. New scans keep real structure
+# via core.text.strip_html and never reach this path.
+
+# Distinctive multi-word headers: split before them even without a trailing colon.
+_HEADER_TIER1 = (
+    r"who we are|who you are|about us|about the team|about the role|about you|"
+    r"about the company|what you'?ll do|what you will do|what you will be doing|"
+    r"what you'?ll be doing|things you will do|things you'?ll do|what you'?ll bring|"
+    r"what you'?ll need|what you bring|what we'?re looking for|what we are looking for|"
+    r"what we offer|what'?s in it for you|why you'?ll love|why join us|"
+    r"key responsibilities|your responsibilities|in this role|the opportunity|"
+    r"your mission|your impact|nice to have|bonus points|must haves?|how we work|"
+    r"how to apply|hiring process|interview process|ready to apply|our stack|"
+    r"tech stack|our values|perks and benefits|benefits and perks|equal opportunity|"
+    r"equal employment"
+)
+# Generic single words: split only when used as a label (followed by a colon), so
+# we never break mid-sentence ("the requirements include ...").
+_HEADER_TIER2 = (
+    r"responsibilities|requirements|qualifications|benefits|perks|compensation|"
+    r"the role|your role"
+)
+_SECTION_SPLIT_RE = re.compile(
+    r"\s+(?=(?:" + _HEADER_TIER1 + r")\b|(?:" + _HEADER_TIER2 + r")\b\s*:)", re.I
+)
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
+_PARA_TARGET = 300  # aim for paragraphs around this many characters
+_PARA_MAX = 460  # a chunk longer than this gets broken down further
+
+
+def _wrap_words(text: str, target: int) -> list[str]:
+    """Break a run with no sentence punctuation (a flattened bullet list) at word
+    boundaries into target-sized pieces, so it never renders as a wall."""
+    out: list[str] = []
+    cur = ""
+    for w in text.split():
+        if cur and len(cur) + 1 + len(w) > target:
+            out.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}" if cur else w
+    if cur:
+        out.append(cur)
+    return out
+
+
+def _sentence_group(text: str, target: int = _PARA_TARGET) -> list[str]:
+    """Group sentences into ~target-sized paragraphs, word-wrapping any single run
+    that has no sentence breaks."""
+    units: list[str] = []
+    for piece in _SENTENCE_SPLIT_RE.split(text):
+        units += [piece] if len(piece) <= target + 220 else _wrap_words(piece, target)
+    out: list[str] = []
+    cur = ""
+    for s in units:
+        if cur and len(cur) + len(s) > target:
+            out.append(cur.strip())
+            cur = s
+        else:
+            cur = f"{cur} {s}".strip() if cur else s
+    if cur.strip():
+        out.append(cur.strip())
+    return out
+
+
+def _reparagraph(text: str) -> list[str]:
+    """Rebuild paragraphs from one flattened block: header breaks first, then
+    sentence-sized grouping, so a legacy JD reads as paragraphs, not one blob."""
+    out: list[str] = []
+    for chunk in _SECTION_SPLIT_RE.split(text):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        out += [chunk] if len(chunk) <= _PARA_MAX else _sentence_group(chunk)
+    return out
+
+
+def jd_lead(jd_text: str | None) -> str:
+    """The first paragraph only -- cheap, for the list teaser. Avoids the full
+    `_reparagraph` (which the list would run thousands of times); the drawer pays
+    that cost once, in `jd_paragraphs`."""
+    if not jd_text or not jd_text.strip():
+        return ""
+    text = jd_text.replace("\r\n", "\n").strip()
+    for sep in ("\n\n", "\n"):
+        if sep in text:
+            return text.split(sep, 1)[0].strip()
+    return text
+
+
 def jd_paragraphs(jd_text: str | None) -> list[str]:
     """Split a JD blob into display paragraphs (blank-line separated; falls back
-    to single newlines; never empty when there is any text)."""
+    to single newlines; never empty when there is any text). Legacy rows stored as
+    one structureless block are rebuilt with `_reparagraph` so the drawer reads as
+    paragraphs instead of a wall."""
     if not jd_text or not jd_text.strip():
         return []
     text = jd_text.replace("\r\n", "\n").strip()
     parts = [p.strip() for p in text.split("\n\n") if p.strip()]
     if len(parts) <= 1:
         parts = [p.strip() for p in text.split("\n") if p.strip()]
+    if len(parts) <= 1:
+        parts = _reparagraph(text)
     return parts or [text]
 
 

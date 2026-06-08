@@ -87,6 +87,138 @@ def test_deterministic_ineligible_unit() -> None:
     )
 
 
+# ── geo: the deterministic India filter (rules.india_eligible) ───────────────────
+
+
+def test_india_eligible_country_code() -> None:
+    assert rules.india_eligible(country="in", location=None, remote_scope=None, jd_text=None)
+    assert rules.india_eligible(country="India", location=None, remote_scope=None, jd_text=None)
+    assert rules.india_eligible(country=" IND ", location=None, remote_scope=None, jd_text=None)
+
+
+def test_india_eligible_word_in_location() -> None:
+    assert rules.india_eligible(
+        country=None, location="Bengaluru, India", remote_scope=None, jd_text=None
+    )
+    assert rules.india_eligible(
+        country=None, location="Remote - India", remote_scope=None, jd_text=None
+    )
+
+
+def test_india_eligible_major_city_without_country_word() -> None:
+    # Decision Q1: curated metros count even when "India" is never written.
+    for city in ("Bengaluru", "Mumbai", "Hyderabad", "Gurugram", "Pune"):
+        assert rules.india_eligible(country=None, location=city, remote_scope=None, jd_text=None), (
+            city
+        )
+
+
+def test_india_eligible_remote_scope_or_jd_mentions_india() -> None:
+    assert rules.india_eligible(country=None, location="Remote", remote_scope="india", jd_text=None)
+    assert rules.india_eligible(
+        country=None,
+        location="Remote",
+        remote_scope=None,
+        jd_text="Fully remote. Open to candidates based in India.",
+    )
+
+
+def test_not_india_eligible_foreign_role() -> None:
+    assert not rules.india_eligible(
+        country="us", location="New York", remote_scope=None, jd_text="Onsite in NYC."
+    )
+
+
+def test_not_india_eligible_bare_worldwide_remote() -> None:
+    # Decision Q2: a global/worldwide remote that never names India does NOT pass.
+    assert not rules.india_eligible(
+        country=None,
+        location="Remote",
+        remote_scope=None,
+        jd_text="Work from anywhere in the world.",
+    )
+    assert not rules.india_eligible(
+        country=None, location="Worldwide", remote_scope=None, jd_text=None
+    )
+
+
+def test_indiana_is_not_india() -> None:
+    # Word-boundary guard: 'Indiana'/'Indianapolis' must never match 'India'.
+    assert not rules.india_eligible(
+        country="us", location="Indianapolis, Indiana", remote_scope=None, jd_text=None
+    )
+
+
+def test_india_city_in_jd_body_does_not_pull_in_a_foreign_role() -> None:
+    # An explicit foreign country blocks the JD-body city match, so a US role that
+    # only name-drops a Bangalore office stays out.
+    assert not rules.india_eligible(
+        country="us",
+        location="San Francisco",
+        remote_scope=None,
+        jd_text="You'll partner daily with our Bangalore engineering team.",
+    )
+
+
+def test_india_city_in_jd_counts_when_country_unknown() -> None:
+    # Real case (a hand-added Deloitte USI role): the city is only in the JD body
+    # and there is no country -> India-eligible. The old "JD never counts" rule
+    # wrongly hid these.
+    jd = "Finance role. Location: Bengaluru/Hyderabad/Pune/Chennai. Qualifications: ..."
+    assert rules.india_eligible(country=None, location=None, remote_scope=None, jd_text=jd)
+
+
+def test_india_word_matches_indian_but_not_indiana() -> None:
+    assert rules.india_eligible(
+        country=None, location=None, remote_scope=None, jd_text="Open to Indian nationals."
+    )
+    assert not rules.india_eligible(
+        country="us", location="Indianapolis, Indiana", remote_scope=None, jd_text=None
+    )
+
+
+def test_serialize_exposes_india_eligible_true(tmp_path: Path) -> None:
+    conn = connect(tmp_path / "g.db")
+    migrate(conn)
+    jid = _seed(conn, url="https://j/in", location="Bengaluru, India", country="in")
+    role = repo.load_one(conn, jid)
+    assert role is not None
+    assert role["indiaEligible"] is True
+    conn.close()
+
+
+def test_serialize_marks_foreign_role_not_india_eligible(tmp_path: Path) -> None:
+    conn = connect(tmp_path / "g.db")
+    migrate(conn)
+    jid = _seed(conn, url="https://j/us", location="New York", country="us", jd_text="Onsite NYC.")
+    role = repo.load_one(conn, jid)
+    assert role is not None
+    assert role["indiaEligible"] is False
+    conn.close()
+
+
+def test_serialize_flags_hand_added_role_as_manual(tmp_path: Path) -> None:
+    conn = connect(tmp_path / "m.db")
+    migrate(conn)
+    # add_job sets neither source nor posted_at -> a hand-added role.
+    jid = _seed(conn, url="https://j/byhand")
+    role = repo.load_one(conn, jid)
+    assert role is not None
+    assert role["manual"] is True
+    conn.close()
+
+
+def test_serialize_scanned_role_is_not_manual(tmp_path: Path) -> None:
+    conn = connect(tmp_path / "m.db")
+    migrate(conn)
+    # The scanners always stamp a posting date; that marks a role as discovered.
+    jid = _seed(conn, url="https://j/scanned", posted_at="2026-06-01T00:00:00Z")
+    role = repo.load_one(conn, jid)
+    assert role is not None
+    assert role["manual"] is False
+    conn.close()
+
+
 def test_snapshot_predicted_fit_on_application(tmp_path: Path) -> None:
     """create_application records the predicted band/score for later calibration."""
     conn = connect(tmp_path / "e.db")

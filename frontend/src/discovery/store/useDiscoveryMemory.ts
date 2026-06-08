@@ -11,6 +11,8 @@ export interface DiscoveryStore {
   watch: WatchedCompany[];
   /** Apply a decision to one role; returns an undo thunk. */
   decide: (ids: string[], decision: DecisionInput) => () => void;
+  /** Stop watching a company (removes the tile from the in-memory watchlist). */
+  unwatch: (company: string) => void;
 }
 
 export function useDiscoveryMemory(): DiscoveryStore {
@@ -38,5 +40,9 @@ export function useDiscoveryMemory(): DiscoveryStore {
     };
   }, []);
 
-  return useMemo(() => ({ roles, watch, decide }), [roles, watch, decide]);
+  const unwatch = useCallback((company: string) => {
+    setWatch((w) => w.filter((x) => x.company !== company));
+  }, []);
+
+  return useMemo(() => ({ roles, watch, decide, unwatch }), [roles, watch, decide, unwatch]);
 }

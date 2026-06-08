@@ -261,6 +261,16 @@ def test_watch_upserts_company_into_watchlist(conn):
     assert rows["c"] == 1
 
 
+def test_remove_watchlist_stops_watching(conn):
+    service.decide(conn, 1, "watch")
+    assert any(w["company"] == "Acme" for w in repo.load_watchlist(conn))
+    repo.remove_watchlist(conn, "Acme")
+    assert all(w["company"] != "Acme" for w in repo.load_watchlist(conn))
+    # Idempotent: removing a company that is not watched is a no-op, not an error.
+    repo.remove_watchlist(conn, "Acme")
+    assert all(w["company"] != "Acme" for w in repo.load_watchlist(conn))
+
+
 def test_skip_sets_skipped_on_today_and_stays_undecided(conn):
     today = date.today()
     res = service.decide(conn, 1, "skip", today=today)

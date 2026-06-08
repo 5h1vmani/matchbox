@@ -27,9 +27,9 @@ _RUNS_DIR = PROJECT_ROOT / "runs"
 # read from the tailoring artifact when a run exists for the job (see
 # `_coverage_for_job`).
 _ROLE_SELECT = """
-  SELECT j.id, j.company, j.title, j.location, j.url, j.apply_url, j.jd_text,
+  SELECT j.id, j.source, j.company, j.title, j.location, j.url, j.apply_url, j.jd_text,
          j.posted_at, j.score, j.score_breakdown_json,
-         j.remote, j.discovery_decision, j.skipped_on, j.freshness, j.closes_at,
+         j.country, j.remote, j.discovery_decision, j.skipped_on, j.freshness, j.closes_at,
          j.sponsorship, j.citizenship_required, j.clearance_required, j.remote_scope,
          j.salary_min, j.salary_max, j.salary_currency, j.salary_period,
          s.ats_type AS ats_type
@@ -67,9 +67,13 @@ def serialize(
         work_auth=work_auth,
     )
     fresh, closing_in = rules.freshness(row["freshness"], row["closes_at"], today)
-    jd = rules.jd_paragraphs(row["jd_text"])
     if jd_preview:
-        jd = [rules.jd_teaser(jd[0])] if jd else []
+        # The list only needs the teaser; jd_lead is O(1)-ish, where the full
+        # jd_paragraphs (legacy-block reparagraphing) would run per row x thousands.
+        lead = rules.jd_lead(row["jd_text"])
+        jd = [rules.jd_teaser(lead)] if lead else []
+    else:
+        jd = rules.jd_paragraphs(row["jd_text"])
 
     return {
         "id": str(row["id"]),
@@ -85,6 +89,21 @@ def serialize(
         "link": row["apply_url"] or row["url"],
         "fit": fit,
         "eligibility": elig,
+        # Deterministic geo gate for the "India-eligible only" filter (Today's
+        # roles). Separate from `eligibility` (the visa/clearance judge) so the
+        # two reasons never blur. country is NULL for ATS jobs (folded into
+        # location), so the predicate reads location/scope/JD too.
+        "indiaEligible": rules.india_eligible(
+            country=row["country"],
+            location=row["location"],
+            remote_scope=row["remote_scope"],
+            jd_text=row["jd_text"],
+        ),
+        # Provenance: a role you added by hand (no ATS source and no posting date,
+        # which the scanners always set) vs one discovery found. Drives the
+        # "Added by me" filter and exempts the role from the India filter -- you
+        # vouched for it by adding it, so it should never be silently hidden.
+        "manual": row["source"] is None and row["posted_at"] is None,
         # Coverage is real only once a tailoring run has matched this job's
         # requirements against the verified library; null until then.
         "coverage": coverage,
@@ -318,6 +337,14 @@ def upsert_watchlist(conn: sqlite3.Connection, company: str, note: str | None = 
             """,
             (company, note or "Watching for a role you're eligible for."),
         )
+
+
+def remove_watchlist(conn: sqlite3.Connection, company: str) -> None:
+    """Drop a company from the watchlist (the 'Stop watching' action). Idempotent
+    -- removing a company that is not watched is a no-op. Job-level decisions are
+    left untouched; this clears only the company tile."""
+    with transaction(conn):
+        conn.execute("DELETE FROM watchlist WHERE company = ?", (company,))
 
 
 def is_dismissed_duplicate(

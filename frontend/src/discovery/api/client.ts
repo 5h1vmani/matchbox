@@ -38,6 +38,17 @@ export const listRoles = () => getJSON<Role[]>("/api/discovery/roles", []);
 export const getRole = (id: string) => getJSON<Role | null>(`/api/discovery/roles/${id}`, null);
 export const listWatch = () => getJSON<WatchedCompany[]>("/api/discovery/watchlist", []);
 
+/** Stop watching a company; resolves to the updated watchlist, or null on failure. */
+async function postWatchlist(url: string, body: unknown): Promise<WatchedCompany[] | null> {
+  try {
+    const r = await fetch(url, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) });
+    return r.ok ? ((await r.json()) as WatchedCompany[]) : null;
+  } catch {
+    return null;
+  }
+}
+export const unwatch = (company: string) => postWatchlist("/api/discovery/unwatch", { company });
+
 export const decide = (id: string, decision: DecisionInput) =>
   postJSON("/api/discovery/decide", { id, decision });
 

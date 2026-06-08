@@ -11,25 +11,15 @@ person to verify when a vendor changes them.
 
 from __future__ import annotations
 
-import re
-from html import unescape
 from typing import Any
 
 import httpx
 
+from matchbox.core.text import strip_html
 from matchbox.discovery.base import AtsType, JobRecord, PollerError
 
 TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 USER_AGENT = "Matchbox/0.3 (https://github.com/5h1vmani/matchbox)"
-
-_TAG_RE = re.compile(r"<[^>]+>")
-_WS_RE = re.compile(r"\s+")
-
-
-def _strip_html(html: str | None) -> str:
-    if not html:
-        return ""
-    return _WS_RE.sub(" ", _TAG_RE.sub(" ", unescape(html))).strip()
 
 
 def _get_json(client: httpx.Client, url: str, ats_type: AtsType, slug: str) -> Any:
@@ -82,7 +72,7 @@ def poll_greenhouse(slug: str, company: str, client: httpx.Client) -> list[JobRe
                 location=(job.get("location") or {}).get("name"),
                 url=url,
                 apply_url=url,
-                jd_text=_strip_html(job.get("content", "")),
+                jd_text=strip_html(job.get("content", "")),
                 posted_at=job.get("updated_at"),
             )
         )
@@ -117,7 +107,7 @@ def poll_lever(slug: str, company: str, client: httpx.Client) -> list[JobRecord]
                 location=(job.get("categories") or {}).get("location"),
                 url=url,
                 apply_url=job.get("applyUrl") or url,
-                jd_text=(job.get("descriptionPlain") or _strip_html(job.get("description"))),
+                jd_text=(job.get("descriptionPlain") or strip_html(job.get("description"))),
                 posted_at=str(job["createdAt"]) if "createdAt" in job else None,
             )
         )
@@ -152,7 +142,7 @@ def poll_ashby(slug: str, company: str, client: httpx.Client) -> list[JobRecord]
                 location=job.get("locationName"),
                 url=url,
                 apply_url=job.get("applyUrl") or url,
-                jd_text=_strip_html(job.get("descriptionHtml", "")),
+                jd_text=strip_html(job.get("descriptionHtml", "")),
                 posted_at=job.get("publishedAt"),
             )
         )
@@ -197,7 +187,7 @@ def poll_workable(slug: str, company: str, client: httpx.Client) -> list[JobReco
                 location=loc_str,
                 url=url,
                 apply_url=url,
-                jd_text=_strip_html(job.get("description") or job.get("full_description") or ""),
+                jd_text=strip_html(job.get("description") or job.get("full_description") or ""),
                 posted_at=job.get("published_on"),
             )
         )
@@ -240,7 +230,7 @@ def poll_smartrecruiters(slug: str, company: str, client: httpx.Client) -> list[
                     location=loc_str,
                     url=str(posting_url),
                     apply_url=str(apply_url) if apply_url else None,
-                    jd_text=_strip_html(
+                    jd_text=strip_html(
                         job.get("jobAd", {})
                         .get("sections", {})
                         .get("jobDescription", {})
@@ -286,7 +276,7 @@ def poll_recruitee(slug: str, company: str, client: httpx.Client) -> list[JobRec
                 location=loc,
                 url=url,
                 apply_url=job.get("careers_apply_url") or url,
-                jd_text=_strip_html(job.get("description") or ""),
+                jd_text=strip_html(job.get("description") or ""),
                 posted_at=job.get("published_at"),
             )
         )

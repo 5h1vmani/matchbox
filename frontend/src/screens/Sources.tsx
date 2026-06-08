@@ -241,8 +241,15 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
     const ti = jobTitle.trim();
     const ur = jobUrl.trim();
     const jd = jobText.trim();
-    if (!co || !ti || !ur || !jd) {
-      flash("Company, title, URL, and the JD text are all required.");
+    // Validate on click (the button stays enabled) so a missing field names
+    // itself, instead of a silently-greyed button that appears to "do nothing".
+    const missing: string[] = [];
+    if (!co) missing.push("company");
+    if (!ti) missing.push("title");
+    if (!ur) missing.push("URL");
+    if (!jd) missing.push("JD text");
+    if (missing.length) {
+      flash("Still need: " + missing.join(", ") + ".");
       return;
     }
     setJobBusy(true);
@@ -254,22 +261,27 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
       apply_url: jobApplyUrl.trim() || null,
       location: jobLocation.trim() || null,
     });
-    setJobBusy(false);
-    if (res.ok) {
-      setJobCompany("");
-      setJobTitle("");
-      setJobUrl("");
-      setJobApplyUrl("");
-      setJobLocation("");
-      setJobText("");
-      flash("Role added. Score new roles to see it in Discover.");
-    } else if (res.status === 409) {
-      flash("A role with that URL already exists.");
-    } else if (res.status === 400) {
-      flash("Company, title, URL, and the JD text are all required.");
-    } else {
-      flash("Could not add that role.");
+    if (!res.ok) {
+      setJobBusy(false);
+      if (res.status === 409) flash("A role with that URL already exists.");
+      else if (res.status === 400) flash("Company, title, URL, and the JD text are all required.");
+      else flash("Could not add that role.");
+      return;
     }
+    // Auto-score so the role lands in Discover in one step (no separate click).
+    const scored = await jobsApi.scoreNewJobs();
+    setJobBusy(false);
+    setJobCompany("");
+    setJobTitle("");
+    setJobUrl("");
+    setJobApplyUrl("");
+    setJobLocation("");
+    setJobText("");
+    flash(
+      scored.scored > 0
+        ? "Added and scored. Open Today's roles — if it is not India-eligible it sits under Set aside."
+        : "Added. Click Score new roles, then check Today's roles.",
+    );
   };
 
   const scoreNew = async () => {
@@ -554,10 +566,10 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
         <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
           <button
             className="btn primary"
-            disabled={jobBusy || !jobCompany.trim() || !jobTitle.trim() || !jobUrl.trim() || !jobText.trim()}
+            disabled={jobBusy}
             onClick={() => void submitJob()}
           >
-            <Icon name="plus" size={14} /> Add role
+            <Icon name="plus" size={14} /> {jobBusy ? "Adding…" : "Add role"}
           </button>
           <button
             className="btn ghost"

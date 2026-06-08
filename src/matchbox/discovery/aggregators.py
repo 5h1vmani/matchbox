@@ -27,11 +27,11 @@ a vendor changes the contract.
 from __future__ import annotations
 
 import re
-from html import unescape
 from typing import Any
 
 import httpx
 
+from matchbox.core.text import strip_html
 from matchbox.discovery.base import JobRecord
 
 TIMEOUT = httpx.Timeout(15.0, connect=5.0)
@@ -42,9 +42,6 @@ USER_AGENT = "Matchbox/0.4 (https://github.com/5h1vmani/matchbox)"
 ADZUNA_ATTRIBUTION = "Jobs by Adzuna"
 HIMALAYAS_ATTRIBUTION = "Remote jobs by Himalayas"
 REMOTIVE_ATTRIBUTION = "Remote jobs by Remotive"
-
-_TAG_RE = re.compile(r"<[^>]+>")
-_WS_RE = re.compile(r"\s+")
 
 # Words that, when present in a title/location/description, mark a role as
 # remote. Matched case-insensitively against word-ish boundaries so we do
@@ -63,13 +60,6 @@ class AggregatorError(Exception):
         super().__init__(f"{source}: {message}")
         self.source = source
         self.message = message
-
-
-def _strip_html(html: str | None) -> str:
-    """Drop HTML tags and collapse whitespace. Same contract as the ATS side."""
-    if not html:
-        return ""
-    return _WS_RE.sub(" ", _TAG_RE.sub(" ", unescape(html))).strip()
 
 
 def _looks_remote(*fields: str | None) -> bool:
@@ -224,7 +214,7 @@ def poll_adzuna(
         if not loc_str and isinstance(location.get("area"), list):
             loc_str = ", ".join(str(a) for a in location["area"] if a) or None
         title = (job.get("title") or "").strip()
-        jd_text = _strip_html(job.get("description"))
+        jd_text = strip_html(job.get("description"))
         company = (job.get("company") or {}).get("display_name") or "Unknown"
         out.append(
             JobRecord(
@@ -308,7 +298,7 @@ def poll_himalayas(
                 location=loc_str,
                 url=str(url_val),
                 apply_url=str(url_val),
-                jd_text=_strip_html(job.get("description") or job.get("excerpt")),
+                jd_text=strip_html(job.get("description") or job.get("excerpt")),
                 posted_at=job.get("pubDate") or job.get("publishedDate") or job.get("pubDateUtc"),
                 country=None,
                 remote=True,
@@ -365,7 +355,7 @@ def poll_remotive(
                 location=job.get("candidate_required_location") or None,
                 url=str(url),
                 apply_url=str(url),
-                jd_text=_strip_html(job.get("description")),
+                jd_text=strip_html(job.get("description")),
                 posted_at=job.get("publication_date"),
                 country=None,
                 remote=True,
