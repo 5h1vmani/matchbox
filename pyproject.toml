@@ -52,7 +52,7 @@ Issues = "https://github.com/5h1vmani/matchbox/issues"
 [project.optional-dependencies]
 dev = [
     "pytest>=9.0.3",
-    "pytest-asyncio>=1.3.0",
+    "pytest-asyncio>=1.4.0",
     "mypy>=2.1.0",
     # Pinned exactly: ruff's lint rules AND format output change between
     # versions. CI installs from here, so an unpinned floor let CI drift past
