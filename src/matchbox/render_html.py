@@ -6,9 +6,9 @@ pure Python, no browser. pdftotext reads the output in correct reading order.
 
 Design system (matches the Pinaka LSAT marketing pages): IBM Plex Sans for
 headings + body, IBM Plex Mono for section eyebrows / dates / labels, a zinc
-grey scale (heading #09090b, body #3f3f46, muted #71717a) with a single indigo
-accent (#6366f1) and 1px hairline rules. ATS-safe: single column, standard
-section headings, real selectable text, no tables for layout.
+grey scale (heading #09090b, body #27272a, muted #52525b) with 1px hairline
+rules. Body and muted text both clear WCAG AAA (>=7:1) on white. ATS-safe:
+single column, standard section headings, real selectable text, no layout tables.
 
 The renderer is tolerant: any section with no content is omitted, so a thin
 cv.json and a rich one both render cleanly. palette/font args are accepted for
@@ -173,8 +173,10 @@ def cv_json_to_html(cv: dict[str, Any], *, palette: str = "slate", font: str = "
     )
     skills = _section("Skills", skills_html)
 
+    # Skills before Education: for an experienced candidate the recruiter and the
+    # ATS want the stack before the degrees. Education sits last.
     body = "\n".join(
-        x for x in (header, summary, competencies, experience, projects, education, skills) if x
+        x for x in (header, summary, competencies, experience, projects, skills, education) if x
     )
 
     tpl = TEMPLATE.read_text(encoding="utf-8")
