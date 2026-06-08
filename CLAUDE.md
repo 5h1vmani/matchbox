@@ -18,15 +18,19 @@ The contract between the app and you lives in `schemas/` as JSON Schema
 * `schemas/work-queue.v1.json` — the app's tailoring queue
 * `schemas/status.v1.json` — your progress reports back to the app
 * `schemas/polish.v1.json` — the keyword-alignment polish payload
+* `schemas/selection.v1.json` — CV bullet selection + tailored summary
 
 A `schema_version` mismatch is a hard error. Stop and report.
 
 ## Hard rules (apply to every mode)
 
 * NEVER invent experience, employers, dates, metrics, or skills.
-* Do NOT pick or hand-rank components yourself — `matchbox.assemble`
-  does selection deterministically. Your judgment goes into requirement
-  extraction and optional polish, nowhere else.
+* You MAY pick which verified bullets go on the CV and write a tailored
+  summary/headline — selection is judgment. Pass them to
+  `matchbox.assemble --selection` (per `schemas/selection.v1.json`); the
+  core validates every id is a real verified bullet and voice-gates the
+  summary. You emit ids only, never bullet text. Omit `--selection` to let
+  the deterministic matcher pick (the offline / no-key fallback).
 * Do NOT assemble or render PDFs yourself. Always call
   `matchbox.assemble`.
 * If the JD needs something the library lacks, leave it as an uncovered
@@ -83,15 +87,20 @@ For each job in the queue:
    python -m matchbox.jobreqs save --job <job_id> --file <reqs.json>
    ```
 
-2. **Render the CV.** The assembler does selection deterministically —
-   you do not pick components yourself.
+2. **Select and render the CV.** Selection is judgment, so you make it.
+   Read the verified library and the requirements, choose the bullets that
+   best evidence each must-have (ordered by impact), and write a tailored
+   `summary` and `headline`. Save them per `schemas/selection.v1.json`,
+   then render:
 
    ```bash
-   python -m matchbox.assemble --run <run-id> --job <job_id>
+   python -m matchbox.assemble --run <run-id> --job <job_id> --selection <sel.json>
    ```
 
-   The output: `runs/<run-id>/output/<job-id>/cv.pdf`, `cv.json`,
-   `coverage.json`.
+   The core validates every id is a real verified bullet and voice-gates
+   the summary/headline before rendering. Omit `--selection` to fall back
+   to the deterministic matcher (offline / no key). The output:
+   `runs/<run-id>/output/<job-id>/cv.pdf`, `cv.json`, `coverage.json`.
 
 3. **Read the coverage report.** Uncovered must-haves are expected;
    record them as `gaps`. Do NOT cover them by inventing content.

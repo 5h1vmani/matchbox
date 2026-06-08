@@ -43,7 +43,7 @@ queue. The CLIs do the rest.
 
 JSON Schema 2020-12 in `schemas/`. Validate before you write:
 `ingest.v1.json`, `job-requirements.v1.json`, `work-queue.v1.json`,
-`status.v1.json`, `polish.v1.json`.
+`status.v1.json`, `polish.v1.json`, `selection.v1.json`.
 
 The active profile's SQLite DB is selected by `MATCHBOX_PROFILE` (or
 `MATCHBOX_DB`). Every CLI below opens it and migrates on start.
@@ -74,11 +74,28 @@ A task carries `kind`, an optional `jobId`/`applicationId`, and a `payload`.
   python -m matchbox.jobreqs save --job <job_id> --file reqs.json
   ```
 
-* **`tailor`** — render the CV (the assembler selects components; you do not):
+* **`tailor`** — pick the CV's content (this is judgment, so you make it), then
+  render. Read the verified library and the JD requirements, choose the bullets
+  that best evidence each must-have, ordered by impact and including every
+  strongly-relevant verified bullet so the page is well-filled (a clean one or
+  two pages, never a sparse overflow — leaving strong evidence on the floor is a
+  failure mode). Write a JD-tailored `summary` and `headline`. Save them per
+  `schemas/selection.v1.json` and render:
 
   ```bash
-  python -m matchbox.assemble --run <run-id> --job <job_id>
+  python -m matchbox.assemble --run <run-id> --job <job_id> --selection sel.json
   ```
+
+  The core VALIDATES your selection: every id must be a real verified library
+  bullet (it rejects unknown/unverified ids loudly), and the summary/headline
+  must pass the voice gate. You emit ids only, never bullet text, so selected
+  text is unmodified — that is the no-fabrication guarantee. Summary truthfulness
+  is on you, like a cover letter: only verified facts.
+
+  WITHOUT `--selection`, the deterministic matcher picks (BM25 + embeddings +
+  MMR) — the offline / no-key fallback. Use it when you cannot reason over the
+  library (no model), not as the default; selection is where your judgment adds
+  the most.
 
   Then read `runs/<run-id>/output/<job-id>/coverage.json`. For each
   `keyword_presence` entry with `present: false`, find the selected bullet (in
