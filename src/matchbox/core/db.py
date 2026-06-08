@@ -56,6 +56,14 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
         target,
         isolation_level=None,  # autocommit; we use explicit transactions
         detect_types=sqlite3.PARSE_DECLTYPES,
+        # FastAPI runs sync routes + the get_conn dependency in anyio's thread
+        # pool, which may create the connection on one pool thread and use/close
+        # it on another. Each request owns its own short-lived connection and
+        # never shares it across threads concurrently, so disabling the
+        # same-thread guard is safe (and required, or every other request 500s
+        # with "SQLite objects created in a thread can only be used in that same
+        # thread").
+        check_same_thread=False,
     )
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")

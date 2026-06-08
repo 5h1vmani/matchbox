@@ -20,6 +20,32 @@ def test_migration_is_idempotent(tmp_db: sqlite3.Connection) -> None:
     assert migrate(tmp_db) == CURRENT_VERSION  # second call is a no-op
 
 
+def test_connection_usable_across_threads(tmp_db: sqlite3.Connection) -> None:
+    """A connection opened on one thread must be usable on another.
+
+    FastAPI runs sync routes + the get_conn dependency in anyio's thread pool,
+    which may create the connection on one pool thread and use/close it on
+    another. Without check_same_thread=False every other web request 500s with
+    sqlite3.ProgrammingError. TestClient reuses one thread, so it never catches
+    this -- hence the explicit cross-thread check here.
+    """
+    import threading
+
+    captured: dict[str, object] = {}
+
+    def use_on_another_thread() -> None:
+        try:
+            captured["row"] = tmp_db.execute("SELECT 1").fetchone()
+        except sqlite3.ProgrammingError as exc:
+            captured["error"] = exc
+
+    worker = threading.Thread(target=use_on_another_thread)
+    worker.start()
+    worker.join()
+    assert "error" not in captured, captured["error"]
+    assert captured["row"] is not None
+
+
 def test_bullet_roundtrip(tmp_db: sqlite3.Connection) -> None:
     exp = lib.add_experience(tmp_db, company="Modal", role="Forward Deployed Engineer")
     bullet = lib.add_bullet(
