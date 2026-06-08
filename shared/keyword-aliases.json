@@ -44,6 +44,8 @@
     ["sre", "site reliability engineering"],
     ["etl", "extract transform load"],
     ["fp&a", "financial planning and analysis"],
-    ["sap analytics cloud", "sac"]
+    ["sap analytics cloud", "sac"],
+    ["bachelor's degree", "bachelor's", "bachelors", "bachelor", "undergraduate degree", "b.com", "bcom", "b.sc", "bsc", "b.tech", "btech"],
+    ["master's degree", "master's", "masters", "master", "postgraduate degree", "msc", "m.sc", "mcom", "m.com", "mtech", "m.tech", "mba"]
   ]
 }
