@@ -1,7 +1,0 @@
-<div class="bg-emerald-50 border border-emerald-200 rounded-md p-3 text-sm text-emerald-900">
-    <strong>Saved.</strong> New weights persisted to profile.yaml.
-    Sum: <span class="tabular-nums">{{ "%.3f" | format(total) }}</span>
-    {% if total < 0.99 or total > 1.01 %}
-    <span class="text-amber-700 ml-1">(not normalised — scoring will rescale relatively)</span>
-    {% endif %}
-</div>
