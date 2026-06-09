@@ -1,143 +1,391 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://matchbox.local/schemas/ingest.v1.json",
-  "title": "Onboarding ingest payload (brain → app)",
-  "description": "Written by the brain after parsing files in inbox/. Consumed by `python -m matchbox.onboarding.ingest_cli`. All rows land with facts_verified = false (where the column exists); the user confirms them in the review screen.",
-  "type": "object",
-  "required": ["schema_version"],
-  "additionalProperties": false,
-  "properties": {
-    "schema_version": { "type": "integer", "const": 1 },
-    "profile": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "full_name": { "type": "string" },
-        "email": { "type": "string" },
-        "phone": { "type": "string" },
-        "location": { "type": "string" },
-        "links": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "headline": { "type": "string" }
-      }
-    },
-    "experiences": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["company", "role"],
-        "additionalProperties": false,
-        "properties": {
-          "company": { "type": "string", "minLength": 1 },
-          "role": { "type": "string", "minLength": 1 },
-          "start_date": { "type": ["string", "null"] },
-          "end_date": { "type": ["string", "null"] },
-          "location": { "type": ["string", "null"] },
-          "sort_order": { "type": "integer", "default": 0 },
-          "bullets": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/bullet" }
-          }
-        }
-      }
-    },
-    "projects": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["name", "text"],
-        "additionalProperties": false,
-        "properties": {
-          "name": { "type": "string", "minLength": 1 },
-          "text": { "type": "string", "minLength": 1 },
-          "url": { "type": ["string", "null"] },
-          "tags": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/tag" }
-          }
-        }
-      }
-    },
-    "skills": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["name"],
-        "additionalProperties": false,
-        "properties": {
-          "name": { "type": "string", "minLength": 1 },
-          "category": { "type": ["string", "null"] },
-          "proficiency": {
-            "type": ["string", "null"],
-            "enum": [null, "working", "fluent", "expert"]
-          },
-          "tags": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/tag" }
-          }
-        }
-      }
-    },
-    "summaries": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["label", "text"],
-        "additionalProperties": false,
-        "properties": {
-          "label": { "type": "string", "minLength": 1 },
-          "text": { "type": "string", "minLength": 1 },
-          "tags": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/tag" }
-          }
-        }
-      }
-    },
-    "answers": {
-      "type": "array",
-      "description": "Reusable Q&A the brain found in the inbox (cover notes, screening answers). Lands unverified; the user confirms at /review.",
-      "items": {
-        "type": "object",
-        "required": ["question", "answer"],
-        "additionalProperties": false,
-        "properties": {
-          "question": { "type": "string", "minLength": 1 },
-          "answer": { "type": "string", "minLength": 1 },
-          "category": { "type": ["string", "null"] },
-          "source_file": { "type": ["string", "null"] }
-        }
-      }
-    }
-  },
+  "title": "Onboarding ingest payload (brain -> app)",
   "$defs": {
-    "bullet": {
-      "type": "object",
-      "required": ["text"],
+    "IngestAnswer": {
       "additionalProperties": false,
       "properties": {
-        "text": { "type": "string", "minLength": 1 },
-        "has_metric": { "type": "boolean", "default": false },
-        "source_file": { "type": ["string", "null"] },
-        "tags": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/tag" }
+        "question": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "answer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
-      }
+      },
+      "required": [
+        "question",
+        "answer"
+      ],
+      "type": "object"
     },
-    "tag": {
-      "type": "object",
-      "required": ["facet", "value"],
+    "IngestBullet": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "has_metric": {
+          "default": false,
+          "type": "boolean"
+        },
+        "source_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tags": {
+          "items": {
+            "$ref": "#/$defs/Tag"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    },
+    "IngestExperience": {
+      "additionalProperties": false,
+      "properties": {
+        "company": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "role": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "end_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sort_order": {
+          "default": 0,
+          "type": "integer"
+        },
+        "bullets": {
+          "items": {
+            "$ref": "#/$defs/IngestBullet"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "company",
+        "role"
+      ],
+      "type": "object"
+    },
+    "IngestProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "full_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "links": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "headline": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "type": "object"
+    },
+    "IngestProject": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tags": {
+          "items": {
+            "$ref": "#/$defs/Tag"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "text"
+      ],
+      "type": "object"
+    },
+    "IngestSkill": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "proficiency": {
+          "anyOf": [
+            {
+              "enum": [
+                "working",
+                "fluent",
+                "expert"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tags": {
+          "items": {
+            "$ref": "#/$defs/Tag"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "IngestSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "$ref": "#/$defs/Tag"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "label",
+        "text"
+      ],
+      "type": "object"
+    },
+    "Tag": {
       "additionalProperties": false,
       "properties": {
         "facet": {
-          "type": "string",
-          "enum": ["role_family", "tech", "seniority", "impact"]
+          "enum": [
+            "role_family",
+            "tech",
+            "seniority",
+            "impact"
+          ],
+          "type": "string"
         },
-        "value": { "type": "string", "minLength": 1 }
-      }
+        "value": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "facet",
+        "value"
+      ],
+      "type": "object"
     }
-  }
+  },
+  "additionalProperties": false,
+  "description": "Written by the brain after parsing files in inbox/. Consumed by `python -m matchbox.onboarding.ingest_cli`. All rows land with facts_verified = false (where the column exists); the user confirms them in the review screen.",
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "profile": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IngestProfile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "experiences": {
+      "items": {
+        "$ref": "#/$defs/IngestExperience"
+      },
+      "type": "array"
+    },
+    "projects": {
+      "items": {
+        "$ref": "#/$defs/IngestProject"
+      },
+      "type": "array"
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/IngestSkill"
+      },
+      "type": "array"
+    },
+    "summaries": {
+      "items": {
+        "$ref": "#/$defs/IngestSummary"
+      },
+      "type": "array"
+    },
+    "answers": {
+      "description": "Reusable Q&A the brain found in the inbox (cover notes, screening answers). Lands unverified; the user confirms at /review.",
+      "items": {
+        "$ref": "#/$defs/IngestAnswer"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version"
+  ],
+  "type": "object"
 }

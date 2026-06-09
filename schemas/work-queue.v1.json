@@ -1,69 +1,105 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://matchbox.local/schemas/work-queue.v1.json",
-  "title": "Matchbox work-queue (app → brain)",
-  "description": "Written by the app when the user confirms a triage run. Read by the brain. One file per run, at runs/<run-id>/work-queue.json.",
-  "type": "object",
-  "required": ["schema_version", "run_id", "created_at", "profile_db", "jobs"],
+  "title": "Matchbox work-queue (app -> brain)",
+  "$defs": {
+    "QueueJob": {
+      "additionalProperties": false,
+      "properties": {
+        "job_id": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "company": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "jd_text": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "apply_url": {
+          "format": "uri",
+          "type": "string"
+        },
+        "want_cv": {
+          "type": "boolean"
+        },
+        "want_cover": {
+          "type": "boolean"
+        },
+        "palette": {
+          "enum": [
+            "slate",
+            "ink",
+            "forest",
+            "claret",
+            "bronze"
+          ],
+          "type": "string"
+        },
+        "font": {
+          "enum": [
+            "source-serif",
+            "source-sans",
+            "inter",
+            "atkinson-hyperlegible"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "company",
+        "title",
+        "jd_text",
+        "apply_url",
+        "want_cv",
+        "want_cover",
+        "palette",
+        "font"
+      ],
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
+  "description": "Written by the app when the user confirms a triage run. Read by the brain. One file per run, at runs/<run-id>/work-queue.json.",
   "properties": {
     "schema_version": {
-      "type": "integer",
-      "const": 1
+      "const": 1,
+      "type": "integer"
     },
     "run_id": {
-      "type": "string",
+      "description": "YYYY-MM-DD-NNN, monotonic within a day.",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{3}$",
-      "description": "YYYY-MM-DD-NNN, monotonic within a day."
+      "type": "string"
     },
     "created_at": {
-      "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "type": "string"
     },
     "profile_db": {
-      "type": "string",
-      "description": "Path to the SQLite DB, relative to the repo root."
+      "description": "Path to the SQLite DB, relative to the repo root.",
+      "type": "string"
     },
     "jobs": {
-      "type": "array",
-      "minItems": 1,
       "items": {
-        "type": "object",
-        "required": [
-          "job_id",
-          "company",
-          "title",
-          "jd_text",
-          "apply_url",
-          "want_cv",
-          "want_cover",
-          "palette",
-          "font"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "job_id": { "type": "integer", "minimum": 1 },
-          "company": { "type": "string", "minLength": 1 },
-          "title": { "type": "string", "minLength": 1 },
-          "jd_text": { "type": "string", "minLength": 1 },
-          "apply_url": { "type": "string", "format": "uri" },
-          "want_cv": { "type": "boolean" },
-          "want_cover": { "type": "boolean" },
-          "palette": {
-            "type": "string",
-            "enum": ["slate", "ink", "forest", "claret", "bronze"]
-          },
-          "font": {
-            "type": "string",
-            "enum": [
-              "source-serif",
-              "source-sans",
-              "inter",
-              "atkinson-hyperlegible"
-            ]
-          }
-        }
-      }
+        "$ref": "#/$defs/QueueJob"
+      },
+      "minItems": 1,
+      "type": "array"
     }
-  }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "created_at",
+    "profile_db",
+    "jobs"
+  ],
+  "type": "object"
 }
