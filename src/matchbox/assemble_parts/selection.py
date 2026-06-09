@@ -11,10 +11,13 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 from matchbox.core.db import PROJECT_ROOT
+from matchbox.core.logging import get_logger
 from matchbox.matching.select import DEFAULT_WORD_BUDGET, Component
 from matchbox.polish import load_voice_rules, validate_voice
 
 _SCHEMAS_DIR = PROJECT_ROOT / "schemas"
+
+log = get_logger(__name__)
 
 
 def _selection_validator() -> Draft202012Validator:
@@ -76,4 +79,11 @@ def _apply_selection(
             break
         kept.append(cid)
         used += words
+    if len(kept) < len(ordered):
+        log.info(
+            "one-page budget kept %d of %d selected bullets (dropped %d trailing)",
+            len(kept),
+            len(ordered),
+            len(ordered) - len(kept),
+        )
     return kept, relevance, summary

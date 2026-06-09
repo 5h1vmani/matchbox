@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from matchbox.core.logging import configure_logging
 from matchbox.web.routes import (
     agent_tasks,
     ai,
@@ -38,6 +39,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     app = FastAPI(
         title="Matchbox",
         version="0.3.0",

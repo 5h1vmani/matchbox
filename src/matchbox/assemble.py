@@ -55,6 +55,7 @@ from matchbox.assemble_parts.reporting import (
 )
 from matchbox.assemble_parts.selection import _apply_selection, validate_selection_payload
 from matchbox.core.db import PROJECT_ROOT, connect
+from matchbox.core.logging import configure_logging, get_logger
 from matchbox.core.migrations import migrate
 from matchbox.matching.coverage import check_keyword_presence
 from matchbox.matching.embed import (
@@ -84,6 +85,8 @@ __all__ = [
 
 RUNS_DIR = PROJECT_ROOT / "runs"
 DEFAULT_K = 12  # max bullets across all roles
+
+log = get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -115,6 +118,7 @@ def assemble_one(
     bge-small-en-v1.5. Tests that use a weak FakeEmbedder pass a lower
     value explicitly.
     """
+    log.info("assemble start run=%s job=%s", run_id, job_id)
     _load_job(conn, job_id)  # ensure the job exists; raises LookupError
     profile = _load_profile(conn)
     requirements = _load_requirements(conn, job_id)
@@ -272,6 +276,13 @@ def assemble_one(
         keyword_presence=keyword_presence,
     )
 
+    log.info(
+        "assemble done run=%s job=%s selected=%d gaps=%d",
+        run_id,
+        job_id,
+        len(selected_ids),
+        len(semantic_gaps),
+    )
     return AssembleResult(
         cv_path=cv_pdf_path,
         cv_json_path=cv_json_path,
@@ -315,6 +326,7 @@ def polish_run(
     Returns a summary dict suitable for stdout: {applied, rejected,
     keyword_presence_before, keyword_presence_after}.
     """
+    log.info("polish start run=%s job=%s", run_id, job_id)
     errors = validate_polish_payload(payload)
     if errors:
         raise ValueError("polish.json failed schema validation: " + "; ".join(errors))
@@ -374,6 +386,13 @@ def polish_run(
 
     _append_polish_section_to_changes_md(out_dir=out_dir, applied=applied, rejected=rejected)
 
+    log.info(
+        "polish done run=%s job=%s applied=%d rejected=%d",
+        run_id,
+        job_id,
+        len(applied),
+        len(rejected),
+    )
     return {
         "applied": [{"id": bp.bullet_id, "new_text": bp.new_text} for bp in applied],
         "rejected": [
@@ -513,6 +532,7 @@ def assemble_cover(
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", required=True, help="run id (YYYY-MM-DD-NNN)")
     parser.add_argument("--job", required=True, type=int, help="job id")

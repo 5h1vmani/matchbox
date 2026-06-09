@@ -23,6 +23,7 @@ from jsonschema import Draft202012Validator
 from matchbox.answers import repo as answers_repo
 from matchbox.core import library as lib
 from matchbox.core.db import connect, transaction
+from matchbox.core.logging import configure_logging
 from matchbox.core.migrations import migrate
 from matchbox.core.models import ItemType
 
@@ -182,6 +183,7 @@ def ingest(payload: dict[str, Any], conn: sqlite3.Connection) -> dict[str, int]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--file", required=True, type=Path, help="JSON payload conforming to ingest.v1.json"

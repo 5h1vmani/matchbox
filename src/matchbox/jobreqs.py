@@ -19,6 +19,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 
 from matchbox.core.db import PROJECT_ROOT, connect, transaction
+from matchbox.core.logging import configure_logging
 from matchbox.core.migrations import migrate
 
 SCHEMA_PATH = PROJECT_ROOT / "schemas" / "job-requirements.v1.json"
@@ -73,6 +74,7 @@ def save_requirements(conn: sqlite3.Connection, job_id: int, payload: dict[str, 
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
