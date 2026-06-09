@@ -18,6 +18,12 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Pin uv to the actions/setup-python interpreter rather than a uv-managed
+      # download, so the 3.12/3.13 matrix actually tests the versions it claims
+      # (and weasyprint resolves the apt-installed Pango/Cairo on the system path).
+      UV_PYTHON_PREFERENCE: only-system
+      UV_PYTHON: ${{ matrix.python-version }}
     strategy:
       fail-fast: false
       matrix:
@@ -34,27 +40,32 @@ jobs:
           cache: pip
 
       - name: Install uv
-        run: pip install uv
+        # Pinned for reproducibility, like ruff in pyproject. Bump deliberately.
+        run: pip install uv==0.11.19
 
       - name: Install weasyprint system libraries (Pango/Cairo for PDF render)
         run: |
           sudo apt-get update
           sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libgdk-pixbuf-2.0-0 libcairo2
 
-      - name: Install dependencies
-        run: uv pip install -e ".[dev]" --system
+      - name: Install dependencies (from lockfile)
+        # --locked asserts uv.lock is in sync with pyproject; a pyproject edit
+        # without a re-lock fails CI instead of silently drifting.
+        run: uv sync --locked --extra dev
 
       - name: Lint (ruff)
-        run: ruff check src/ tests/
+        run: uv run --no-sync ruff check src/ tests/
 
       - name: Format check (ruff)
-        run: ruff format --check src/ tests/
+        run: uv run --no-sync ruff format --check src/ tests/
 
       - name: Type check (mypy)
-        run: mypy src/matchbox/
+        run: uv run --no-sync mypy src/matchbox/
 
-      - name: Tests (pytest)
-        run: pytest tests/ -v
+      - name: Tests (pytest + coverage gate)
+        # fail_under=80 lives in [tool.coverage.report]; this step fails if the
+        # suite drops below it.
+        run: uv run --no-sync pytest tests/ -v --cov=src/matchbox --cov-report=term
 
   docs-lint:
     runs-on: ubuntu-latest

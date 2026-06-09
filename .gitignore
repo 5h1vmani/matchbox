@@ -35,6 +35,9 @@ dist/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
 
 # Built tracker SPA (artifact) — regenerate with: cd frontend && npm run build
 /src/matchbox/web/static/app/

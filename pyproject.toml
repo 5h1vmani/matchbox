@@ -53,6 +53,7 @@ Issues = "https://github.com/5h1vmani/matchbox/issues"
 dev = [
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.0",
     "mypy>=2.1.0",
     # Pinned exactly: ruff's lint rules AND format output change between
     # versions. CI installs from here, so an unpinned floor let CI drift past
@@ -99,6 +100,15 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src/matchbox"]
+
+[tool.coverage.report]
+# Baseline when the gate was introduced was 83% (line coverage). The floor sits
+# just below to catch regressions while leaving headroom for in-flight refactors.
+# Ratchet this up as coverage improves; it should track real coverage, not lag it.
+fail_under = 80
 
 [tool.codespell]
 # Skip these directories and patterns entirely.
