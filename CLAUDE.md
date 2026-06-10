@@ -154,14 +154,27 @@ For each job in the queue:
    with the rule that failed. The CLI exits 0 on success, 3 on schema
    failure, 5 if there is no prior assemble to polish.
 
-5. **(M7+) Cover letter.** If `want_cover` is true, write the body to
+5. **Cold-read gate (the SOTA bar) — required before a CV is final.**
+   Re-read `shared/cv-rubric.md`. Self-check the seven dimensions while
+   drafting, then run the cold read: spawn a FRESH-context reader (small
+   fast model) that gets only the JD text, the rendered CV text, and the
+   recruiter persona from the rubric — never the construction artifacts.
+   Ship at >= 6/7 passes with no fail on narrative arithmetic, evidence
+   completeness, or the 6-second test. Below the bar: revise the
+   selection/summary/polish and re-read, at most twice, then surface the
+   disagreement to the user. Record the scores in the run notes. When a
+   dimension fails because the library lacks evidence, draft the missing
+   bullet for the user to verify in Review — that is a library gap, not a
+   wording problem.
+
+6. **(M7+) Cover letter.** If `want_cover` is true, write the body to
    `runs/<run-id>/output/<job-id>/cover.txt` and render:
 
    ```bash
    python -m matchbox.assemble --run <run-id> --job <job_id> --cover
    ```
 
-6. **Update `runs/<run-id>/status.json`** with this job's progress.
+7. **Update `runs/<run-id>/status.json`** with this job's progress.
    Validate against `schemas/status.v1.json` before writing. The shape:
 
    ```json
@@ -187,7 +200,7 @@ For each job in the queue:
    The React app shows progress via the run handoff and the Apply packet
    (the artifacts land under `runs/<run-id>/output/<job-id>/`).
 
-7. When every job is processed, set the top-level `status` to `"done"`.
+8. When every job is processed, set the top-level `status` to `"done"`.
 
 If anything fails, set the job's `cv_status` (or top-level `status`) to
 `"error"` and put the message in the `error` field. Fail loud.
