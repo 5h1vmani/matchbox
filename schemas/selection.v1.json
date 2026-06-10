@@ -30,6 +30,23 @@
       "minLength": 1,
       "type": "string"
     },
+    "selected_project_ids": {
+      "anyOf": [
+        {
+          "items": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional verified project ids to render in the Projects section, in order. Each MUST be a verified library project; the core rejects any unknown or unverified id (same no-fabrication rule as bullets). Omitted -> no Projects section (the deterministic fallback never selects projects)."
+    },
     "headline": {
       "anyOf": [
         {

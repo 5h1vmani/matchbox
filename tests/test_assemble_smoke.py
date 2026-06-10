@@ -510,3 +510,76 @@ def test_smoke_fails_loud_when_requirements_missing(tmp_path: Path) -> None:
             embedder=FakeEmbedder(vocab=["did", "python"]),
         )
     assert "requirements" in str(exc.value).lower()
+
+
+def test_selection_renders_verified_projects(
+    seeded_db_and_runs_dir: tuple[sqlite3.Connection, Path, int],
+) -> None:
+    conn, _tmp, job_id = seeded_db_and_runs_dir
+    p1 = lib.add_project(
+        conn,
+        name="Matchbox",
+        text="Multi-agent job-application pipeline with hybrid retrieval.",
+        url="https://github.com/example/matchbox",
+        facts_verified=True,
+    )
+    summary = (
+        "Engineer with verified delivery across data platforms and open source, "
+        "comfortably clearing the twenty word minimum for the voice gate here."
+    )
+    result = assemble_one(
+        conn=conn,
+        run_id="2026-05-22-003",
+        job_id=job_id,
+        palette="slate",
+        font="source-serif",
+        embedder=FakeEmbedder(vocab=["python", "kubernetes", "pipelines", "etl"]),
+        coverage_floor=0.3,
+        selection={
+            "schema_version": 1,
+            "run_id": "2026-05-22-003",
+            "job_id": job_id,
+            "selected_bullet_ids": [1, 2],
+            "selected_project_ids": [p1.id],
+            "summary": summary,
+        },
+    )
+    cv = json.loads(result.cv_json_path.read_text())
+    assert cv["projects"] == [
+        {
+            "name": "Matchbox",
+            "text": "Multi-agent job-application pipeline with hybrid retrieval.",
+            "url": "https://github.com/example/matchbox",
+        }
+    ]
+    html = (result.cv_json_path.parent / "cv.html").read_text()
+    assert "Projects" in html and "Matchbox" in html
+
+
+def test_selection_rejects_unverified_project(
+    seeded_db_and_runs_dir: tuple[sqlite3.Connection, Path, int],
+) -> None:
+    conn, _tmp, job_id = seeded_db_and_runs_dir
+    unverified = lib.add_project(conn, name="Draft", text="Not confirmed yet.")
+    with pytest.raises(ValueError) as exc:
+        assemble_one(
+            conn=conn,
+            run_id="r",
+            job_id=job_id,
+            palette="slate",
+            font="source-serif",
+            embedder=FakeEmbedder(vocab=["python", "kubernetes", "pipelines", "etl"]),
+            coverage_floor=0.3,
+            selection={
+                "schema_version": 1,
+                "run_id": "r",
+                "job_id": job_id,
+                "selected_bullet_ids": [1],
+                "selected_project_ids": [unverified.id],
+                "summary": (
+                    "A perfectly fine summary that comfortably clears the twenty word "
+                    "minimum the voice gate enforces for every tailored summary text."
+                ),
+            },
+        )
+    assert "verified library projects" in str(exc.value)

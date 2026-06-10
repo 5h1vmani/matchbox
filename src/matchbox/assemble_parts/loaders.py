@@ -50,6 +50,16 @@ def _load_components(
     return comps, raw
 
 
+def _load_verified_projects(conn: sqlite3.Connection) -> dict[int, dict[str, Any]]:
+    """Verified projects only, keyed by id. Selection may place these in the
+    Projects section; unverified projects are never renderable (the same hard
+    rule as bullets)."""
+    rows = conn.execute(
+        "SELECT id, name, text, url FROM project WHERE facts_verified = 1 ORDER BY id"
+    ).fetchall()
+    return {r["id"]: dict(r) for r in rows}
+
+
 def _load_unverified_bullets(conn: sqlite3.Connection) -> list[tuple[int, str]]:
     """(id, text) for every NOT-yet-verified bullet.
 

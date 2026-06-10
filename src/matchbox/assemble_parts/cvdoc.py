@@ -112,6 +112,7 @@ def _build_cv_json(
     experiences: list[dict[str, Any]],
     summary_text: str,
     conn: sqlite3.Connection,
+    projects: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     skills_rows = conn.execute(
         "SELECT category, name FROM skill ORDER BY category, name"
@@ -167,7 +168,7 @@ def _build_cv_json(
         },
         "summary": summary_text,
         "experiences": work,
-        "projects": [],
+        "projects": projects or [],
         "skills": skills,
         "education": education,
     }

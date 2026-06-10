@@ -112,8 +112,10 @@ For each job in the queue:
 2. **Select and render the CV.** Selection is judgment, so you make it.
    Read the verified library and the requirements, choose the bullets that
    best evidence each must-have (ordered by impact), and write a tailored
-   `summary` and `headline`. Save them per `schemas/selection.v1.json`,
-   then render:
+   `summary` and `headline`. When verified projects evidence a must-have
+   better than any bullet (open-source work often does), include their ids
+   as `selected_project_ids` — they render as a Projects section. Save it
+   all per `schemas/selection.v1.json`, then render:
 
    ```bash
    python -m matchbox.assemble --run <run-id> --job <job_id> --selection <sel.json>

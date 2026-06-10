@@ -47,13 +47,18 @@ from matchbox.assemble_parts.loaders import (
     _load_profile,
     _load_requirements,
     _load_unverified_bullets,
+    _load_verified_projects,
 )
 from matchbox.assemble_parts.render import _extract_pdf_text, _palette_and_font_for, _render_pdf
 from matchbox.assemble_parts.reporting import (
     _append_polish_section_to_changes_md,
     _write_changes_md,
 )
-from matchbox.assemble_parts.selection import _apply_selection, validate_selection_payload
+from matchbox.assemble_parts.selection import (
+    _apply_project_selection,
+    _apply_selection,
+    validate_selection_payload,
+)
 from matchbox.core.db import PROJECT_ROOT, connect
 from matchbox.core.logging import configure_logging, get_logger
 from matchbox.core.migrations import migrate
@@ -185,6 +190,12 @@ def assemble_one(
         sim = result.similarity_matrix
         summary_text = _pick_summary(conn)
 
+    # Optional Projects section: brain-selected, verified projects only (the
+    # deterministic fallback never picks projects).
+    projects: list[dict[str, Any]] = []
+    if selection is not None and selection.get("selected_project_ids"):
+        projects = _apply_project_selection(selection, _load_verified_projects(conn))
+
     # Build the CV JSON, bullets in the chosen order (the brain's order when
     # supplied, library order otherwise).
     comp_by_id = {c.id: c for c in components}
@@ -195,6 +206,7 @@ def assemble_one(
         experiences=experiences,
         summary_text=summary_text,
         conn=conn,
+        projects=projects,
     )
     # Fingerprint the selected bullets so re_render_cv can warn when the
     # DB has drifted (the user edited a bullet after this render).

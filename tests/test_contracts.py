@@ -31,6 +31,7 @@ VALID: dict[str, tuple[type[Any], dict[str, Any]]] = {
             "run_id": "2026-05-22-001",
             "job_id": 42,
             "selected_bullet_ids": [3, 1, 2],
+            "selected_project_ids": [2, 1],
             "summary": "Engineer with a verified delivery record across two roles.",
             "headline": "Senior Backend Engineer",
             "rationale": "covers the three must-haves",
@@ -250,6 +251,18 @@ INVALID: list[tuple[str, dict[str, Any], str]] = [
             "summary": "x",
         },
         "schema_version const: 1",
+    ),
+    (
+        "selection.v1.json",
+        {
+            "schema_version": 1,
+            "run_id": "r",
+            "job_id": 1,
+            "selected_bullet_ids": [1],
+            "selected_project_ids": [],
+            "summary": "x",
+        },
+        "selected_project_ids minItems: 1 when present",
     ),
     (
         "job-facts.v1.json",

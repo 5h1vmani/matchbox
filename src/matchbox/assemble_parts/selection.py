@@ -31,6 +31,31 @@ def validate_selection_payload(payload: dict[str, Any]) -> list[str]:
     return [e.message for e in _selection_validator().iter_errors(payload)]
 
 
+def _apply_project_selection(
+    selection: dict[str, Any], verified_projects: dict[int, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Validate the brain's optional project picks against the verified library;
+    return the project rows in the brain's order. Same no-fabrication rule as
+    bullets: an unknown or unverified id is a loud rejection, never a skip."""
+    ids = [int(i) for i in (selection.get("selected_project_ids") or [])]
+    if not ids:
+        return []
+    unknown = [i for i in ids if i not in verified_projects]
+    if unknown:
+        raise ValueError(
+            "selection references ids that are not verified library projects: "
+            + ", ".join(map(str, unknown))
+        )
+    seen: set[int] = set()
+    out: list[dict[str, Any]] = []
+    for i in ids:
+        if i not in seen:
+            seen.add(i)
+            p = verified_projects[i]
+            out.append({"name": p["name"], "text": p["text"], "url": p["url"]})
+    return out
+
+
 def _apply_selection(
     selection: dict[str, Any], components: list[Component]
 ) -> tuple[list[int], dict[int, float], str]:

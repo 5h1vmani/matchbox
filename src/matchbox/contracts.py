@@ -89,6 +89,15 @@ assemble falls back to the deterministic matcher (offline / no-key path)."""
             "responsibility, exactly like a cover letter -- only verified facts may appear."
         )
     )
+    selected_project_ids: Annotated[list[PosInt], Field(min_length=1)] | None = Field(
+        default=None,
+        description=(
+            "Optional verified project ids to render in the Projects section, in order. "
+            "Each MUST be a verified library project; the core rejects any unknown or "
+            "unverified id (same no-fabrication rule as bullets). Omitted -> no Projects "
+            "section (the deterministic fallback never selects projects)."
+        ),
+    )
     headline: str | None = Field(
         default=None,
         description=(
