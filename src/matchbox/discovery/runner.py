@@ -11,6 +11,7 @@ Failures are visible: a failed source surfaces with a populated
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 import time
@@ -67,12 +68,46 @@ def _list_enabled_sources(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+def _infer_country(location: str | None) -> str | None:
+    """Country from the location string when the source did not provide one.
+
+    ATS pollers never set country, so an India office posting ("Bengaluru,
+    India") was unfilterable by country. Location-only on purpose: matching the
+    JD body here would pull in foreign roles that merely name-drop an India
+    office. India is the only country the eligibility rules act on, so that is
+    the only inference made."""
+    from matchbox.discovery_api.rules import india_eligible
+
+    if location and india_eligible(
+        country=None, location=location, remote_scope=None, jd_text=None
+    ):
+        return "in"
+    return None
+
+
+def _eligibility_json(
+    *, country: str | None, location: str | None, remote_scope: str | None, jd_text: str | None
+) -> str:
+    """Persisted deterministic geo eligibility, so SQL and the brain can filter
+    without re-deriving it. Same rule the discovery UI applies at read time."""
+    from matchbox.discovery_api.rules import india_eligible
+
+    return json.dumps(
+        {
+            "india": india_eligible(
+                country=country, location=location, remote_scope=remote_scope, jd_text=jd_text
+            )
+        }
+    )
+
+
 def _row_params(source_id: int | None, j: JobRecord) -> dict[str, Any]:
     """INSERT params for one job, with Tier-2 enrichment + the dedup key.
 
     country/remote come off the JobRecord; the eligibility/seniority signals are
     deterministic regex reads of the title + JD (no LLM)."""
     rec = enrich.enrich_record(j.title, j.jd_text)
+    country = j.country or _infer_country(j.location)
     return {
         "source": source_id,
         "company": j.company,
@@ -83,7 +118,13 @@ def _row_params(source_id: int | None, j: JobRecord) -> dict[str, Any]:
         "jd_text": j.jd_text,
         "posted_at": j.posted_at,
         "fetched_at": _now_iso(),
-        "country": j.country,
+        "country": country,
+        "eligibility_json": _eligibility_json(
+            country=country,
+            location=j.location,
+            remote_scope=rec["remote_scope"],
+            jd_text=j.jd_text,
+        ),
         # ATS pollers leave remote=False; derive it from the JD text so an ATS
         # remote role is filterable like an aggregator one.
         "remote": 1 if (j.remote or _looks_remote(j.title, j.location, j.jd_text)) else 0,
@@ -128,12 +169,14 @@ def _upsert_jobs(conn: sqlite3.Connection, source_id: int | None, jobs: list[Job
         INSERT OR IGNORE INTO job (
             source, company, title, location, url, apply_url,
             jd_text, posted_at, fetched_at, status, country, remote,
+            eligibility_json,
             dedup_key, seniority, min_years_exp, role_family, sponsorship,
             citizenship_required, clearance_required, remote_scope,
             salary_min, salary_max, salary_currency, salary_period, employment_type
         ) VALUES (
             :source, :company, :title, :location, :url, :apply_url,
             :jd_text, :posted_at, :fetched_at, 'new', :country, :remote,
+            :eligibility_json,
             :dedup_key, :seniority, :min_years_exp, :role_family, :sponsorship,
             :citizenship_required, :clearance_required, :remote_scope,
             :salary_min, :salary_max, :salary_currency, :salary_period, :employment_type
@@ -154,23 +197,29 @@ def _upsert_jobs(conn: sqlite3.Connection, source_id: int | None, jobs: list[Job
 
 
 def backfill_enrichment(conn: sqlite3.Connection) -> int:
-    """One-time pass: enrich jobs that predate Tier-2 (sponsorship still NULL).
+    """One-time pass: enrich jobs that predate a Tier-2 signal.
 
-    Idempotent -- enrichment always sets `sponsorship` to a non-null value, so a
-    re-run skips already-enriched rows. Rows enriched before the `role_family`
-    tagger existed have it NULL, so we also catch those. (dedup_key/company_id
-    were filled by the 007 migration backfill.) Returns the number of rows
-    enriched."""
+    Idempotent -- enrichment always sets `sponsorship` and `eligibility_json` to
+    non-null values, so a re-run skips already-enriched rows. Rows enriched
+    before the `role_family` tagger or the eligibility/country persistence
+    existed have those NULL, so we also catch them. (dedup_key/company_id were
+    filled by the 007 migration backfill.) Returns the number of rows enriched.
+
+    `role_family` is deliberately NOT a re-run trigger: the tagger returns None
+    for titles it cannot classify, so using it as a marker would re-enrich those
+    rows on every call."""
     rows = conn.execute(
-        "SELECT id, title, jd_text FROM job WHERE sponsorship IS NULL OR role_family IS NULL"
+        "SELECT id, title, jd_text, location, country FROM job "
+        "WHERE sponsorship IS NULL OR eligibility_json IS NULL"
     ).fetchall()
     with transaction(conn):
         for r in rows:
             rec = enrich.enrich_record(r["title"], r["jd_text"])
+            country = r["country"] or _infer_country(r["location"])
             conn.execute(
                 "UPDATE job SET seniority = ?, min_years_exp = ?, role_family = ?, "
                 "sponsorship = ?, citizenship_required = ?, clearance_required = ?, "
-                "remote_scope = ? WHERE id = ?",
+                "remote_scope = ?, country = ?, eligibility_json = ? WHERE id = ?",
                 (
                     rec["seniority"],
                     rec["min_years_exp"],
@@ -179,6 +228,13 @@ def backfill_enrichment(conn: sqlite3.Connection) -> int:
                     rec["citizenship_required"],
                     rec["clearance_required"],
                     rec["remote_scope"],
+                    country,
+                    _eligibility_json(
+                        country=country,
+                        location=r["location"],
+                        remote_scope=rec["remote_scope"],
+                        jd_text=r["jd_text"],
+                    ),
                     r["id"],
                 ),
             )

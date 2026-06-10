@@ -19,11 +19,25 @@ from matchbox.graph.backfill import backfill_graph
 _DIR = Path(__file__).parent
 SCHEMA_FILE = _DIR / "schema.sql"  # version 1 baseline
 
+
+def _add_eligibility_column(conn: sqlite3.Connection) -> None:
+    """011: job.eligibility_json — persisted deterministic geo eligibility.
+
+    Conditional on purpose: long-lived DBs already carry this column from a
+    pre-migration era, and SQLite has no ADD COLUMN IF NOT EXISTS, so a plain
+    SQL migration would fail exactly where the column already exists."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(job)")}
+    if "eligibility_json" not in cols:
+        conn.execute("ALTER TABLE job ADD COLUMN eligibility_json TEXT")
+
+
 # Python data steps that run AFTER the SQL of the same version, keyed by
 # version number. DDL belongs in the matching NNN_*.sql file; these are for
-# row-by-row data transformations the SQL layer cannot express cleanly.
+# row-by-row data transformations the SQL layer cannot express cleanly (or,
+# like 011, DDL that must be conditional).
 _PY_STEPS: dict[int, Callable[[sqlite3.Connection], None]] = {
     2: backfill_graph,
+    11: _add_eligibility_column,
 }
 
 
