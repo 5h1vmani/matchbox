@@ -23,6 +23,7 @@ from __future__ import annotations
 import base64
 import html as _html
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,29 @@ _FONT_FILES = {
 
 def _esc(s: Any) -> str:
     return _html.escape(str(s))
+
+
+# A metric worth a recruiter's six-second scan: an optional currency prefix,
+# digits (with thousands separators / decimals), an optional unit suffix.
+# (?<![\w$£€₹]) blocks the digits inside identifiers like K6, S3, EC2, A4.
+_METRIC_RE = re.compile(
+    r"(?<![\w$£€₹])"
+    r"((?:INR|USD|GBP|EUR|[$£€₹])\s?)?"
+    r"(\d[\d,]*(?:\.\d+)?)"
+    r"(\s?(?:%|\+|percent|lakh|crore|million|billion)|x\b)?"
+)
+
+
+def _emphasize_metrics(text: str) -> str:
+    """Escape ``text`` and wrap metric spans in <strong> so numbers survive the
+    six-second scan. Pure presentation: the underlying text (and the PDF's
+    extracted text) is unchanged, so ATS parsing and keyword checks see exactly
+    the verified wording."""
+
+    def _wrap(m: re.Match[str]) -> str:
+        return f"<strong>{m.group(0)}</strong>"
+
+    return _METRIC_RE.sub(_wrap, _esc(text))
 
 
 def _b64(name: str) -> str:
@@ -81,7 +105,7 @@ def _experience_html(experiences: list[dict[str, Any]]) -> str:
     earlier = [e for e in experiences if e.get("earlier")]
     blocks: list[str] = []
     for e in full:
-        bullets = "".join(f"<li>{_esc(b)}</li>" for b in e.get("bullets", []))
+        bullets = "".join(f"<li>{_emphasize_metrics(b)}</li>" for b in e.get("bullets", []))
         loc = e.get("location")
         loc_html = f'<div class="entry-location">{_esc(loc)}</div>' if loc else ""
         dates = f"{_esc(e.get('start_date', ''))} to {_esc(e.get('end_date', ''))}"
@@ -151,7 +175,7 @@ def cv_json_to_html(cv: dict[str, Any], *, palette: str = "slate", font: str = "
         proj_html += (
             '<div class="entry"><div class="entry-header">'
             f'<div class="entry-title">{_esc(p.get("name", ""))}</div></div>'
-            f'<div class="entry-description">{_esc(p.get("text", ""))}{url}</div></div>'
+            f'<div class="entry-description">{_emphasize_metrics(p.get("text", ""))}{url}</div></div>'
         )
     projects = _section("Projects", proj_html)
 

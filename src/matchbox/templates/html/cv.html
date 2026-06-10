@@ -5,9 +5,10 @@
   <title>{{NAME}} CV</title>
   <style>
     /* Matchbox CV — Pinaka LSAT design system. IBM Plex Sans (headings/body) +
-       IBM Plex Mono (eyebrows/dates/labels), zinc grey scale + indigo accent,
-       1px hairlines. Rendered by weasyprint; fonts embedded as base64.
-       ATS-safe: single column, standard headings, real text, no layout tables. */
+       IBM Plex Mono (eyebrows/dates/labels), zinc grey scale (deliberately no
+       accent colour), 1px hairlines. Rendered by weasyprint; fonts embedded as
+       base64. ATS-safe: single column, standard headings, real text, no layout
+       tables. Metrics render <strong> so numbers survive the six-second scan. */
     @font-face { font-family:'IBM Plex Sans'; font-style:normal; font-weight:400; src:url(data:font/ttf;base64,__SANS_REG_B64__) format('truetype'); }
     @font-face { font-family:'IBM Plex Sans'; font-style:normal; font-weight:600; src:url(data:font/ttf;base64,__SANS_SB_B64__) format('truetype'); }
     @font-face { font-family:'IBM Plex Mono'; font-style:normal; font-weight:400; src:url(data:font/ttf;base64,__MONO_REG_B64__) format('truetype'); }
@@ -25,8 +26,10 @@
     .header { padding-bottom:11px; margin-bottom:15px; border-bottom:1px solid #e4e4e7; }
     .name { font-weight:600; font-size:27px; letter-spacing:-0.02em; color:#09090b; line-height:1.1; margin-bottom:6px; }
     .header-meta { font-size:11.5px; color:#52525b; line-height:1.55; }
-    .header-meta a { color:#27272a; text-decoration:none; }
-    .header-meta .sep { color:#d4d4d8; margin:0 7px; }
+    /* Links stay body-grey but underline so they read as clickable on screen
+       (recruiters read PDFs digitally); the light underline keeps print calm. */
+    .header-meta a { color:#27272a; text-decoration:underline; text-decoration-color:#a1a1aa; text-underline-offset:2px; }
+    .header-meta .sep { color:#a1a1aa; margin:0 7px; }
 
     /* Sections — Mono eyebrow in indigo + hairline rule (the signature treatment) */
     .section { margin-top:15px; }
@@ -40,18 +43,19 @@
 
     .competencies { display:flex; flex-wrap:wrap; line-height:1.6; }
     .competency { font-size:11.5px; color:#27272a; }
-    .competency:not(:last-child)::after { content:'  ·  '; color:#d4d4d8; }
+    .competency:not(:last-child)::after { content:'  ·  '; color:#a1a1aa; }
 
     /* Entries */
     .entry { margin-bottom:11px; page-break-inside:avoid; break-inside:avoid; orphans:2; widows:2; }
     .entry-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:1px; }
-    .entry-title { font-weight:600; font-size:13px; color:#09090b; }
+    .entry-title { font-weight:600; font-size:14px; color:#09090b; }
     .entry-company { font-weight:400; color:#27272a; }
-    .entry-dates { font-family:'IBM Plex Mono'; font-weight:400; font-size:10px; color:#52525b; letter-spacing:-0.01em; white-space:nowrap; }
+    .entry-dates { font-family:'IBM Plex Mono'; font-weight:400; font-size:10px; color:#52525b; white-space:nowrap; }
     .entry-location { font-family:'IBM Plex Mono'; font-size:10px; color:#52525b; margin-bottom:5px; }
     .entry-description { font-size:12.5px; line-height:1.5; margin-bottom:4px; color:#27272a; }
     .entry-bullets { list-style:none; padding:0; margin:0; }
     .entry-bullets li { font-size:12.5px; line-height:1.5; color:#27272a; margin-bottom:3px; padding-left:13px; position:relative; orphans:2; widows:2; }
+    .entry-bullets li strong, .entry-description strong { font-weight:600; color:#09090b; }
     .entry-bullets li::before { content:''; position:absolute; left:1px; top:7.5px; width:4px; height:4px; background:#52525b; border-radius:50%; }
 
     /* Compressed earlier roles */
@@ -65,12 +69,12 @@
     .education-entry .dates { font-family:'IBM Plex Mono'; font-size:10px; color:#52525b; white-space:nowrap; }
 
     /* Skills */
-    .skills-row { margin-bottom:4px; font-size:12px; line-height:1.5; }
+    .skills-row { margin-bottom:4px; font-size:12.5px; line-height:1.5; }
     .skills-row .label { font-weight:600; color:#09090b; }
 
     @media print {
       html, body { background:#ffffff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-      a { color:#27272a; text-decoration:none; }
+      a { color:#27272a; }
       .entry, .education-entry { page-break-inside:avoid; break-inside:avoid; }
       .section-header { page-break-after:avoid; break-after:avoid; }
       p, li { orphans:2; widows:2; }
