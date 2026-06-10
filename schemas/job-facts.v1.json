@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matchbox.local/schemas/job-facts.v1.json",
+  "title": "Matchbox job facts (brain -> app)",
+  "additionalProperties": false,
+  "description": "Written by the brain after reading a shortlisted job's full JD. The scan's Tier-1 regex enrichment is coarse (filter/rank quality); these are the precise facts for jobs worth pursuing. Saved via `python -m matchbox.jobfacts save`; only the fields present in the payload are written, so omitting a field leaves the scan-time value in place. Facts must come from the JD text -- never guessed.",
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "job_id": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "salary_min": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "salary_max": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "salary_currency": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ISO 4217, e.g. INR, USD."
+    },
+    "salary_period": {
+      "anyOf": [
+        {
+          "enum": [
+            "year",
+            "month",
+            "week",
+            "day",
+            "hour"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "employment_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "full_time",
+            "part_time",
+            "contract",
+            "internship"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "seniority": {
+      "anyOf": [
+        {
+          "enum": [
+            "intern",
+            "junior",
+            "mid",
+            "senior",
+            "staff",
+            "lead",
+            "principal"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "min_years_exp": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "role_family": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Free label, lowercase-kebab (e.g. ml, pm, ai-transformation). Richer than the Tier-1 tagger's fixed families on purpose."
+    },
+    "remote_scope": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Stated remote constraint, e.g. 'remote (India only)'."
+    },
+    "country": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z]{2}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ISO 3166-1 alpha-2, lowercase."
+    },
+    "sponsorship": {
+      "anyOf": [
+        {
+          "enum": [
+            "offered",
+            "none",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "citizenship_required": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "clearance_required": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "closes_at": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Application deadline (ISO date) when the JD states one."
+    }
+  },
+  "required": [
+    "schema_version",
+    "job_id"
+  ],
+  "type": "object"
+}

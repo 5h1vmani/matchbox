@@ -45,6 +45,10 @@ Facet = Literal["role_family", "tech", "seniority", "impact"]
 RequirementType = Literal["must-have", "responsibility", "nice"]
 JobStatus = Literal["pending", "running", "done", "skipped", "error"]
 RunStatus = Literal["queued", "running", "done", "error"]
+Seniority = Literal["intern", "junior", "mid", "senior", "staff", "lead", "principal"]
+EmploymentType = Literal["full_time", "part_time", "contract", "internship"]
+SalaryPeriod = Literal["year", "month", "week", "day", "hour"]
+SponsorshipSignal = Literal["offered", "none", "unknown"]
 
 
 class StrictModel(BaseModel):
@@ -331,6 +335,52 @@ class Ingest(StrictModel):
 
 
 # --------------------------------------------------------------------------
+# job-facts.v1.json  (brain -> app, Tier-2 precise enrichment)
+# --------------------------------------------------------------------------
+class JobFacts(StrictModel):
+    """Written by the brain after reading a shortlisted job's full JD. The scan's \
+Tier-1 regex enrichment is coarse (filter/rank quality); these are the precise \
+facts for jobs worth pursuing. Saved via `python -m matchbox.jobfacts save`; \
+only the fields present in the payload are written, so omitting a field leaves \
+the scan-time value in place. Facts must come from the JD text -- never guessed."""
+
+    model_config = ConfigDict(extra="forbid", title="Matchbox job facts (brain -> app)")
+
+    schema_version: Literal[1]
+    job_id: PosInt
+    salary_min: float | None = Field(default=None, ge=0)
+    salary_max: float | None = Field(default=None, ge=0)
+    salary_currency: str | None = Field(
+        default=None, pattern=r"^[A-Z]{3}$", description="ISO 4217, e.g. INR, USD."
+    )
+    salary_period: SalaryPeriod | None = None
+    employment_type: EmploymentType | None = None
+    seniority: Seniority | None = None
+    min_years_exp: int | None = Field(default=None, ge=0)
+    role_family: NonEmptyStr | None = Field(
+        default=None,
+        description=(
+            "Free label, lowercase-kebab (e.g. ml, pm, ai-transformation). Richer than "
+            "the Tier-1 tagger's fixed families on purpose."
+        ),
+    )
+    remote_scope: str | None = Field(
+        default=None, description="Stated remote constraint, e.g. 'remote (India only)'."
+    )
+    country: str | None = Field(
+        default=None, pattern=r"^[a-z]{2}$", description="ISO 3166-1 alpha-2, lowercase."
+    )
+    sponsorship: SponsorshipSignal | None = None
+    citizenship_required: bool | None = None
+    clearance_required: bool | None = None
+    closes_at: str | None = Field(
+        default=None,
+        pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+        description="Application deadline (ISO date) when the JD states one.",
+    )
+
+
+# --------------------------------------------------------------------------
 # Schema generation
 # --------------------------------------------------------------------------
 # (model, filename) for every published contract. The brain reads these files;
@@ -342,6 +392,7 @@ SCHEMA_REGISTRY: tuple[tuple[type[BaseModel], str], ...] = (
     (WorkQueue, "work-queue.v1.json"),
     (Status, "status.v1.json"),
     (Ingest, "ingest.v1.json"),
+    (JobFacts, "job-facts.v1.json"),
 )
 
 

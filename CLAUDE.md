@@ -15,12 +15,34 @@ The contract between the app and you lives in `schemas/` as JSON Schema
 
 * `schemas/ingest.v1.json` — onboarding payload
 * `schemas/job-requirements.v1.json` — extracted JD requirements
+* `schemas/job-facts.v1.json` — precise job facts for shortlisted roles
 * `schemas/work-queue.v1.json` — the app's tailoring queue
 * `schemas/status.v1.json` — your progress reports back to the app
 * `schemas/polish.v1.json` — the keyword-alignment polish payload
 * `schemas/selection.v1.json` — CV bullet selection + tailored summary
 
 A `schema_version` mismatch is a hard error. Stop and report.
+
+The schema files are GENERATED from the pydantic models in
+`src/matchbox/contracts.py` (`python -m matchbox.contracts`). Edit the
+models, never the JSON files.
+
+## Job-facts mode (Tier-2 enrichment for shortlisted roles)
+
+The scan's regex enrichment is coarse. When the user shortlists a job (or
+asks you to "enrich" one), read its full `jd_text` from the DB and save the
+precise facts the JD actually states — salary, employment type, seniority,
+years required, role family, remote scope, country, sponsorship/citizenship/
+clearance signals, application deadline:
+
+```bash
+python -m matchbox.jobfacts save --job <job_id> --file <facts.json>
+```
+
+Per `schemas/job-facts.v1.json`. PARTIAL by design: include only the fields
+the JD states; omitted fields keep their scan-time values; an explicit null
+clears a wrong guess. Never infer a fact the JD does not state — the
+no-fabrication rule applies to job data exactly as it does to CV content.
 
 ## Hard rules (apply to every mode)
 

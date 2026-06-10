@@ -111,6 +111,27 @@ VALID: dict[str, tuple[type[Any], dict[str, Any]]] = {
             ],
         },
     ),
+    "job-facts.v1.json": (
+        c.JobFacts,
+        {
+            "schema_version": 1,
+            "job_id": 7558,
+            "salary_min": 3500000,
+            "salary_max": 5000000,
+            "salary_currency": "INR",
+            "salary_period": "year",
+            "employment_type": "full_time",
+            "seniority": "senior",
+            "min_years_exp": 5,
+            "role_family": "ai-transformation",
+            "remote_scope": "remote (India only)",
+            "country": "in",
+            "sponsorship": "unknown",
+            "citizenship_required": False,
+            "clearance_required": False,
+            "closes_at": "2026-07-01",
+        },
+    ),
     "ingest.v1.json": (
         c.Ingest,
         {
@@ -229,6 +250,16 @@ INVALID: list[tuple[str, dict[str, Any], str]] = [
             "summary": "x",
         },
         "schema_version const: 1",
+    ),
+    (
+        "job-facts.v1.json",
+        {"schema_version": 1, "job_id": 1, "employment_type": "permanent"},
+        "employment_type enum",
+    ),
+    (
+        "job-facts.v1.json",
+        {"schema_version": 1, "job_id": 1, "country": "India"},
+        "country must be lowercase ISO-2",
     ),
 ]
 

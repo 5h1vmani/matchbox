@@ -68,6 +68,7 @@ dev = [
 matchbox = "matchbox.cli:app"
 matchbox-web = "matchbox.web.app:run"
 matchbox-jobreqs = "matchbox.jobreqs:main"
+matchbox-jobfacts = "matchbox.jobfacts:main"
 matchbox-assemble = "matchbox.assemble:main"
 matchbox-ingest = "matchbox.onboarding.ingest_cli:main"
 
