@@ -6,12 +6,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Application, TrackerActions } from "../types";
 import * as api from "../api/client";
 
-export function useApps(): [Application[], TrackerActions] {
+export function useApps(): [Application[], TrackerActions, boolean] {
   const [apps, setApps] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
-    api.listApplications().then((list) => { if (alive) setApps(list); });
+    api.listApplications().then((list) => { if (alive) { setApps(list); setLoading(false); } });
     return () => { alive = false; };
   }, []);
 
@@ -32,5 +33,5 @@ export function useApps(): [Application[], TrackerActions] {
     toggleStar: (id) => run(api.toggleStar(id)),
   }), [run]);
 
-  return [apps, actions];
+  return [apps, actions, loading];
 }

@@ -36,7 +36,7 @@ const STATUS_ICON: Record<oapi.OfferStatus, string> = {
 };
 
 function money(n: number | null, currency: string | null): string {
-  if (n === null) return "—";
+  if (n === null) return "N/A";
   const formatted = n.toLocaleString("en-US");
   return currency ? `${currency} ${formatted}` : formatted;
 }
@@ -90,7 +90,7 @@ function BenchmarkPanel({ offer }: { offer: oapi.Offer }) {
           <div style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
             <div>
               <div className="mono" style={{ fontSize: 20, fontWeight: 600 }}>
-                {bm.percentile === null ? "—" : `p${bm.percentile}`}
+                {bm.percentile === null ? "N/A" : `p${bm.percentile}`}
               </div>
               <div className="sub">percentile</div>
             </div>
@@ -98,7 +98,7 @@ function BenchmarkPanel({ offer }: { offer: oapi.Offer }) {
               <div className="mono" style={{ fontSize: 20, fontWeight: 600 }}>
                 {bm.range
                   ? `${money(bm.range.low, bm.currency)} – ${money(bm.range.high, bm.currency)}`
-                  : "—"}
+                  : "N/A"}
               </div>
               <div className="sub">p25 – p75</div>
             </div>
@@ -251,7 +251,7 @@ function AddForm({ apps, onAdd, flash }: AddFormProps) {
             <option value="">Select an application…</option>
             {apps.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.company} — {a.role}
+                {a.company}: {a.role}
               </option>
             ))}
           </select>
@@ -337,7 +337,7 @@ function OfferCard({ offer, label, onStatus, busy }: OfferCardProps) {
           <div className="sub">total comp</div>
         </div>
         <div>
-          <div className="mono" style={{ fontSize: 22, fontWeight: 600 }}>{offer.equity ?? "—"}</div>
+          <div className="mono" style={{ fontSize: 22, fontWeight: 600 }}>{offer.equity ?? "N/A"}</div>
           <div className="sub">equity</div>
         </div>
       </div>
@@ -355,7 +355,7 @@ function OfferCard({ offer, label, onStatus, busy }: OfferCardProps) {
         {terminal ? (
           <span className="sub" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             <Icon name={offer.status === "accepted" ? "check-circle" : "x"} size={15} />
-            {STATUS_LABEL[offer.status] ?? offer.status} — no further changes.
+            {STATUS_LABEL[offer.status] ?? offer.status}. No further changes.
           </span>
         ) : (
           transitions.map((t) => (
@@ -373,8 +373,8 @@ function OfferCard({ offer, label, onStatus, busy }: OfferCardProps) {
 
       {offer.status === "negotiating" && (
         <p className="sub" style={{ marginTop: 10 }}>
-          This tracks status only. Write your counter-offer draft in Claude Code — it is grounded and
-          voice-checked there. No strategy text is generated here.
+          This tracks status only. Write your counter-offer draft in Claude Code (it is grounded and
+          voice-checked there). No strategy text is generated here.
         </p>
       )}
     </section>
@@ -402,7 +402,7 @@ export function Offers({ flash }: { flash: (msg: string) => void }) {
 
   const labelFor = (applicationId: number): string => {
     const app = apps.find((a) => String(a.id) === String(applicationId));
-    return app ? `${app.company} — ${app.role}` : `Application #${applicationId}`;
+    return app ? `${app.company}: ${app.role}` : `Application #${applicationId}`;
   };
 
   const onAdd = (offer: oapi.Offer) => setOffers((prev) => [offer, ...prev]);

@@ -94,9 +94,10 @@ interface ReviewProps {
   onDecide: (role: Role, decision: DecisionInput) => void;
   onOpenJD: (role: Role) => void;
   onGoBrowse: () => void;
+  loading?: boolean;
 }
 
-export function Review({ roles, onDecide, onOpenJD, onGoBrowse }: ReviewProps) {
+export function Review({ roles, onDecide, onOpenJD, onGoBrowse, loading }: ReviewProps) {
   const [asideOpen, setAsideOpen] = useState(false);
 
   // "India-eligible only" — default on (the user can work only in India).
@@ -142,11 +143,13 @@ export function Review({ roles, onDecide, onOpenJD, onGoBrowse }: ReviewProps) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!current) return;
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const tag = (e.target as HTMLElement).tagName.toLowerCase();
+      // Don't intercept when focus is on an interactive element.
+      if (tag === "input" || tag === "textarea" || tag === "select" || tag === "button" || tag === "a") return;
       if (e.key === "x" || e.key === "X") onDecide(current, "dismissed");
       else if (e.key === "t" || e.key === "T") onDecide(current, "tracked");
       else if (e.key === "Enter") onDecide(current, "tailoring");
+      else if (e.key === "ArrowDown") onDecide(current, "skip");
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -170,7 +173,9 @@ export function Review({ roles, onDecide, onOpenJD, onGoBrowse }: ReviewProps) {
         </label>
       </div>
 
-      {current ? (
+      {loading ? (
+        <div className="quiet" style={{ padding: "40px 20px" }}>Loading…</div>
+      ) : current ? (
         <Fragment>
           <div className="qprog">
             <div className="qprog__bar"><div className="qprog__fill" style={{ width: pct + "%" }} /></div>

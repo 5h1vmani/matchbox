@@ -91,9 +91,9 @@ def _get_json(
     except httpx.RequestError as e:
         raise AggregatorError(source, f"network error: {e}") from e
     if r.status_code == 429:
-        raise AggregatorError(source, "rate limited (429) — back off and retry later")
+        raise AggregatorError(source, "rate limited (429): back off and retry later")
     if r.status_code == 401 or r.status_code == 403:
-        raise AggregatorError(source, f"auth rejected (HTTP {r.status_code}) — check API key")
+        raise AggregatorError(source, f"auth rejected (HTTP {r.status_code}): check API key")
     if r.status_code >= 400:
         raise AggregatorError(source, f"HTTP {r.status_code}: {r.text[:200]}")
     try:

@@ -37,7 +37,7 @@ function MomentumPanel() {
   const copy = MOMENTUM_COPY[m.status] ?? MOMENTUM_COPY.push;
   const reasonRows = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 18 }}>
+    <div className="momentum-grid" style={{ marginBottom: 18 }}>
       <div className="card" style={{ padding: "16px 20px" }}>
         <div className="sec-h" style={{ marginBottom: 12 }}>
           <span className="t">This week</span>
@@ -118,7 +118,7 @@ export function Insights({ apps, dir }: { apps: Application[]; dir: Direction })
 
       <MomentumPanel />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 22 }}>
+      <div className="stat-grid" style={{ marginBottom: 22 }}>
         <Stat k="Active" v={m.active} sub="still in motion" icon="activity" />
         <Stat k="Response rate" v={m.respRate + "%"} sub={m.heard + " of " + m.applied + " replied"} icon="mail" />
         <Stat k="Interviewing" v={m.interviewing} sub="phone + onsite" icon="users" tone="#2f5d72" />

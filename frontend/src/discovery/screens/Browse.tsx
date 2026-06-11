@@ -93,9 +93,10 @@ interface BrowseProps {
   onOpen: (role: Role) => void;
   onDecide: (role: Role, decision: DecisionInput) => void;
   onBatch: (decision: DecisionInput) => void;
+  loading?: boolean;
 }
 
-export function Browse({ roles, sel, onToggleSel, onClearSel, onOpen, onDecide, onBatch }: BrowseProps) {
+export function Browse({ roles, sel, onToggleSel, onClearSel, onOpen, onDecide, onBatch, loading }: BrowseProps) {
   const saved = useRef(loadBrowseState()).current;
   const [q, setQ] = useState<string>((saved.q as string) ?? "");
   const [eligibleOnly, setEligibleOnly] = useState<boolean>((saved.eligibleOnly as boolean) ?? true);
@@ -241,9 +242,13 @@ export function Browse({ roles, sel, onToggleSel, onClearSel, onOpen, onDecide, 
         {!eligibleOnly && <span className="fcount" style={{ color: "var(--faint-foreground)" }}>· including ones you may not be eligible for</span>}
       </div>
 
-      {list.length === 0 ? (
+      {loading ? (
         <div className="quiet" style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
-          <div className="big">No roles match {q ? `“${q}”` : "these filters"}.</div>
+          <div className="big">Loading...</div>
+        </div>
+      ) : list.length === 0 ? (
+        <div className="quiet" style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
+          <div className="big">No roles match {q ? `"${q}"` : "these filters"}.</div>
           {anyActive ? (
             <button className="btn ghost small" style={{ marginTop: 10 }} onClick={clearAll}>Clear all filters</button>
           ) : "Try widening fit or freshness."}

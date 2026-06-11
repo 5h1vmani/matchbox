@@ -36,7 +36,7 @@
   --foreground:        light-dark(#09090b,  #fafafa);
   --muted:             light-dark(#f4f4f5,  #27272a);
   --muted-foreground:  light-dark(#71717a,  #a1a1aa);
-  --faint-foreground:  light-dark(#a1a1aa,  #71717a);
+  --faint-foreground:  light-dark(#71717a,  #a1a1aa);
   --card:              light-dark(#fff,     #18181b);
   --card-foreground:   light-dark(#09090b,  #fafafa);
 

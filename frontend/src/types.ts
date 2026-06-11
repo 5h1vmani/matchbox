@@ -62,6 +62,10 @@ export interface Application {
   starred: boolean;
   mono: { bg: string; fg: string }; // monogram colours
   stale: boolean; // DERIVED — recomputed on read, never persisted
+  jobId: number; // the job row this application tracks
+  runId: string | null; // tailoring run queued for this app (null = never queued)
+  jobUrl: string | null; // apply_url ?? url from the job row
+  cvUrl: string | null; // served CV link when a tailored PDF exists on disk
 }
 
 export interface Profile {

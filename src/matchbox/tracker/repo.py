@@ -10,14 +10,15 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from matchbox.core.db import transaction
+from matchbox.core.db import PROJECT_ROOT, transaction
 from matchbox.tracker import rules
 
 _APP_SELECT = """
-  SELECT a.id, a.job_id, a.stage, a.salary, a.source, a.starred, a.has_draft,
+  SELECT a.id, a.job_id, a.run_id, a.stage, a.salary, a.source, a.starred, a.has_draft,
          a.applied_at, a.updated_at, a.next_action, a.next_action_kind,
          a.next_action_at, a.next_action_time, a.cv_path, a.cover_path,
-         j.company, j.title AS role, j.location AS location
+         j.company, j.title AS role, j.location AS location,
+         j.url AS job_url, j.apply_url AS apply_url
     FROM application a
     JOIN job j ON j.id = a.job_id
 """
@@ -70,6 +71,20 @@ def _children(
     return events, notes, contacts
 
 
+def _cv_url(conn: sqlite3.Connection, app_id: int, job_id: int, cv_path: str | None) -> str | None:
+    """Resolve the served CV link: the stamped cv_path first, else the newest
+    run output on disk (apps queued before a later re-tailor keep a stale or
+    empty cv_path while runs/<id>/output/<job>/cv.pdf exists)."""
+    if cv_path and (PROJECT_ROOT / cv_path).is_file():
+        return f"/api/applications/{app_id}/cv"
+    for r in conn.execute(
+        "SELECT run_id FROM run_job WHERE job_id=? ORDER BY run_id DESC", (job_id,)
+    ):
+        if (PROJECT_ROOT / "runs" / r["run_id"] / "output" / str(job_id) / "cv.pdf").is_file():
+            return f"/runs/{r['run_id']}/output/{job_id}/cv.pdf"
+    return None
+
+
 def serialize(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     app_id = row["id"]
     events, notes, contacts = _children(conn, app_id)
@@ -94,6 +109,10 @@ def serialize(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
         "starred": bool(row["starred"]),
         "mono": rules.mono_for(row["company"]),
         "stale": rules.is_stale(stage, na["due"] if na else None, updated_days),
+        "jobId": row["job_id"],
+        "runId": row["run_id"],
+        "jobUrl": row["apply_url"] or row["job_url"] or None,
+        "cvUrl": _cv_url(conn, app_id, row["job_id"], row["cv_path"]),
     }
 
 

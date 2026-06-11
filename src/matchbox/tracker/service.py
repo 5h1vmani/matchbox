@@ -155,7 +155,7 @@ def log_response(
             _set_next_action(updates, rules.default_action_for(row["stage"]))
         if updates:
             repo.update_app(conn, app_id, **updates)
-        repo.add_event(conn, app_id, "reply", "Heard back — positive")
+        repo.add_event(conn, app_id, "reply", "Heard back, positive")
     elif rtype == "rejected":
         updates = {"stage": "rejected"}
         reason = _close_reason(close_reason)

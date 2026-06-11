@@ -252,6 +252,7 @@ function ExperienceCard({
   const dates = dateRange(experience.startDate, experience.endDate);
 
   const remove = async (): Promise<void> => {
+    if (!window.confirm("Delete this experience and all its bullets?")) return;
     setBusy(true);
     const ok = await api.deleteExperience(experience.id);
     setBusy(false);
@@ -265,7 +266,7 @@ function ExperienceCard({
     <div className="card" style={{ padding: "16px 20px" }}>
       <div className="sec-h" style={{ marginBottom: 6, alignItems: "flex-start" }}>
         <span className="t" style={{ flex: 1, minWidth: 0 }}>
-          {experience.company} — {experience.role}
+          {experience.company}: {experience.role}
         </span>
         <button className="btn ghost tiny" disabled={busy} onClick={() => void remove()} title="Delete experience">
           <Icon name="trash-2" size={13} /> ×
@@ -528,7 +529,7 @@ function AddSkill({
         <label className="fld" style={{ flex: "1 1 140px" }}>
           <span className="fld__l">Proficiency (optional)</span>
           <select className="inp" value={proficiency} onChange={(e) => setProficiency(e.target.value)}>
-            <option value="">—</option>
+            <option value="">(none)</option>
             {PROFICIENCIES.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
@@ -780,7 +781,7 @@ export function Library({ flash }: { flash: (msg: string) => void }) {
         <div>
           <h1>Library</h1>
           <p className="sub">
-            Your verified facts — experiences, projects, skills, and summaries. A model only ever
+            Your verified facts: experiences, projects, skills, and summaries. A model only ever
             pulls from what lives here, and nothing here is invented.
           </p>
         </div>

@@ -90,7 +90,7 @@ export function useAppsMemory(): [Application[], TrackerActions] {
   const logResponse = useCallback((id: string, type: ResponseType) => {
     patch(id, (a) => {
       if (type === "reply") {
-        pushEvent(a, "reply", "Heard back — positive");
+        pushEvent(a, "reply", "Heard back, positive");
         if (a.stage === "applied") { a.stage = "phone"; a.nextAction = defaultActionFor("phone"); }
         else a.nextAction = a.nextAction || defaultActionFor(a.stage);
         a.stale = false;

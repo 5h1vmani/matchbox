@@ -164,7 +164,7 @@ function RoundRow({
             className="inp"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional notes — what was asked, how it felt…"
+            placeholder="Optional notes: what was asked, how it felt…"
           />
           <button
             className="btn tiny"
@@ -274,7 +274,7 @@ export function Workspace({ flash }: { flash: (msg: string) => void }) {
     if (!selectedId) return;
     void rounds.createRound(selectedId, body).then((r) => {
       if (r) {
-        flash("Round added — " + (KIND_LABEL[r.kind] ?? r.kind));
+        flash("Round added: " + (KIND_LABEL[r.kind] ?? r.kind));
         refresh(selectedId);
       } else {
         flash("Could not add the round.");
@@ -311,7 +311,7 @@ export function Workspace({ flash }: { flash: (msg: string) => void }) {
       <div className="phead">
         <div>
           <h1>Workspace</h1>
-          <p className="sub">Add rounds yourself — there is no calendar sync.</p>
+          <p className="sub">Add rounds yourself. There is no calendar sync.</p>
         </div>
       </div>
 
@@ -320,7 +320,7 @@ export function Workspace({ flash }: { flash: (msg: string) => void }) {
           <p className="sub">No interviews in flight yet.</p>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 16, alignItems: "start" }}>
+        <div className="workspace-grid" style={{ alignItems: "start" }}>
           {/* Left: interviewing applications. */}
           <div className="card" style={{ padding: "16px 20px" }}>
             <div className="sec-h" style={{ marginBottom: 12 }}>
@@ -350,7 +350,7 @@ export function Workspace({ flash }: { flash: (msg: string) => void }) {
             {selected && (
               <div className="sec-h">
                 <span className="t" style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-                  <Icon name="users" size={15} /> {selected.company} — {selected.role}
+                  <Icon name="users" size={15} /> {selected.company}: {selected.role}
                 </span>
               </div>
             )}

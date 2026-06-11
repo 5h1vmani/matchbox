@@ -105,41 +105,40 @@ function MustHaveRow({ m }: { m: PacketMustHave }) {
   );
 }
 
-const PALETTES: ReadonlyArray<string> = ["slate", "ink", "forest", "claret", "bronze"];
-const FONTS: ReadonlyArray<string> = ["source-serif", "source-sans", "inter", "atkinson-hyperlegible"];
+function CommandCopy({ cmd, flash }: { cmd: string; flash: (msg: string) => void }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    void navigator.clipboard?.writeText(cmd).then(() => {
+      setCopied(true);
+      flash("Copied.");
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--muted)", borderRadius: 6, padding: "8px 12px" }}>
+      <code style={{ flex: 1, fontSize: 13, background: "none", padding: 0 }}>{cmd}</code>
+      <button className="btn ghost tiny" onClick={copy}><Icon name="copy" size={13} /> {copied ? "Copied" : "Copy"}</button>
+    </div>
+  );
+}
+
 
 function ResumeTab({ packet, flash }: { packet: Packet; flash: (msg: string) => void }) {
-  const [palette, setPalette] = useState("slate");
-  const [font, setFont] = useState("source-serif");
   const [cvSrc, setCvSrc] = useState<string | null>(packet.resume?.cvUrl ?? null);
-  const [restyling, setRestyling] = useState(false);
 
   // Re-seed the iframe src when the selected application's packet changes.
   useEffect(() => {
     setCvSrc(packet.resume?.cvUrl ?? null);
   }, [packet]);
 
-  const restyle = async () => {
-    setRestyling(true);
-    const res = await packetApi.restyleCv(String(packet.applicationId), palette, font);
-    setRestyling(false);
-    if (res) {
-      setCvSrc(`${res.cvUrl}?t=${Date.now()}`);
-      flash("Restyled.");
-      if (res.drift.length > 0) {
-        flash("Heads up: a bullet changed in your library since this CV was built.");
-      }
-    } else {
-      flash("Could not restyle the CV.");
-    }
-  };
-
   if (!packet.resume) {
+    const cmd = packet.runId ? `process run ${packet.runId}` : null;
     return (
       <div className="card" style={{ padding: "16px 20px" }}>
-        <p className="sub" style={{ margin: 0 }}>
-          No tailored CV yet — run the tailoring in Claude Code.
+        <p className="sub" style={{ margin: cmd ? "0 0 10px" : 0 }}>
+          No tailored CV yet. Run the tailoring in Claude Code.
         </p>
+        {cmd && <CommandCopy cmd={cmd} flash={flash} />}
       </div>
     );
   }
@@ -170,33 +169,14 @@ function ResumeTab({ packet, flash }: { packet: Packet; flash: (msg: string) => 
           style={{ width: "100%", height: 520, border: "1px solid var(--border)", borderRadius: 8 }}
         />
         <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <select
-            className="inp"
-            value={palette}
-            onChange={(e) => setPalette(e.target.value)}
-            style={{ width: "auto" }}
-          >
-            {PALETTES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <select
-            className="inp"
-            value={font}
-            onChange={(e) => setFont(e.target.value)}
-            style={{ width: "auto" }}
-          >
-            {FONTS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-          <button className="btn ghost" disabled={restyling} onClick={() => void restyle()}>
-            <Icon name="sparkles" size={14} /> {restyling ? "Restyling…" : "Restyle"}
-          </button>
+          <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
+            <a className="btn ghost" href={cvSrc ?? packet.resume.cvUrl} target="_blank" rel="noreferrer">
+              <Icon name="external-link" size={14} /> Open PDF
+            </a>
+            <a className="btn ghost" href={cvSrc ?? packet.resume.cvUrl} download="cv.pdf">
+              <Icon name="download" size={14} /> Download
+            </a>
+          </span>
         </div>
       </div>
 
@@ -298,7 +278,7 @@ function CoverTab({
     if (!ok) {
       // The check failed; surface the violations but still let the user edit.
       setSaving(false);
-      flash("Cover has voice issues — review them, then save.");
+      flash("Cover has voice issues. Review them, then save.");
       return;
     }
     const { coverUrl } = await packetApi.saveCover(appId, text);
@@ -331,7 +311,7 @@ function CoverTab({
             setChecked(false);
           }}
           rows={7}
-          placeholder="Drafted from your library, in your voice — or write your own."
+          placeholder="Drafted from your library, in your voice. Or write your own."
           style={{ resize: "vertical", fontFamily: "inherit" }}
         />
       </label>
@@ -345,7 +325,7 @@ function CoverTab({
               <Icon name="check" size={12} /> Your voice, your key
             </span>
           ) : (
-            <span className="badge muted">Demo — add a key in Settings</span>
+            <span className="badge muted">Demo (add a key in Settings)</span>
           )}
         </div>
       )}
@@ -356,7 +336,7 @@ function CoverTab({
           <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
             {violations.map((v, i) => (
               <li key={i} className="sub" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-                <span className="mono">{v.rule}</span> — {v.detail}
+                <span className="mono">{v.rule}</span>: {v.detail}
               </li>
             ))}
           </ul>
@@ -431,7 +411,7 @@ function QuestionsTab({ flash }: { flash: (msg: string) => void }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div className="card" style={{ padding: "16px 20px" }}>
         <p className="sub" style={{ margin: 0 }}>
-          Paste the form's screening questions — there's no honest way to scrape them.
+          Paste the form's screening questions. There is no honest way to scrape them.
           Optional questions can stay blank.
         </p>
       </div>
@@ -456,11 +436,13 @@ function SubmitTab({
   packet,
   flash,
   onSubmitted,
+  jobUrl,
 }: {
   appId: string;
   packet: Packet;
   flash: (msg: string) => void;
   onSubmitted: (stage: string) => void;
+  jobUrl?: string | null;
 }) {
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState(packet.stage);
@@ -492,9 +474,16 @@ function SubmitTab({
       </div>
       <p className="sub" style={{ margin: "0 0 14px", lineHeight: 1.5 }}>
         Once you have submitted the application on the company's site, mark it here.
-        We set a follow-up <strong>reminder</strong> for 7 days out — a due-date you'll
+        We set a follow-up <strong>reminder</strong> for 7 days out: a due-date you'll
         see on Today, not a scheduled task.
       </p>
+      {jobUrl && (
+        <div style={{ marginBottom: 14 }}>
+          <a className="btn outline" href={jobUrl} target="_blank" rel="noreferrer">
+            <Icon name="external-link" size={14} /> Open posting
+          </a>
+        </div>
+      )}
       <button
         className="btn primary"
         disabled={busy || applied}
@@ -512,22 +501,27 @@ function SubmitTab({
   );
 }
 
-export function Apply({ flash }: { flash: (msg: string) => void }) {
-  const [apps, setApps] = useState<Application[]>([]);
-  const [loadingApps, setLoadingApps] = useState(true);
+export function Apply({ flash, apps: propApps }: { flash: (msg: string) => void; apps?: Application[] }) {
+  const [apps, setApps] = useState<Application[]>(propApps ?? []);
+  const [loadingApps, setLoadingApps] = useState(!propApps);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [packet, setPacket] = useState<Packet | null>(null);
   const [loadingPacket, setLoadingPacket] = useState(false);
   const [tab, setTab] = useState<TabId>("resume");
 
-  // Fetch applications on mount; default to the first.
+  // Fetch applications on mount (only if not passed from Shell); default to the first.
   useEffect(() => {
+    if (propApps) {
+      setApps(propApps);
+      setSelectedId((cur) => cur ?? (propApps.length > 0 ? propApps[0].id : null));
+      return;
+    }
     void listApplications().then((rows) => {
       setApps(rows);
       setSelectedId((cur) => cur ?? (rows.length > 0 ? rows[0].id : null));
       setLoadingApps(false);
     });
-  }, []);
+  }, [propApps]);
 
   // Load the packet whenever the selection changes.
   useEffect(() => {
@@ -554,7 +548,7 @@ export function Apply({ flash }: { flash: (msg: string) => void }) {
       <div className="phead">
         <div>
           <h1>Apply</h1>
-          <p className="sub">Your application packet — the tailored CV, the cover, your answers, and the send.</p>
+          <p className="sub">Your application packet: the tailored CV, the cover, your answers, and the send.</p>
         </div>
       </div>
 
@@ -576,7 +570,7 @@ export function Apply({ flash }: { flash: (msg: string) => void }) {
             >
               {apps.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.company} — {a.role}
+                  {a.company}: {a.role}
                 </option>
               ))}
             </select>
@@ -601,7 +595,7 @@ export function Apply({ flash }: { flash: (msg: string) => void }) {
           ) : !packet ? (
             <div className="card" style={{ padding: "16px 20px" }}>
               <p className="sub" style={{ margin: 0 }}>
-                No packet for {selected ? selected.company : "this application"} yet — run the
+                No packet for {selected ? selected.company : "this application"} yet. Run the
                 tailoring in Claude Code.
               </p>
             </div>
@@ -612,7 +606,7 @@ export function Apply({ flash }: { flash: (msg: string) => void }) {
           ) : tab === "questions" ? (
             <QuestionsTab flash={flash} />
           ) : (
-            <SubmitTab appId={String(selectedId)} packet={packet} flash={flash} onSubmitted={onSubmitted} />
+            <SubmitTab appId={String(selectedId)} packet={packet} flash={flash} onSubmitted={onSubmitted} jobUrl={selected?.jobUrl} />
           )}
         </div>
       )}

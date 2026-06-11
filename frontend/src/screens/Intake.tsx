@@ -105,7 +105,7 @@ export function Intake({ flash }: { flash: (msg: string) => void }) {
           <h1>Onboarding</h1>
           <p className="sub">
             Your files stay on this machine. When you run the ingest, a model reads them to pull out
-            your experience. You review every extracted fact before it counts — nothing is used until
+            your experience. You review every extracted fact before it counts. Nothing is used until
             you confirm it.
           </p>
         </div>
@@ -159,7 +159,7 @@ export function Intake({ flash }: { flash: (msg: string) => void }) {
             className="inp"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Paste anything that describes your work — roles, projects, bullet points…"
+            placeholder="Paste anything that describes your work: roles, projects, bullet points…"
             rows={4}
             style={{ resize: "vertical", fontFamily: "inherit" }}
           />

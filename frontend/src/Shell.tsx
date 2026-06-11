@@ -12,6 +12,7 @@ import * as tapi from "./api/client";
 import type { ProfileInfo, UserInfo } from "./api/client";
 import * as dapi from "./discovery/api/client";
 import { useApps } from "./store/useApps";
+import { useAppsMemory } from "./store/useAppsMemory";
 import { useDiscovery } from "./discovery/store/useDiscovery";
 import { useDiscoveryMemory } from "./discovery/store/useDiscoveryMemory";
 import { Today } from "./screens/Today";
@@ -88,6 +89,27 @@ const PATH_NAV: Record<string, string> = {
   settings: "settings",
   insights: "insights",
   applications: "applications",
+  browse: "browse",
+  watchlist: "watchlist",
+};
+// nav id -> URL path (reverse of PATH_NAV; "today" → "/")
+const NAV_PATH: Record<string, string> = {
+  review: "/discover",
+  verify: "/review",
+  apply: "/apply",
+  library: "/library",
+  onboarding: "/onboarding",
+  sources: "/sources",
+  profile: "/profile",
+  workspace: "/workspace",
+  offers: "/offers",
+  answers: "/answers",
+  settings: "/settings",
+  insights: "/insights",
+  applications: "/applications",
+  today: "/",
+  browse: "/browse",
+  watchlist: "/watchlist",
 };
 function initialNav(): string {
   const seg = window.location.pathname.split("/")[1] || "";
@@ -176,11 +198,16 @@ function Sidebar({ nav, onNav, onPalette, appsCount, todoCount, queueCount, prof
 }
 
 export function Shell() {
-  // Both stores live in one shell.
-  const [apps, actions] = useApps();
+  // Both stores live in one shell. ?sample swaps BOTH for in-memory sample
+  // data so every screen demos without touching the DB.
+  const [liveApps, liveActions, liveAppsLoading] = useApps();
+  const [memApps, memActions] = useAppsMemory();
+  const [apps, actions, appsLoading] = USE_SAMPLE
+    ? [memApps, memActions, false] as const
+    : [liveApps, liveActions, liveAppsLoading] as const;
   const live = useDiscovery();
   const mem = useDiscoveryMemory();
-  const { roles, watch, unwatch } = USE_SAMPLE ? mem : live;
+  const { roles, watch, unwatch, loading: rolesLoading } = USE_SAMPLE ? { ...mem, loading: false } : live;
   type RunHandoff = { runId: string; prompt: string } | null;
   const decide = useCallback((ids: string[], decision: DecisionInput): { undo: () => void; run?: Promise<RunHandoff> } => {
     if (USE_SAMPLE) return { undo: mem.decide(ids, decision) };
@@ -228,6 +255,12 @@ export function Shell() {
     flash(DECISION_TOAST[decision] || "Done", undo);
     surfaceRun(run, 1);
   }, [decide, flash, surfaceRun]);
+  // Tailor straight from the tracker: queue a run for the application's job.
+  const onTailorApp = useCallback((app: Application) => {
+    const { run } = decide([String(app.jobId)], "tailoring");
+    flash(DECISION_TOAST.tailoring);
+    surfaceRun(run, 1);
+  }, [decide, flash, surfaceRun]);
   const toggleSel = useCallback((id: string) => {
     setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }, []);
@@ -269,7 +302,23 @@ export function Shell() {
     if (it.href) { window.location.href = it.href; return; }
     setNav(it.id);
     if (it.id === "applications") setFilter("all");
+    const path = NAV_PATH[it.id] ?? "/";
+    history.pushState(null, "", path);
+    document.title = "Matchbox: " + it.label;
   }, []);
+
+  // Keep back/forward working.
+  useEffect(() => {
+    const onPop = () => setNav(initialNav());
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // Set the initial title.
+  useEffect(() => {
+    const it = NAV.find((n) => n.id === nav);
+    if (it) document.title = "Matchbox: " + it.label;
+  }, [nav]);
 
   // ⌘K / Ctrl-K opens the palette from anywhere.
   useEffect(() => {
@@ -300,22 +349,22 @@ export function Shell() {
   }, [onNav]);
 
   let screen: ReactNode;
-  if (nav === "review") screen = <Review roles={reviewRoles} onDecide={onDecide} onOpenJD={(r) => setJd(r.id)} onGoBrowse={() => setNav("browse")} />;
-  else if (nav === "browse") screen = <Browse roles={roles} sel={sel} onToggleSel={toggleSel} onClearSel={clearSel} onOpen={(r) => setJd(r.id)} onDecide={onDecide} onBatch={onBatch} />;
+  if (nav === "review") screen = <Review roles={reviewRoles} loading={rolesLoading} onDecide={onDecide} onOpenJD={(r) => setJd(r.id)} onGoBrowse={() => setNav("browse")} />;
+  else if (nav === "browse") screen = <Browse roles={roles} loading={rolesLoading} sel={sel} onToggleSel={toggleSel} onClearSel={clearSel} onOpen={(r) => setJd(r.id)} onDecide={onDecide} onBatch={onBatch} />;
   else if (nav === "watchlist") screen = <Watchlist watch={watch} flash={flash} onUnwatch={unwatch} />;
   else if (nav === "insights") screen = <Insights apps={apps} dir={DIR} />;
   else if (nav === "workspace") screen = <Workspace flash={flash} />;
   else if (nav === "offers") screen = <Offers flash={flash} />;
   else if (nav === "answers") screen = <Answers flash={flash} />;
-  else if (nav === "apply") screen = <Apply flash={flash} />;
+  else if (nav === "apply") screen = <Apply flash={flash} apps={apps} />;
   else if (nav === "verify") screen = <ReviewFacts flash={flash} />;
   else if (nav === "onboarding") screen = <Intake flash={flash} />;
   else if (nav === "library") screen = <Library flash={flash} />;
   else if (nav === "sources") screen = <Sources flash={flash} />;
   else if (nav === "profile") screen = <Profile flash={flash} />;
   else if (nav === "settings") screen = <Settings flash={flash} />;
-  else if (nav === "applications") screen = <Tracker apps={apps} actions={actions} flash={flash} onOpen={openDetail} dir={DIR} view={view} setView={setView} filter={filter} setFilter={setFilter} />;
-  else screen = <Today apps={apps} actions={actions} flash={flash} onOpen={openDetail} dir={DIR} />;
+  else if (nav === "applications") screen = <Tracker apps={apps} actions={actions} flash={flash} onOpen={openDetail} dir={DIR} view={view} setView={setView} filter={filter} setFilter={setFilter} loading={appsLoading} onGoDiscover={() => setNav("browse")} onTailor={onTailorApp} />;
+  else screen = <Today apps={apps} actions={actions} flash={flash} onOpen={openDetail} dir={DIR} loading={appsLoading} />;
 
   return (
     <div className="shell" data-dir={DIR} data-density="regular">
@@ -324,11 +373,11 @@ export function Shell() {
 
       {paletteOpen && <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />}
 
-      {detailApp && <Detail app={detailApp} actions={actions} flash={flash} focusNote={detail?.note} onClose={() => setDetail(null)} />}
+      {detailApp && <Detail app={detailApp} actions={actions} flash={flash} focusNote={detail?.note} onClose={() => setDetail(null)} onTailor={onTailorApp} />}
       {jdRole && <JDDrawer role={jdRole} onDecide={onDecide} onClose={() => setJd(null)} flash={flash} />}
 
       {toast && (
-        <div className="toasts">
+        <div className="toasts" role="status" aria-live="polite">
           <div className="toast">
             <Icon name="check-circle" size={16} /> {toast.msg}
             {toast.undo && <button className="undo" onClick={() => { toast.undo!(); setToast(null); }}>Undo</button>}

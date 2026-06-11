@@ -279,7 +279,7 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
     setJobText("");
     flash(
       scored.scored > 0
-        ? "Added and scored. Open Today's roles — if it is not India-eligible it sits under Set aside."
+        ? "Added and scored. Open Today's roles: if it is not India-eligible it sits under Set aside."
         : "Added. Click Score new roles, then check Today's roles.",
     );
   };
@@ -299,7 +299,7 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
         <div>
           <h1>Sources</h1>
           <p className="sub">
-            The job boards you point at companies. A scan is a real, live fetch — and an honest one: a
+            The job boards you point at companies. A scan is a real, live fetch, and an honest one: a
             bad slug shows up here as a warning after you scan, never guessed at.
           </p>
         </div>
@@ -432,7 +432,7 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
         </div>
         <p className="sub" style={{ margin: "0 0 14px" }}>
           Optional. Bring your own Adzuna credentials and the remote scan will include it. The key is
-          stored only on this device and used straight from here — never sent anywhere else.
+          stored only on this device and used straight from here, never sent anywhere else.
         </p>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>

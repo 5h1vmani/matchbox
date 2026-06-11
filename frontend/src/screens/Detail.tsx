@@ -8,6 +8,8 @@ import { Icon } from "../ui/icon";
 import { Badge, MonoLogo, StageStepper } from "../ui/atoms";
 import { QuickButton, StarBtn } from "../ui/parts";
 import { useDialog } from "../lib/useDialog";
+import { listArtifacts, markArtifactSent } from "../api/client";
+import type { Artifact } from "../api/client";
 
 function whenText(daysAgo: number): string {
   if (daysAgo <= 0) return "Today";
@@ -31,6 +33,7 @@ interface DetailProps {
   flash: Flash;
   onClose: () => void;
   focusNote?: boolean;
+  onTailor?: (app: Application) => void;
 }
 
 interface Cta {
@@ -39,11 +42,33 @@ interface Cta {
   run: () => void;
 }
 
-export function Detail({ app, actions, flash, onClose, focusNote }: DetailProps) {
+export function Detail({ app, actions, flash, onClose, focusNote, onTailor }: DetailProps) {
   const [note, setNote] = useState("");
+  const [tailorQueued, setTailorQueued] = useState(false);
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const dialogRef = useDialog<HTMLDivElement>(onClose);
   useEffect(() => { if (focusNote && noteRef.current) noteRef.current.focus(); }, [focusNote]);
+
+  // Fetch draft artifact when the drawer opens for an app that has one.
+  const [draftArtifact, setDraftArtifact] = useState<Artifact | null>(null);
+  const [copyFlash, setCopyFlash] = useState(false);
+  useEffect(() => {
+    if (!app.hasDraft) { setDraftArtifact(null); return; }
+    void listArtifacts(app.id).then((arts) => {
+      const draft = [...arts].reverse().find(
+        (a) => (a.kind === "followup" || a.kind === "thankyou") && a.status === "draft",
+      ) ?? null;
+      setDraftArtifact(draft);
+    });
+  }, [app.id, app.hasDraft]);
+
+  const copyDraft = () => {
+    if (!draftArtifact?.body) return;
+    void navigator.clipboard.writeText(draftArtifact.body).then(() => {
+      setCopyFlash(true);
+      setTimeout(() => setCopyFlash(false), 2000);
+    });
+  };
 
   const a = app.nextAction;
   const i = FLOW.indexOf(app.stage);
@@ -53,8 +78,8 @@ export function Detail({ app, actions, flash, onClose, focusNote }: DetailProps)
   const primaryCta = (): Cta | null => {
     if (!a) return null;
     const map: Record<string, Cta> = {
-      followup: { label: "Mark sent", icon: "send", run: () => { actions.markDone(app.id); flash("Follow-up sent to " + app.company); } },
-      thanks: { label: "Mark sent", icon: "send", run: () => { actions.markDone(app.id); flash("Thank-you sent"); } },
+      followup: { label: "Mark sent", icon: "check", run: () => { actions.markDone(app.id); flash("Marked sent to " + app.company); if (draftArtifact) void markArtifactSent(app.id, draftArtifact.id).catch(() => {}); } },
+      thanks: { label: "Mark sent", icon: "check", run: () => { actions.markDone(app.id); flash("Marked sent."); if (draftArtifact) void markArtifactSent(app.id, draftArtifact.id).catch(() => {}); } },
       apply: { label: "Mark applied", icon: "check", run: () => { actions.markDone(app.id); flash("Marked applied to " + app.company); } },
       prep: { label: "Mark prepped", icon: "check", run: () => { actions.markDone(app.id); flash("Prep done"); } },
       interview: { label: "Mark done", icon: "check", run: () => { actions.markDone(app.id); flash("Interview logged"); } },
@@ -73,7 +98,16 @@ export function Detail({ app, actions, flash, onClose, focusNote }: DetailProps)
           <button className="iconbtn" onClick={onClose} title="Close"><Icon name="x" size={18} /></button>
           <span className="sp" />
           <StarBtn app={app} actions={actions} size={16} />
-          <button className="iconbtn" title="Open job post" onClick={() => flash("Would open the job post")}><Icon name="external-link" size={16} /></button>
+          {app.jobUrl && (
+            <a className="iconbtn" href={app.jobUrl} target="_blank" rel="noreferrer" title="Open job post">
+              <Icon name="external-link" size={16} />
+            </a>
+          )}
+          {app.cvUrl && (
+            <a className="iconbtn" href={app.cvUrl} target="_blank" rel="noreferrer" title="Open tailored CV (PDF)">
+              <Icon name="file-text" size={16} />
+            </a>
+          )}
           <QuickButton app={app} actions={actions} flash={flash} onOpen={() => {}} />
         </div>
 
@@ -102,6 +136,11 @@ export function Detail({ app, actions, flash, onClose, focusNote }: DetailProps)
                 <div className="s">{a.due !== null ? dueInfo(a.due)?.text : "No date set"}{app.hasDraft && (a.kind === "followup" || a.kind === "thanks") ? " · draft ready" : ""}</div>
               </div>
               <div className="cta">
+                {a.kind === "apply" && app.jobUrl && (
+                  <a className="btn outline small" href={app.jobUrl} target="_blank" rel="noreferrer">
+                    <Icon name="external-link" size={14} /> Open posting
+                  </a>
+                )}
                 <button className="btn outline small" onClick={() => { actions.snooze(app.id, 2); flash("Snoozed for 2 days"); }}>Snooze</button>
                 {cta && <button className="btn accent small" onClick={cta.run}><Icon name={cta.icon} size={14} /> {cta.label}</button>}
               </div>
@@ -117,6 +156,51 @@ export function Detail({ app, actions, flash, onClose, focusNote }: DetailProps)
               <span className="di" style={{ color: "var(--muted-foreground)" }}><Icon name="hourglass" size={18} /></span>
               <div><div className="l">Waiting to hear back</div><div className="s">Applied {app.appliedDaysAgo}d ago · no reply yet</div></div>
               <div className="cta"><button className="btn outline small" onClick={() => { actions.remind(app.id, 0); flash("Follow-up reminder set"); }}><Icon name="reply" size={14} /> Follow up</button></div>
+            </div>
+          )}
+
+          {/* Tailored CV state: open it, or get one made */}
+          <div className="dsec">
+            <div className="dsec__h">Tailored CV</div>
+            {app.cvUrl ? (
+              <a className="btn outline small" href={app.cvUrl} target="_blank" rel="noreferrer">
+                <Icon name="file-text" size={14} /> Open CV (PDF)
+              </a>
+            ) : app.runId || tailorQueued ? (
+              <div className="note">
+                <div className="nt">
+                  Queued for tailoring. Run this in Claude Code to draft it:
+                  {app.runId && <> <code className="mono">process run {app.runId}</code></>}
+                </div>
+                {app.runId && (
+                  <button className="btn ghost tiny" style={{ marginTop: 6 }}
+                    onClick={() => { void navigator.clipboard?.writeText("process run " + app.runId); flash("Copied. Paste it into Claude Code."); }}>
+                    <Icon name="copy" size={13} /> Copy command
+                  </button>
+                )}
+              </div>
+            ) : onTailor ? (
+              <button className="btn accent small" onClick={() => { setTailorQueued(true); onTailor(app); }}>
+                <Icon name="sparkles" size={14} /> Tailor a CV for this role
+              </button>
+            ) : (
+              <div className="note"><div className="nt">No tailored CV yet.</div></div>
+            )}
+          </div>
+
+          {/* Draft artifact body */}
+          {draftArtifact?.body && (
+            <div className="dsec">
+              <div className="dsec__h">
+                Draft: {draftArtifact.kind === "thankyou" ? "thank-you" : "follow-up"}
+                <span className="sp" />
+                <button className="btn ghost tiny" onClick={copyDraft}>
+                  <Icon name="copy" size={13} /> {copyFlash ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <div className="note" style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13.5, lineHeight: 1.6 }}>
+                {draftArtifact.body}
+              </div>
             </div>
           )}
 
@@ -170,7 +254,7 @@ export function Detail({ app, actions, flash, onClose, focusNote }: DetailProps)
             <div className="notebox">
               <textarea
                 ref={noteRef}
-                placeholder="Jot a note — what to ask, who you met, how it felt…"
+                placeholder="Jot a note: what to ask, who you met, how it felt…"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitNote(); }}
@@ -187,8 +271,6 @@ export function Detail({ app, actions, flash, onClose, focusNote }: DetailProps)
                 <div className="contact" key={idx}>
                   <span className="av">{c.initials}</span>
                   <div><div className="nm">{c.name}</div><div className="rl">{c.role}</div></div>
-                  <span className="sp" />
-                  <button className="iconbtn" title="Email" onClick={() => flash("Would compose an email")}><Icon name="mail" size={15} /></button>
                 </div>
               ))}
             </div>

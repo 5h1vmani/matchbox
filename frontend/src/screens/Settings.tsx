@@ -64,7 +64,7 @@ export function Settings({ flash }: { flash: (msg: string) => void }) {
         <div className="sec-h" style={{ marginBottom: 14 }}>
           <span className="t">AI assistance</span>
           <span className={cx("badge", cfg.hasKey ? "ok" : "muted")} style={{ marginLeft: "auto" }}>
-            {cfg.hasKey ? "Live — your key" : "Demo — add a key"}
+            {cfg.hasKey ? "Live (your key)" : "Demo (add a key)"}
           </span>
         </div>
 

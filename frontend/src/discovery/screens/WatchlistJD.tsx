@@ -41,6 +41,12 @@ export function Watchlist({ watch, flash, onUnwatch }: { watch: WatchedCompany[]
           <p className="sub">Companies worth watching, even when there's no role for you today. We'll surface openings as they post.</p>
         </div>
       </div>
+      {watch.length === 0 ? (
+        <div className="quiet">
+          <div className="big">Nothing on your watchlist yet.</div>
+          Companies land here when you tap "Watch company" on a role card in Today's roles or Browse.
+        </div>
+      ) : (
       <div className="watch-grid">
         {watch.map((w, i) => (
           <div className="wtile" key={i}>
@@ -60,6 +66,7 @@ export function Watchlist({ watch, flash, onUnwatch }: { watch: WatchedCompany[]
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

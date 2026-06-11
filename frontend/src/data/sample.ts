@@ -100,11 +100,11 @@ export function buildSampleApps(): Application[] {
       }
       if (st.id === "onsite" || st.id === "offer") {
         const screen = Math.max(1, (appliedDaysAgo as number) - (10 + (k % 4)));
-        events.push({ daysAgo: screen, kind: "screen", text: "Phone screen — went well" });
+        events.push({ daysAgo: screen, kind: "screen", text: "Phone screen, went well" });
         contacts.push({ name: pick(firstNames, idx + 3), role: pick(recruiterRoles, idx + 1), initials: pick(firstNames, idx + 3).slice(0, 1) });
       }
       if (st.id === "offer") {
-        events.push({ daysAgo: Math.max(1, updatedDaysAgo + 1), kind: "onsite", text: "Onsite — strong fit" });
+        events.push({ daysAgo: Math.max(1, updatedDaysAgo + 1), kind: "onsite", text: "Onsite: strong fit" });
         events.push({ daysAgo: updatedDaysAgo, kind: "offer", text: "Offer received" });
       }
       if (st.id === "rejected") {
@@ -117,7 +117,7 @@ export function buildSampleApps(): Application[] {
         const noteText = pick([
           "Team seems small and senior. Ask about design org size.",
           "Comp band looked flexible. They mentioned equity refresh.",
-          "Used their product for a year — lead with that.",
+          "Used their product for a year. Lead with that.",
           "Referral said the hiring bar is high on craft. Bring the case study.",
           "Remote but quarterly onsites in SF. Confirm travel cadence.",
         ], idx);
@@ -170,6 +170,10 @@ export function buildSampleApps(): Application[] {
         mono: { bg: c[0], fg: c[1] },
         starred: idx % 9 === 0,
         stale: false,
+        jobId: idx + 1,
+        runId: null,
+        jobUrl: null,
+        cvUrl: null,
       });
       idx++;
     }

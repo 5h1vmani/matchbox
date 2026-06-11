@@ -23,7 +23,7 @@ function StaleHint({ app }: { app: Application }) {
   );
 }
 
-function Row({ app, actions, flash, onOpen }: { app: Application; actions: TrackerActions; flash: Flash; onOpen: OpenDetail }) {
+function Row({ app, actions, flash, onOpen, onTailor }: { app: Application; actions: TrackerActions; flash: Flash; onOpen: OpenDetail; onTailor?: (app: Application) => void }) {
   const a = app.nextAction;
   return (
     <div className={cx("row", app.stale && "stale")} onClick={() => onOpen(app)}>
@@ -55,6 +55,22 @@ function Row({ app, actions, flash, onOpen }: { app: Application; actions: Track
       </div>
 
       <div className="row-actions" onClick={(e) => e.stopPropagation()}>
+        {app.stage === "saved" && !app.cvUrl && !app.runId && onTailor && (
+          <button className="iconbtn" title="Tailor a CV for this role" onClick={() => onTailor(app)}>
+            <Icon name="sparkles" size={15} />
+          </button>
+        )}
+        {app.jobUrl && (
+          <a className="iconbtn" href={app.jobUrl} target="_blank" rel="noreferrer"
+            title={app.stage === "saved" ? "Open the job post to apply" : "Open job post"}>
+            <Icon name="external-link" size={15} />
+          </a>
+        )}
+        {app.cvUrl && (
+          <a className="iconbtn" href={app.cvUrl} target="_blank" rel="noreferrer" title="Open tailored CV (PDF)">
+            <Icon name="file-text" size={15} />
+          </a>
+        )}
         <div className="quick">
           <StarBtn app={app} actions={actions} />
         </div>
@@ -64,7 +80,7 @@ function Row({ app, actions, flash, onOpen }: { app: Application; actions: Track
   );
 }
 
-function ListView({ groups, actions, flash, onOpen }: { groups: Group[]; actions: TrackerActions; flash: Flash; onOpen: OpenDetail }) {
+function ListView({ groups, actions, flash, onOpen, onTailor }: { groups: Group[]; actions: TrackerActions; flash: Flash; onOpen: OpenDetail; onTailor?: (app: Application) => void }) {
   if (groups.every((g) => g.items.length === 0)) {
     return (
       <div className="list">
@@ -84,7 +100,7 @@ function ListView({ groups, actions, flash, onOpen }: { groups: Group[]; actions
               {g.id !== "saved" && g.id !== "rejected" && g.cold > 0 && <span className="sp" />}
               {g.cold > 0 && g.id !== "rejected" && <span className="shown">{g.cold} going cold</span>}
             </div>
-            {g.items.map((app) => <Row key={app.id} app={app} actions={actions} flash={flash} onOpen={onOpen} />)}
+            {g.items.map((app) => <Row key={app.id} app={app} actions={actions} flash={flash} onOpen={onOpen} onTailor={onTailor} />)}
           </div>
         ),
       )}
@@ -103,6 +119,18 @@ function BoardCard({ app, onOpen }: { app: Application; onOpen: OpenDetail }) {
       <div className="rl">{app.role}</div>
       <div className="foot">
         <span className="sal mono">{app.salary}</span>
+        <span className="bacts" onClick={(e) => e.stopPropagation()}>
+          {app.jobUrl && (
+            <a className="iconbtn" href={app.jobUrl} target="_blank" rel="noreferrer" title="Open job post">
+              <Icon name="external-link" size={13} />
+            </a>
+          )}
+          {app.cvUrl && (
+            <a className="iconbtn" href={app.cvUrl} target="_blank" rel="noreferrer" title="Open tailored CV (PDF)">
+              <Icon name="file-text" size={13} />
+            </a>
+          )}
+        </span>
         {app.nextAction && app.nextAction.due !== null && app.nextAction.kind !== "wait"
           ? <Due due={app.nextAction.due} short />
           : app.stale ? <StaleHint app={app} />
@@ -143,9 +171,12 @@ interface TrackerProps {
   setView: (v: string) => void;
   filter: string;
   setFilter: (f: string) => void;
+  loading?: boolean;
+  onGoDiscover?: () => void;
+  onTailor?: (app: Application) => void;
 }
 
-export function Tracker({ apps, actions, flash, onOpen, dir, view, setView, filter, setFilter }: TrackerProps) {
+export function Tracker({ apps, actions, flash, onOpen, dir, view, setView, filter, setFilter, loading, onGoDiscover, onTailor }: TrackerProps) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("due");
 
@@ -195,7 +226,7 @@ export function Tracker({ apps, actions, flash, onOpen, dir, view, setView, filt
             <button className={cx(view === "list" && "active")} onClick={() => setView("list")}><Icon name="list" size={15} /> List</button>
             <button className={cx(view === "board" && "active")} onClick={() => setView("board")}><Icon name="columns-3" size={15} /> Board</button>
           </div>
-          <button className="btn" onClick={() => { window.location.href = "/discover"; }}><Icon name="plus" size={16} /> Add</button>
+          <button className="btn" onClick={() => { if (onGoDiscover) onGoDiscover(); else window.location.href = "/discover"; }}><Icon name="plus" size={16} /> Add</button>
         </div>
       </div>
 
@@ -222,9 +253,13 @@ export function Tracker({ apps, actions, flash, onOpen, dir, view, setView, filt
         </button>
       </div>
 
-      {view === "list"
-        ? <ListView groups={groups} actions={actions} flash={flash} onOpen={onOpen} />
-        : <BoardView groups={groups} onOpen={onOpen} />}
+      {loading ? (
+        <div className="quiet"><div className="big">Loading…</div></div>
+      ) : view === "list" ? (
+        <ListView groups={groups} actions={actions} flash={flash} onOpen={onOpen} onTailor={onTailor} />
+      ) : (
+        <BoardView groups={groups} onOpen={onOpen} />
+      )}
     </div>
   );
 }

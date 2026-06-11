@@ -10,9 +10,10 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from matchbox.core.db import connect, db_path, list_profiles
+from matchbox.core.db import PROJECT_ROOT, connect, db_path, list_profiles
 from matchbox.tracker import repo, service
 from matchbox.web.deps import ACTIVE_PROFILE_COOKIE, ConnDep, ProfileDep
 
@@ -57,6 +58,26 @@ def _require(app: dict[str, Any] | None) -> dict[str, Any]:
 @router.get("/applications")
 def list_applications(conn: ConnDep) -> list[dict[str, Any]]:
     return repo.load_apps(conn)
+
+
+@router.get("/applications/{app_id}/cv", include_in_schema=False)
+def serve_cv(app_id: int, conn: ConnDep) -> FileResponse:
+    """Serve the application's tailored CV PDF. The stored cv_path is
+    repo-relative (e.g. people/<slug>/output/<job>/cv.pdf); refuse anything
+    that resolves outside the project root or is not a PDF."""
+    row = conn.execute("SELECT cv_path FROM application WHERE id=?", (app_id,)).fetchone()
+    if row is None or not row["cv_path"]:
+        raise HTTPException(status_code=404, detail="no CV for this application")
+    target = (PROJECT_ROOT / row["cv_path"]).resolve()
+    try:
+        target.relative_to(PROJECT_ROOT.resolve())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="cv path escapes project root") from e
+    if target.suffix.lower() != ".pdf":
+        raise HTTPException(status_code=415, detail=f"refused type: {target.suffix}")
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="CV file missing on disk")
+    return FileResponse(str(target), media_type="application/pdf")
 
 
 @router.get("/profile")

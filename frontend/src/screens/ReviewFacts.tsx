@@ -164,7 +164,7 @@ function ExperienceCard({
     <div className="card" style={{ padding: "16px 20px" }}>
       <div className="sec-h" style={{ marginBottom: 6, alignItems: "flex-start" }}>
         <span className="t" style={{ flex: 1, minWidth: 0 }}>
-          {experience.company} — {experience.role}
+          {experience.company}: {experience.role}
         </span>
         <button className="btn ghost tiny" disabled={busy} onClick={() => void verifyRole()}>
           <Icon name="check-circle" size={13} /> Verify all in this role
@@ -341,6 +341,7 @@ export function ReviewFacts({ flash }: { flash: (msg: string) => void }) {
     );
 
   const verifyEverything = async () => {
+    if (!window.confirm("Mark every fact as verified? You vouch for all of it.")) return;
     setVerifyingAll(true);
     const next = await api.verifyAll();
     setVerifyingAll(false);

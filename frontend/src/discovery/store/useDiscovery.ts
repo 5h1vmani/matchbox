@@ -19,6 +19,7 @@ export interface LiveDecisionResult {
 export interface LiveDiscoveryStore {
   roles: Role[];
   watch: WatchedCompany[];
+  loading: boolean;
   decide: (ids: string[], decision: DecisionInput) => LiveDecisionResult;
   /** Stop watching a company. Optimistic; reconciles with the server list. */
   unwatch: (company: string) => void;
@@ -27,11 +28,13 @@ export interface LiveDiscoveryStore {
 export function useDiscovery(): LiveDiscoveryStore {
   const [roles, setRoles] = useState<Role[]>([]);
   const [watch, setWatch] = useState<WatchedCompany[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
-    api.listRoles().then((list) => { if (alive) setRoles(list); });
-    api.listWatch().then((list) => { if (alive) setWatch(list); });
+    Promise.all([api.listRoles(), api.listWatch()]).then(([roleList, watchList]) => {
+      if (alive) { setRoles(roleList); setWatch(watchList); setLoading(false); }
+    });
     return () => { alive = false; };
   }, []);
 
@@ -46,7 +49,7 @@ export function useDiscovery(): LiveDiscoveryStore {
   }, []);
 
   const decide = useCallback((ids: string[], decision: DecisionInput): LiveDecisionResult => {
-    // Optimistic local update (mirrors the design's applyDecision).
+    // Snapshot the previous decision for each role before mutating.
     const prev: Record<string, Role["decision"]> = {};
     setRoles((list) => list.map((r) => {
       if (ids.includes(r.id)) {
@@ -65,8 +68,27 @@ export function useDiscovery(): LiveDiscoveryStore {
       if (decision === "watch") refreshWatch();
     });
 
+    // Undo: only supported when the previous decision is a known DecisionInput
+    // value that the server can accept. "skip" never mutates the server so
+    // reverting local state is sufficient; all others POST the prior decision
+    // back. If a role had no prior decision we can't clear it to "undecided"
+    // via the existing API, so we skip that role's server call.
+    const supportedDecisions = new Set<string>(["tracked", "tailoring", "dismissed", "watch", "skip"]);
+    const canUndo = decision !== "skip" && ids.some((id) => prev[id] != null && supportedDecisions.has(String(prev[id])));
+
     return {
-      undo: () => {
+      undo: canUndo ? () => {
+        // Revert local state immediately.
+        setRoles((list) => list.map((r) => (r.id in prev ? { ...r, decision: prev[r.id] } : r)));
+        // POST the prior decision back to the server for each role that had one.
+        for (const id of ids) {
+          const prior = prev[id];
+          if (prior != null && supportedDecisions.has(String(prior))) {
+            void api.decide(id, prior as DecisionInput).then((res) => reconcile(res.roles));
+          }
+        }
+      } : () => {
+        // Undo unsupported (no prior decision to restore) — just revert local.
         setRoles((list) => list.map((r) => (r.id in prev ? { ...r, decision: prev[r.id] } : r)));
       },
       // The hand-off prompt resolves once the run is created (tailoring only).
@@ -79,5 +101,5 @@ export function useDiscovery(): LiveDiscoveryStore {
     void api.unwatch(company).then((list) => { if (list) setWatch(list); });
   }, []);
 
-  return useMemo(() => ({ roles, watch, decide, unwatch }), [roles, watch, decide, unwatch]);
+  return useMemo(() => ({ roles, watch, loading, decide, unwatch }), [roles, watch, loading, decide, unwatch]);
 }

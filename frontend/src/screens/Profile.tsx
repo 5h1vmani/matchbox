@@ -116,7 +116,7 @@ export function Profile({ flash }: { flash: (msg: string) => void }) {
         <div>
           <h1>Profile</h1>
           <p className="sub">
-            This block sits at the top of every CV you render. Nothing here is computed — fix a typo
+            This block sits at the top of every CV you render. Nothing here is computed. Fix a typo
             once and it carries everywhere.
           </p>
         </div>
@@ -202,7 +202,7 @@ export function Profile({ flash }: { flash: (msg: string) => void }) {
         </div>
         <p className="sub" style={{ marginTop: -4, marginBottom: 16 }}>
           These feed the eligibility filter in Discover. Sponsorship/clearance only ever rule a role
-          OUT on an explicit conflict — never in.
+          OUT on an explicit conflict, never in.
         </p>
 
         <label className="fld">
@@ -279,7 +279,7 @@ export function Profile({ flash }: { flash: (msg: string) => void }) {
             />
           </div>
           <span className="sub" style={{ marginTop: 6 }}>
-            Optional. Whole numbers — your own compensation reference, stored locally.
+            Optional. Whole numbers only. Your own compensation reference, stored locally.
           </span>
         </div>
 

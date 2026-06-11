@@ -49,6 +49,16 @@ function TaskRow({ app, actions, flash, onOpen, done, onToggle }: TaskRowProps) 
             <Icon name="check" size={11} /> Draft
           </Badge>
         )}
+        {!isDone && app.nextAction?.kind === "apply" && app.jobUrl && (
+          <a className="iconbtn" href={app.jobUrl} target="_blank" rel="noreferrer" title="Open the job post to apply">
+            <Icon name="external-link" size={15} />
+          </a>
+        )}
+        {!isDone && app.cvUrl && (
+          <a className="iconbtn" href={app.cvUrl} target="_blank" rel="noreferrer" title="Open tailored CV (PDF)">
+            <Icon name="file-text" size={15} />
+          </a>
+        )}
         {!isDone && app.nextAction && <Due due={app.nextAction.due} />}
         <div className="acts">
           <button
@@ -90,11 +100,12 @@ interface TodayProps {
   onOpen: OpenDetail;
   dir: Direction;
   onGoTo?: (id: string) => void;
+  loading?: boolean;
 }
 
 const CAP = 7;
 
-export function Today({ apps, actions, flash, onOpen, dir }: TodayProps) {
+export function Today({ apps, actions, flash, onOpen, dir, loading }: TodayProps) {
   const [done, setDone] = useState<Record<string, boolean>>({});
   const [coldOpen, setColdOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -188,7 +199,9 @@ export function Today({ apps, actions, flash, onOpen, dir }: TodayProps) {
           <span className="t">{dir === "focus" ? "Also today" : "Today"}</span>
           <span className="n mono">{listSource.filter((a) => !done[a.id]).length}</span>
         </div>
-        {listSource.length === 0 ? (
+        {loading ? (
+          <div className="quiet" style={{ padding: "20px 12px", fontSize: 13 }}>Loading…</div>
+        ) : listSource.length === 0 ? (
           dir === "ledger" ? (
             <div className="quiet"><div className="big">Nothing needs you today.</div>Go for a walk. Your applications are all up to date.</div>
           ) : (
@@ -243,8 +256,8 @@ export function Today({ apps, actions, flash, onOpen, dir }: TodayProps) {
                     <div className="l">{app.nextAction && app.nextAction.kind === "thanks" ? "Thank-you note" : "Follow-up"} · {app.company}</div>
                     <div className="s">{app.role}</div>
                   </div>
-                  <button className="btn outline small" onClick={() => { actions.markDone(app.id); flash("Sent to " + app.company); }}>
-                    <Icon name="send" size={13} /> Send
+                  <button className="btn outline small" onClick={() => { actions.markDone(app.id); flash("Marked sent. Nice."); }}>
+                    <Icon name="check" size={13} /> Mark sent
                   </button>
                 </div>
               ))}

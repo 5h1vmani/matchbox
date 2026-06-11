@@ -49,6 +49,34 @@ export interface UserInfo {
   active: boolean;
 }
 
+export interface Artifact {
+  id: number;
+  applicationId: number;
+  kind: string;
+  path: string | null;
+  body: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export const listArtifacts = (appId: string | number, kind?: string) =>
+  getJSON<Artifact[]>(
+    `/api/applications/${appId}/artifacts${kind ? `?kind=${kind}` : ""}`,
+    [],
+  );
+
+export async function markArtifactSent(appId: string | number, artifactId: number): Promise<void> {
+  try {
+    await fetch(`/api/applications/${appId}/artifacts/${artifactId}/status`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ status: "sent" }),
+    });
+  } catch {
+    /* fire-and-forget */
+  }
+}
+
 export const getProfile = () => getJSON<ProfileInfo>("/api/profile", { name: "You", initials: "Y", slug: "" });
 export const listUsers = () => getJSON<UserInfo[]>("/api/users", []);
 
