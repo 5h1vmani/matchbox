@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from matchbox.contracts import Font, Palette
 from matchbox.core.db import PROJECT_ROOT
 from matchbox.tracker import service
 from matchbox.web.deps import ConnDep
@@ -23,9 +24,10 @@ router = APIRouter(prefix="/api/applications")
 
 _RUNS_DIR = PROJECT_ROOT / "runs"
 
-
-PALETTES = ("slate", "ink", "forest", "claret", "bronze")
-FONTS = ("source-serif", "source-sans", "inter", "atkinson-hyperlegible")
+# Single source for the palette/font vocab: the contracts Literals. Deriving the
+# validation tuples here keeps the REST surface and the schema from drifting.
+PALETTES = get_args(Palette)
+FONTS = get_args(Font)
 
 
 class CoverBody(BaseModel):
