@@ -12,7 +12,6 @@ triage UI; this module:
 
 from __future__ import annotations
 
-import functools
 import json
 import os
 import sqlite3
@@ -20,17 +19,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from jsonschema import Draft202012Validator
-
+from matchbox.contracts import schema_errors
 from matchbox.core.db import PROJECT_ROOT, transaction
 
 RUNS_DIR = PROJECT_ROOT / "runs"
-SCHEMA_PATH = PROJECT_ROOT / "schemas" / "work-queue.v1.json"
-
-
-@functools.cache
-def _validator() -> Draft202012Validator:
-    return Draft202012Validator(json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
 
 
 @dataclass(slots=True)
@@ -137,12 +129,9 @@ def create_run(
         "jobs": queue_jobs,
     }
 
-    errors = sorted(_validator().iter_errors(payload), key=lambda e: list(e.absolute_path))
+    errors = schema_errors("work-queue.v1.json", payload)
     if errors:
-        msgs = "; ".join(
-            f"{'.'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}" for e in errors
-        )
-        raise ValueError(f"work-queue.json failed schema validation: {msgs}")
+        raise ValueError("work-queue.json failed schema validation: " + "; ".join(errors))
 
     out_path = out_dir / "work-queue.json"
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

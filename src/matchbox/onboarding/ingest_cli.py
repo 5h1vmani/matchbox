@@ -18,21 +18,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
-
 from matchbox.answers import repo as answers_repo
+from matchbox.contracts import schema_errors
 from matchbox.core import library as lib
 from matchbox.core.db import connect, transaction
 from matchbox.core.logging import configure_logging
 from matchbox.core.migrations import migrate
 from matchbox.core.models import ItemType
-
-SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "ingest.v1.json"
-
-
-def _load_validator() -> Draft202012Validator:
-    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    return Draft202012Validator(schema)
 
 
 def _apply_tags(
@@ -203,12 +195,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: invalid JSON in {args.file}: {e}", file=sys.stderr)
         return 2
 
-    validator = _load_validator()
-    errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.absolute_path))
+    errors = schema_errors("ingest.v1.json", payload)
     if errors:
-        for err in errors:
-            loc = ".".join(str(p) for p in err.absolute_path) or "<root>"
-            print(f"schema error at {loc}: {err.message}", file=sys.stderr)
+        for msg in errors:
+            print(f"schema error at {msg}", file=sys.stderr)
         return 3
 
     conn = connect(args.db) if args.db else connect()

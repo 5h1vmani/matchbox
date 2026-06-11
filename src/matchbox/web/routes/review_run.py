@@ -9,30 +9,24 @@ deletion, and the status.json schema validation.
 
 from __future__ import annotations
 
-import json
 import shutil
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response
-from jsonschema import Draft202012Validator
 
+from matchbox.contracts import schema_errors
 from matchbox.core.db import PROJECT_ROOT
 from matchbox.web.deps import ConnDep
 
 router = APIRouter()
 
 RUNS_DIR = PROJECT_ROOT / "runs"
-STATUS_SCHEMA = json.loads(
-    (PROJECT_ROOT / "schemas" / "status.v1.json").read_text(encoding="utf-8")
-)
-_STATUS_VALIDATOR = Draft202012Validator(STATUS_SCHEMA)
 
 
 def validate_status_payload(payload: dict[str, Any]) -> list[str]:
     """Return a list of human-readable schema errors (empty = ok)."""
-    errors = sorted(_STATUS_VALIDATOR.iter_errors(payload), key=lambda e: list(e.absolute_path))
-    return [f"{'.'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}" for e in errors]
+    return schema_errors("status.v1.json", payload)
 
 
 @router.delete("/runs/{run_id}", response_class=Response)

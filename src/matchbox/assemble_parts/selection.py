@@ -5,30 +5,20 @@ assemble.py."""
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
-from jsonschema import Draft202012Validator
-
-from matchbox.core.db import PROJECT_ROOT
+from matchbox.contracts import validator_for
 from matchbox.core.logging import get_logger
 from matchbox.matching.select import DEFAULT_WORD_BUDGET, Component
 from matchbox.polish import load_voice_rules, validate_voice
 
-_SCHEMAS_DIR = PROJECT_ROOT / "schemas"
-
 log = get_logger(__name__)
-
-
-def _selection_validator() -> Draft202012Validator:
-    schema = json.loads((_SCHEMAS_DIR / "selection.v1.json").read_text(encoding="utf-8"))
-    return Draft202012Validator(schema)
 
 
 def validate_selection_payload(payload: dict[str, Any]) -> list[str]:
     """Schema-validate a brain selection payload. Returns human-readable errors
     (empty when valid)."""
-    return [e.message for e in _selection_validator().iter_errors(payload)]
+    return [e.message for e in validator_for("selection.v1.json").iter_errors(payload)]
 
 
 def _apply_project_selection(

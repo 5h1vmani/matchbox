@@ -21,8 +21,10 @@ false``; ``Field(ge=1)`` -> ``minimum: 1``; ``Field(min_length=1)`` ->
 from __future__ import annotations
 
 import json
+from functools import cache
 from typing import Annotated, Any, Literal
 
+from jsonschema import Draft202012Validator
 from pydantic import BaseModel, ConfigDict, Field
 
 from matchbox.core.db import PROJECT_ROOT
@@ -478,6 +480,27 @@ def write_schemas() -> list[str]:
         path.write_text(text, encoding="utf-8")
         written.append(filename)
     return written
+
+
+# --------------------------------------------------------------------------
+# Runtime validation — one cached validator per generated schema
+# --------------------------------------------------------------------------
+@cache
+def validator_for(filename: str) -> Draft202012Validator:
+    """Cached jsonschema validator for a generated schema file, by basename
+    (e.g. "polish.v1.json"). The single loader every payload validation uses."""
+    schema = json.loads((SCHEMAS_DIR / filename).read_text(encoding="utf-8"))
+    return Draft202012Validator(schema)
+
+
+def schema_errors(filename: str, payload: dict[str, Any]) -> list[str]:
+    """Validation errors as 'path: message' strings, sorted by path; empty when
+    valid. The shared error shape across the jobreqs/jobfacts/polish/work-queue/
+    status validators."""
+    errors = sorted(
+        validator_for(filename).iter_errors(payload), key=lambda e: list(e.absolute_path)
+    )
+    return [f"{'.'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}" for e in errors]
 
 
 if __name__ == "__main__":

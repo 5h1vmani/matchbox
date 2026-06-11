@@ -16,17 +16,10 @@ import sqlite3
 import sys
 from pathlib import Path
 
-from jsonschema import Draft202012Validator
-
-from matchbox.core.db import PROJECT_ROOT, connect, transaction
+from matchbox.contracts import schema_errors
+from matchbox.core.db import connect, transaction
 from matchbox.core.logging import configure_logging
 from matchbox.core.migrations import migrate
-
-SCHEMA_PATH = PROJECT_ROOT / "schemas" / "job-requirements.v1.json"
-
-
-def _validator() -> Draft202012Validator:
-    return Draft202012Validator(json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
 
 
 def save_requirements(conn: sqlite3.Connection, job_id: int, payload: dict[str, object]) -> None:
@@ -46,12 +39,9 @@ def save_requirements(conn: sqlite3.Connection, job_id: int, payload: dict[str, 
     if payload_job_id is None:
         # Tolerate omission only — a hand-edited file without the field.
         payload = {**payload, "job_id": job_id}
-    errors = sorted(_validator().iter_errors(payload), key=lambda e: list(e.absolute_path))
+    errors = schema_errors("job-requirements.v1.json", payload)
     if errors:
-        msgs = "; ".join(
-            f"{'.'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}" for e in errors
-        )
-        raise ValueError(f"job-requirements.json failed schema validation: {msgs}")
+        raise ValueError("job-requirements.json failed schema validation: " + "; ".join(errors))
 
     with transaction(conn):
         cur = conn.execute(

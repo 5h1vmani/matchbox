@@ -25,12 +25,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
-
+from matchbox.contracts import schema_errors
 from matchbox.core.db import PROJECT_ROOT
 
 VOICE_RULES_PATH = PROJECT_ROOT / "shared" / "voice-rules.json"
-POLISH_SCHEMA_PATH = PROJECT_ROOT / "schemas" / "polish.v1.json"
 
 # Em-dash characters: standard em-dash (—) and the double-hyphen
 # approximation that some editors auto-convert into one.
@@ -61,10 +59,6 @@ class BulletPolish:
 def load_voice_rules() -> dict[str, Any]:
     data: dict[str, Any] = json.loads(VOICE_RULES_PATH.read_text(encoding="utf-8"))
     return data
-
-
-def _validator() -> Draft202012Validator:
-    return Draft202012Validator(json.loads(POLISH_SCHEMA_PATH.read_text(encoding="utf-8")))
 
 
 def validate_voice(
@@ -133,8 +127,7 @@ def validate_voice(
 def validate_polish_payload(payload: dict[str, Any]) -> list[str]:
     """Schema-level validation. Returns plain-language errors (empty
     list = ok)."""
-    errors = sorted(_validator().iter_errors(payload), key=lambda e: list(e.absolute_path))
-    return [f"{'.'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}" for e in errors]
+    return schema_errors("polish.v1.json", payload)
 
 
 def apply_polish_to_cv_json(
