@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from matchbox.core.db import PROJECT_ROOT
+from matchbox.core.text import METRIC_UNIT_WORDS
 
 TEMPLATE = PROJECT_ROOT / "src" / "matchbox" / "templates" / "html" / "cv.html"
 FONTS_DIR = PROJECT_ROOT / "shared" / "fonts"
@@ -143,31 +144,8 @@ def _is_metric_match(m: re.Match[str]) -> bool:
         # magnitude words / letters
         if s in ("k", "m", "b", "bn", "million", "billion", "thousand", "lakh", "crore"):
             return True
-        # unit words
-        unit_words = {
-            "ms",
-            "s",
-            "sec",
-            "secs",
-            "seconds",
-            "min",
-            "mins",
-            "minutes",
-            "hours",
-            "days",
-            "weeks",
-            "months",
-            "gb",
-            "tb",
-            "mb",
-            "pb",
-            "percent",
-            "bps",
-            "qps",
-            "rps",
-            "fps",
-        }
-        if s in unit_words:
+        # unit words (shared vocabulary; the regexes above embed it inline)
+        if s in METRIC_UNIT_WORDS:
             return True
         # lowercase plural word ending in "s" (users, engineers, requests...)
         if re.fullmatch(r"[a-z][a-z]*s", s):

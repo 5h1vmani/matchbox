@@ -9,6 +9,7 @@ import re
 import sqlite3
 from typing import Any, cast
 
+from matchbox.core.text import METRIC_UNIT_WORDS
 from matchbox.matching.select import Component
 
 _MONTHS = {
@@ -116,29 +117,7 @@ _SKILLS_MIN_MATCH = 6
 _SKILLS_FALLBACK_CAP = 12
 
 # Unit/scale words whose presence after a number makes it a metric.
-_UNIT_WORDS = {
-    "ms",
-    "s",
-    "sec",
-    "secs",
-    "seconds",
-    "min",
-    "mins",
-    "minutes",
-    "hours",
-    "days",
-    "weeks",
-    "months",
-    "gb",
-    "tb",
-    "mb",
-    "pb",
-    "percent",
-    "bps",
-    "qps",
-    "rps",
-    "fps",
-}
+_UNIT_WORDS = METRIC_UNIT_WORDS
 
 
 def _jd_matched_skills(conn: sqlite3.Connection, jd_text: str) -> tuple[list[dict[str, Any]], str]:

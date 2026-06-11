@@ -10,6 +10,7 @@ free.
 from __future__ import annotations
 
 import re
+from datetime import date
 from html import unescape
 
 TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -65,3 +66,29 @@ def strip_html(html: str | None) -> str:
     t = _SPACE_AROUND_NL_RE.sub("\n", t)  # trim spaces hugging a newline
     t = _MULTI_NL_RE.sub("\n\n", t)  # at most one blank line between blocks
     return t.strip()
+
+
+# ── shared vocab + date parsing ──────────────────────────────────────────────
+
+# Unit/scale words that, following a number, make it a metric. The single
+# vocabulary for the CV skills filter (cvdoc) and the renderer's metric emphasis
+# (render_html). The render_html regexes embed the same words inline for speed;
+# this set is the source they are kept consistent with.
+METRIC_UNIT_WORDS: frozenset[str] = frozenset(
+    {
+        "ms", "s", "sec", "secs", "seconds", "min", "mins", "minutes", "hours",
+        "days", "weeks", "months", "gb", "tb", "mb", "pb", "percent", "bps",
+        "qps", "rps", "fps",
+    }
+)  # fmt: skip
+
+
+def parse_iso_date(s: str | None) -> date | None:
+    """First 10 chars of an ISO string -> date, or None when absent/unparsable.
+    The one date parser shared by the discovery and tracker rules."""
+    if not s:
+        return None
+    try:
+        return date.fromisoformat(s[:10])
+    except ValueError:
+        return None
