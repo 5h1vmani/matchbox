@@ -20,6 +20,9 @@ runs/*
 # Working notes — local plans and audit reports, never committed.
 plans/
 audit/
+docs/audits/
+docs/history/
+docs/plan/
 
 # Onboarding staging — user files, never committed.
 inbox/*
