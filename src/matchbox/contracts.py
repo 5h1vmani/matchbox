@@ -66,8 +66,9 @@ class Selection(StrictModel):
 what order, plus a JD-tailored summary. The deterministic core validates that \
 every id is a real verified library bullet (the no-fabrication guarantee lives \
 in that check, not in selection being an algorithm), voice-gates the summary, \
-enforces the one-page budget, then renders. When no selection file is supplied, \
-assemble falls back to the deterministic matcher (offline / no-key path)."""
+enforces the target_pages-scaled bullet budget, then renders. When no selection \
+file is supplied, assemble falls back to the deterministic matcher (offline / \
+no-key path)."""
 
     model_config = ConfigDict(extra="forbid", title="Matchbox CV selection (brain -> core)")
 
@@ -78,8 +79,8 @@ assemble falls back to the deterministic matcher (offline / no-key path)."""
         description=(
             "Verified bullet ids, in the order the brain wants them rendered (within "
             "each role). Each MUST be a verified library bullet; the core rejects any "
-            "unknown or unverified id. Trailing ids past the one-page budget are "
-            "dropped, lowest-priority first."
+            "unknown or unverified id. Trailing ids past the target_pages-scaled bullet "
+            "budget are dropped, lowest-priority first."
         )
     )
     summary: NonEmptyStr = Field(
@@ -96,6 +97,26 @@ assemble falls back to the deterministic matcher (offline / no-key path)."""
             "Each MUST be a verified library project; the core rejects any unknown or "
             "unverified id (same no-fabrication rule as bullets). Omitted -> no Projects "
             "section (the deterministic fallback never selects projects)."
+        ),
+    )
+    selected_skill_ids: Annotated[list[PosInt], Field(min_length=1)] | None = Field(
+        default=None,
+        description=(
+            "Optional skill ids to render in the Skills section, in order. Each MUST be "
+            "a real library skill id; the core rejects any unknown id. Skills are grouped "
+            "by category; category order follows the brain's id list (first appearance); "
+            "items within a category keep the brain's order. No cap -- the brain's "
+            "judgment governs. Omitted -> the deterministic fallback picks JD-relevant "
+            "skills (it never dumps the whole library)."
+        ),
+    )
+    target_pages: Literal[1, 2] = Field(
+        default=1,
+        description=(
+            "Page budget the brain is targeting. 2 is a deliberate choice for "
+            "senior/depth-heavy applications, never an accident. The bullet budget scales "
+            "with this value (target_pages=2 doubles the word budget). The deterministic "
+            "no-selection fallback always uses the 1-page budget."
         ),
     )
     headline: str | None = Field(

@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
     configure_logging()
     app = FastAPI(
         title="Matchbox",
-        version="0.3.0",
+        version="0.4.0",
         docs_url=None,
         redoc_url=None,
     )

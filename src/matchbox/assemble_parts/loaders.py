@@ -73,6 +73,13 @@ def _load_unverified_bullets(conn: sqlite3.Connection) -> list[tuple[int, str]]:
     return [(r["id"], r["text"]) for r in rows]
 
 
+def _load_library_skills(conn: sqlite3.Connection) -> dict[int, dict[str, Any]]:
+    """All skills in the library, keyed by id. Skills have no facts_verified
+    column -- every library skill is renderable; validation is id-exists only."""
+    rows = conn.execute("SELECT id, name, category FROM skill ORDER BY category, name").fetchall()
+    return {r["id"]: dict(r) for r in rows}
+
+
 def _load_requirements(conn: sqlite3.Connection, job_id: int) -> list[Requirement]:
     row = conn.execute("SELECT requirements_json FROM job WHERE id = ?", (job_id,)).fetchone()
     if row is None or not row["requirements_json"]:

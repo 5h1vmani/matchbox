@@ -45,27 +45,152 @@ def _esc(s: Any) -> str:
     return _html.escape(str(s))
 
 
-# A metric worth a recruiter's six-second scan: an optional currency prefix,
-# digits (with thousands separators / decimals), an optional unit suffix.
-# (?<![\w$£€₹]) blocks the digits inside identifiers like K6, S3, EC2, A4.
+# ── metric emphasis ───────────────────────────────────────────────────────────
+#
+# Policy: bold a number only when it clearly signals magnitude/quantity. Never
+# bold standalone calendar years (1900-2099) or dotted version numbers, which
+# are identifiers, not metrics.
+#
+# (?<![\w$£€₹]) blocks digits glued to identifier-characters (K6, S3, EC2, A4).
+#
+# The regex is applied AFTER html.escape so all text is safe ASCII/HTML.
+
+# Year range pattern: 4-digit year, optionally connected to another with a dash.
+# Also matches "since 2019" and "in 2020" via the lookbehind/negative approach
+# in _emphasize_metrics (we filter by excluding years in the callback).
+_YEAR_RE = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
+
+# Dotted version number: at least one dot between digit groups (3.11, 2.0.1).
+_VERSION_RE = re.compile(r"\b\d+\.\d+(?:\.\d+)*\b")
+
+# Currency prefixes (named and symbolic).
+_CURRENCY_PREFIX_RE = re.compile(r"(?:INR|USD|GBP|EUR|[$£€₹])\s?\d")
+
+# Magnitude suffixes/words glued or following a number.
+_MAG_SUFFIX_RE = re.compile(
+    r"\d\s?(?:k|K|M|B|bn|million|billion|thousand|lakh|crore)\b", re.IGNORECASE
+)
+
+# Multiplier: 3x, ×4, x3, 3× etc.
+_MULT_RE = re.compile(r"(?:(?:x|×)\d|\d(?:x|×))\b", re.IGNORECASE)
+
+# Comma-grouped thousands: 250,000
+_COMMA_NUM_RE = re.compile(r"\b\d{1,3}(?:,\d{3})+\b")
+
+# Percentage: ends with %
+_PCT_RE = re.compile(r"\d%")
+
+# "+" suffix metric: 500+
+_PLUS_RE = re.compile(r"\d\+")
+
+# Lowercase unit words that follow a number (incl. plural words ending in "s").
+_UNIT_WORDS_RE = re.compile(
+    r"\b\d+\s+(?:ms|s|sec|secs|seconds|min|mins|minutes|hours|days|weeks|months|"
+    r"gb|tb|mb|pb|percent|bps|qps|rps|fps|[a-z][a-z]*s)\b"
+)
+
+# The master scanner: optional currency prefix, digits (with commas/decimals),
+# optional trailing signals.  The callback decides whether to bold.
 _METRIC_RE = re.compile(
     r"(?<![\w$£€₹])"
     r"((?:INR|USD|GBP|EUR|[$£€₹])\s?)?"
     r"(\d[\d,]*(?:\.\d+)?)"
-    r"(\s?(?:%|\+|percent|lakh|crore|million|billion)|x\b)?"
+    r"([%+]|"
+    r"\s?(?:x|×)\b|"
+    r"(?:x|×)(?=\d)|"
+    r"\s?(?:k|K|M|B|bn|million|billion|thousand|lakh|crore)\b|"
+    r"\s?percent\b|"
+    r"\s?(?:ms|s|sec|secs|seconds|min|mins|minutes|hours|days|weeks|months|"
+    r"gb|tb|mb|pb|bps|qps|rps|fps)\b|"
+    r"\s+[a-z][a-z]*s\b"
+    r")?"
 )
 
 
+def _is_metric_match(m: re.Match[str]) -> bool:
+    """Return True when the regex match represents a bold-worthy metric."""
+    full = m.group(0)
+    prefix = m.group(1) or ""
+    digits = m.group(2) or ""
+    suffix = m.group(3) or ""
+
+    # Hard exclusion: dotted version numbers (digits.digits[.digits...]).
+    # These appear in the raw text before escaping, but the escape only affects
+    # <, >, &, ", ' — dots and digits survive unchanged, so this check is safe.
+    if re.fullmatch(r"\d+\.\d+(?:\.\d+)*", full.strip()):
+        return False
+
+    # Hard exclusion: standalone calendar years 1900-2099, with no prefix/suffix
+    # that would make them a metric (e.g. "$2019" or "2019+" would still bold).
+    if not prefix and not suffix:
+        raw_digits = digits.replace(",", "")
+        if re.fullmatch(r"(?:1[0-9]{3}|20[0-9]{2})", raw_digits):
+            return False
+
+    # A currency prefix alone makes it a metric.
+    if prefix:
+        return True
+
+    # A qualifying suffix makes it a metric.
+    s = suffix.strip().lower()
+    if s:
+        # % or +
+        if s in ("%", "+"):
+            return True
+        # multiplier x/×
+        if s in ("x", "×"):
+            return True
+        # magnitude words / letters
+        if s in ("k", "m", "b", "bn", "million", "billion", "thousand", "lakh", "crore"):
+            return True
+        # unit words
+        unit_words = {
+            "ms",
+            "s",
+            "sec",
+            "secs",
+            "seconds",
+            "min",
+            "mins",
+            "minutes",
+            "hours",
+            "days",
+            "weeks",
+            "months",
+            "gb",
+            "tb",
+            "mb",
+            "pb",
+            "percent",
+            "bps",
+            "qps",
+            "rps",
+            "fps",
+        }
+        if s in unit_words:
+            return True
+        # lowercase plural word ending in "s" (users, engineers, requests...)
+        if re.fullmatch(r"[a-z][a-z]*s", s):
+            return True
+
+    # Comma-grouped thousands (250,000) — digit group already matched with commas.
+    return "," in digits
+
+
 def _emphasize_metrics(text: str) -> str:
-    """Escape ``text`` and wrap metric spans in <strong> so numbers survive the
-    six-second scan. Pure presentation: the underlying text (and the PDF's
-    extracted text) is unchanged, so ATS parsing and keyword checks see exactly
-    the verified wording."""
+    """Escape ``text`` and wrap metric spans in <strong> so signal numbers
+    survive the six-second scan.  Calendar years and version numbers are never
+    bolded.  Pure presentation: the underlying text (and the PDF's extracted
+    text) is unchanged, so ATS parsing and keyword checks see exactly the
+    verified wording."""
+    escaped = _esc(text)
 
     def _wrap(m: re.Match[str]) -> str:
-        return f"<strong>{m.group(0)}</strong>"
+        if _is_metric_match(m):
+            return f"<strong>{m.group(0)}</strong>"
+        return m.group(0)
 
-    return _METRIC_RE.sub(_wrap, _esc(text))
+    return _METRIC_RE.sub(_wrap, escaped)
 
 
 def _b64(name: str) -> str:
@@ -80,8 +205,15 @@ def _section(title: str, body: str) -> str:
     )
 
 
-def _split_contact(contact: list[str]) -> dict[str, str]:
-    out = {"email": "", "phone": "", "linkedin": "", "github": "", "location": ""}
+def _split_contact(contact: list[str]) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "email": "",
+        "phone": "",
+        "linkedin": "",
+        "github": "",
+        "location": "",
+        "extras": [],
+    }
     rest: list[str] = []
     for c in contact:
         cl = c.lower()
@@ -97,7 +229,14 @@ def _split_contact(contact: list[str]) -> dict[str, str]:
             rest.append(c)
     if rest:
         out["location"] = rest[0]
+        out["extras"] = rest[1:]
     return out
+
+
+def _ensure_https(url: str) -> str:
+    """Return url with https:// prefix, stripping any existing http(s):// first."""
+    stripped = re.sub(r"^https?://", "", url)
+    return f"https://{stripped}"
 
 
 def _experience_html(experiences: list[dict[str, Any]]) -> str:
@@ -133,7 +272,10 @@ def cv_json_to_html(cv: dict[str, Any], *, palette: str = "slate", font: str = "
     prof: dict[str, Any] = cv.get("profile", {})
     parts = _split_contact(list(prof.get("contact", [])))
     location = parts["location"] or str(prof.get("location", ""))
-    visa = str(prof.get("visa_line") or prof.get("headline") or "")
+    extras: list[str] = list(parts.get("extras", []))
+    # headline: voice-gated selection headline rendered prominently under the name.
+    # visa_line is an older alias kept for backwards compat; headline wins.
+    headline = str(prof.get("headline") or prof.get("visa_line") or "")
 
     links: list[str] = []
     if parts["email"]:
@@ -141,15 +283,24 @@ def cv_json_to_html(cv: dict[str, Any], *, palette: str = "slate", font: str = "
     if parts["phone"]:
         links.append(_esc(parts["phone"]))
     if parts["linkedin"]:
-        links.append(f'<a href="https://{_esc(parts["linkedin"])}">{_esc(parts["linkedin"])}</a>')
+        safe_url = _ensure_https(parts["linkedin"])
+        # Display without scheme (matches previous visual output for already-correct values).
+        display = re.sub(r"^https?://", "", parts["linkedin"])
+        links.append(f'<a href="{_esc(safe_url)}">{_esc(display)}</a>')
     if parts["github"]:
-        links.append(f'<a href="https://{_esc(parts["github"])}">{_esc(parts["github"])}</a>')
+        safe_url = _ensure_https(parts["github"])
+        display = re.sub(r"^https?://", "", parts["github"])
+        links.append(f'<a href="{_esc(safe_url)}">{_esc(display)}</a>')
     sep = '<span class="sep">/</span>'
-    line2 = _esc(location) + (f" {sep} {_esc(visa)}" if visa else "")
+    # Build location meta line: location + any extra unrecognised contact items.
+    meta_location_parts = ([_esc(location)] if location else []) + [_esc(e) for e in extras]
+    line2 = (" " + sep + " ").join(meta_location_parts)
+    headline_html = f'<div class="header-headline">{_esc(headline)}</div>' if headline else ""
     header = (
         '<header class="header">'
         f'<div class="name">{_esc(prof.get("name", ""))}</div>'
-        f'<div class="header-meta">{line2}</div>'
+        + headline_html
+        + f'<div class="header-meta">{line2}</div>'
         f'<div class="header-meta">{(" " + sep + " ").join(links)}</div>'
         "</header>"
     )
@@ -217,14 +368,21 @@ def render_cv_pdf(
     *,
     palette: str = "slate",
     font: str = "ibm-plex",
-) -> None:
-    """Render cv.json to a PDF via the HTML template + weasyprint."""
+) -> int:
+    """Render cv.json to a PDF via the HTML template + weasyprint.
+
+    Returns the number of pages in the rendered PDF so callers can log
+    or warn on multi-page spills without a separate reader pass.
+    """
     from weasyprint import HTML
 
     cv = json.loads(cv_json_path.read_text(encoding="utf-8"))
     html_str = cv_json_to_html(cv, palette=palette, font=font)
     (cv_json_path.parent / "cv.html").write_text(html_str, encoding="utf-8")
-    HTML(string=html_str, base_url=str(cv_json_path.parent)).write_pdf(str(out_path))
+    document = HTML(string=html_str, base_url=str(cv_json_path.parent)).render()
+    page_count = len(document.pages)
+    document.write_pdf(str(out_path))
+    return page_count
 
 
 # ─── cover-letter renderer ────────────────────────────────────────────────────
@@ -346,7 +504,7 @@ def cover_data_to_html(
         '<html lang="en">\n'
         "<head>\n"
         '  <meta charset="UTF-8">\n'
-        f"  <title>{name} — Cover Letter</title>\n"
+        f"  <title>{name}: Cover Letter</title>\n"
         f"  <style>{css}</style>\n"
         "</head>\n"
         "<body>\n"

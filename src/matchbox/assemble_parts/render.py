@@ -9,17 +9,19 @@ from pathlib import Path
 from pypdf import PdfReader
 
 
-def _render_pdf(cv_json_path: Path, out_path: Path, palette: str, font: str) -> None:
+def _render_pdf(cv_json_path: Path, out_path: Path, palette: str, font: str) -> int:
     """Render the CV from cv.json to PDF.
 
     Uses the in-repo HTML/CSS template plus weasyprint (pure Python, no
     browser): the v0.1 layout, and pdftotext reads it in correct order. The
     populated HTML is written beside cv.json so the artifact dir stays
     self-contained and re-renderable.
+
+    Returns the page count of the rendered PDF.
     """
     from matchbox.render_html import render_cv_pdf
 
-    render_cv_pdf(cv_json_path, out_path, palette=palette, font=font)
+    return render_cv_pdf(cv_json_path, out_path, palette=palette, font=font)
 
 
 def _extract_pdf_text(pdf_path: Path) -> str:

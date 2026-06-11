@@ -106,6 +106,101 @@ def _experiences_in_order(
     return ordered
 
 
+_SKILLS_MAX_CATS = 4
+_SKILLS_MAX_ITEMS = 18
+_SKILLS_MIN_MATCH = 6
+_SKILLS_FALLBACK_CAP = 12
+
+# Unit/scale words whose presence after a number makes it a metric.
+_UNIT_WORDS = {
+    "ms",
+    "s",
+    "sec",
+    "secs",
+    "seconds",
+    "min",
+    "mins",
+    "minutes",
+    "hours",
+    "days",
+    "weeks",
+    "months",
+    "gb",
+    "tb",
+    "mb",
+    "pb",
+    "percent",
+    "bps",
+    "qps",
+    "rps",
+    "fps",
+}
+
+
+def _jd_matched_skills(conn: sqlite3.Connection, jd_text: str) -> tuple[list[dict[str, Any]], str]:
+    """Filter skills by JD relevance; never dump the library.
+
+    Returns (skill_groups, summary_line) where summary_line describes what
+    happened for changes.md (e.g. "Skills: 12 of 54 rendered (JD-matched)").
+    """
+    all_rows = conn.execute(
+        "SELECT id, category, name FROM skill ORDER BY category, name"
+    ).fetchall()
+    total = len(all_rows)
+    if total == 0:
+        return [], "Skills: 0 of 0 rendered (no library skills)"
+
+    jd_lower = jd_text.lower()
+
+    # Word-boundary-aware check: split name into tokens; require all tokens to
+    # appear in the JD (handles "React Native" matching "react native" in JD).
+    def _matches(name: str) -> bool:
+        tokens = re.split(r"[\s/\-]+", name.lower())
+        return all(tok in jd_lower for tok in tokens if tok)
+
+    matched = [r for r in all_rows if _matches(r["name"])]
+    used_ids = {r["id"] for r in matched}
+
+    # Top-up to _SKILLS_MIN_MATCH if too few matched.
+    if len(matched) < _SKILLS_MIN_MATCH:
+        topup_candidates = [r for r in all_rows if r["id"] not in used_ids]
+        topup = topup_candidates[: _SKILLS_FALLBACK_CAP - len(matched)]
+        matched = matched + topup
+
+    # Cap to _SKILLS_MAX_ITEMS items and _SKILLS_MAX_CATS categories, dropping
+    # whole lowest-yield categories beyond the cap.
+    cat_buckets: dict[str, list[str]] = {}
+    cat_order: list[str] = []
+    for r in matched:
+        cat = r["category"] or "Other"
+        if cat not in cat_buckets:
+            cat_order.append(cat)
+            cat_buckets[cat] = []
+        cat_buckets[cat].append(r["name"])
+
+    # Drop categories beyond _SKILLS_MAX_CATS (by ascending yield — drop smallest).
+    if len(cat_order) > _SKILLS_MAX_CATS:
+        # Sort by descending yield; keep top _SKILLS_MAX_CATS.
+        cat_order_sorted = sorted(cat_order, key=lambda c: len(cat_buckets[c]), reverse=True)
+        kept_cats = set(cat_order_sorted[:_SKILLS_MAX_CATS])
+        cat_order = [c for c in cat_order if c in kept_cats]
+
+    # Trim total items to _SKILLS_MAX_ITEMS across all kept categories.
+    skills: list[dict[str, Any]] = []
+    remaining = _SKILLS_MAX_ITEMS
+    for cat in cat_order:
+        items = cat_buckets[cat][:remaining]
+        if items:
+            skills.append({"category": cat, "items": items})
+            remaining -= len(items)
+        if remaining <= 0:
+            break
+
+    rendered_count = sum(len(g["items"]) for g in skills)
+    summary_line = f"Skills: {rendered_count} of {total} rendered (JD-matched)"
+    return skills, summary_line
+
+
 def _build_cv_json(
     *,
     profile: dict[str, Any],
@@ -113,15 +208,35 @@ def _build_cv_json(
     summary_text: str,
     conn: sqlite3.Connection,
     projects: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    skills_rows = conn.execute(
-        "SELECT category, name FROM skill ORDER BY category, name"
-    ).fetchall()
-    skill_by_cat: dict[str, list[str]] = {}
-    for r in skills_rows:
-        cat = r["category"] or "Other"
-        skill_by_cat.setdefault(cat, []).append(r["name"])
-    skills = [{"category": cat, "items": items} for cat, items in skill_by_cat.items()]
+    selected_skills: list[dict[str, Any]] | None = None,
+    jd_text: str | None = None,
+) -> tuple[dict[str, Any], str]:
+    """Build the cv.json dict.
+
+    Returns (cv_dict, skills_summary_line) where skills_summary_line is
+    suitable for appending to changes.md.
+    """
+    if selected_skills is not None:
+        # Brain explicitly chose skills.
+        skills = selected_skills
+        total = conn.execute("SELECT COUNT(*) FROM skill").fetchone()[0]
+        rendered_count = sum(len(g["items"]) for g in skills)
+        skills_summary_line = f"Skills: {rendered_count} of {total} rendered (brain-selected)"
+    elif jd_text:
+        skills, skills_summary_line = _jd_matched_skills(conn, jd_text)
+    else:
+        # Last-resort fallback: dump full library (pre-existing behaviour for
+        # callers that do not pass jd_text).
+        all_rows = conn.execute(
+            "SELECT category, name FROM skill ORDER BY category, name"
+        ).fetchall()
+        skill_by_cat: dict[str, list[str]] = {}
+        for r in all_rows:
+            cat = r["category"] or "Other"
+            skill_by_cat.setdefault(cat, []).append(r["name"])
+        skills = [{"category": cat, "items": items} for cat, items in skill_by_cat.items()]
+        total = sum(len(g["items"]) for g in skills)
+        skills_summary_line = f"Skills: {total} of {total} rendered (full library)"
 
     contact: list[str] = []
     if profile.get("email"):
@@ -159,7 +274,7 @@ def _build_cv_json(
         for r in degree_rows
     ]
 
-    return {
+    cv_dict = {
         "schema_version": 1,
         "profile": {
             "name": str(profile.get("full_name", "Your Name")),
@@ -172,6 +287,7 @@ def _build_cv_json(
         "skills": skills,
         "education": education,
     }
+    return cv_dict, skills_summary_line
 
 
 def _pick_summary(conn: sqlite3.Connection) -> str:

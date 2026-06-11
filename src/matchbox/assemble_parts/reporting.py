@@ -25,6 +25,9 @@ def _write_changes_md(
     requirements: list[Requirement] | None = None,
     similarity_matrix: Any = None,
     candidate_count: int = 2,
+    page_count: int | None = None,
+    target_pages: int = 1,
+    skills_summary_line: str | None = None,
 ) -> Path:
     """Write a human-readable summary of what changed vs. the master library.
 
@@ -58,7 +61,7 @@ def _write_changes_md(
     ordered = sorted(grouped.values(), key=lambda g: g["_sort"])
 
     lines: list[str] = []
-    lines.append(f"# Changes for {job_company} — {job_title}")
+    lines.append(f"# Changes for {job_company}: {job_title}")
     lines.append("")
     total_selected = len(selected_set)
     total_library = len(raw_bullets)
@@ -69,7 +72,7 @@ def _write_changes_md(
     lines.append("")
 
     for ex in ordered:
-        lines.append(f"## {ex['company']} — {ex['role']}")
+        lines.append(f"## {ex['company']}: {ex['role']}")
         lines.append(f"_{ex['start_date']} → {ex['end_date']}_")
         lines.append("")
         if ex["selected"]:
@@ -143,6 +146,17 @@ def _write_changes_md(
                         lines.append(f"    - ({sim:.2f}) {raw_bullets[cid]['text']}")
         lines.append("")
 
+    if skills_summary_line:
+        lines.append(skills_summary_line)
+        lines.append("")
+
+    if page_count is not None:
+        page_note = f"Pages: {page_count} (target {target_pages})"
+        if page_count > target_pages:
+            page_note += " (exceeds target: cut selection or set target_pages: 2)"
+        lines.append(page_note)
+        lines.append("")
+
     out_path = out_dir / "changes.md"
     out_path.write_text("\n".join(lines), encoding="utf-8")
     return out_path
@@ -177,7 +191,7 @@ def _append_polish_section_to_changes_md(
         lines.append("")
         for bp in rejected:
             why = "; ".join(f"{v.rule}: {v.detail}" for v in bp.violations)
-            lines.append(f"- bullet {bp.bullet_id} — {why}")
+            lines.append(f"- bullet {bp.bullet_id}: {why}")
             lines.append(f"  - proposed: {bp.new_text}")
     lines.append("")
 

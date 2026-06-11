@@ -3,7 +3,7 @@
   "$id": "https://matchbox.local/schemas/selection.v1.json",
   "title": "Matchbox CV selection (brain -> core)",
   "additionalProperties": false,
-  "description": "Written by the brain to pick which verified bullets go on the CV and in what order, plus a JD-tailored summary. The deterministic core validates that every id is a real verified library bullet (the no-fabrication guarantee lives in that check, not in selection being an algorithm), voice-gates the summary, enforces the one-page budget, then renders. When no selection file is supplied, assemble falls back to the deterministic matcher (offline / no-key path).",
+  "description": "Written by the brain to pick which verified bullets go on the CV and in what order, plus a JD-tailored summary. The deterministic core validates that every id is a real verified library bullet (the no-fabrication guarantee lives in that check, not in selection being an algorithm), voice-gates the summary, enforces the target_pages-scaled bullet budget, then renders. When no selection file is supplied, assemble falls back to the deterministic matcher (offline / no-key path).",
   "properties": {
     "schema_version": {
       "const": 1,
@@ -17,7 +17,7 @@
       "type": "integer"
     },
     "selected_bullet_ids": {
-      "description": "Verified bullet ids, in the order the brain wants them rendered (within each role). Each MUST be a verified library bullet; the core rejects any unknown or unverified id. Trailing ids past the one-page budget are dropped, lowest-priority first.",
+      "description": "Verified bullet ids, in the order the brain wants them rendered (within each role). Each MUST be a verified library bullet; the core rejects any unknown or unverified id. Trailing ids past the target_pages-scaled bullet budget are dropped, lowest-priority first.",
       "items": {
         "minimum": 1,
         "type": "integer"
@@ -46,6 +46,32 @@
       ],
       "default": null,
       "description": "Optional verified project ids to render in the Projects section, in order. Each MUST be a verified library project; the core rejects any unknown or unverified id (same no-fabrication rule as bullets). Omitted -> no Projects section (the deterministic fallback never selects projects)."
+    },
+    "selected_skill_ids": {
+      "anyOf": [
+        {
+          "items": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional skill ids to render in the Skills section, in order. Each MUST be a real library skill id; the core rejects any unknown id. Skills are grouped by category; category order follows the brain's id list (first appearance); items within a category keep the brain's order. No cap -- the brain's judgment governs. Omitted -> the deterministic fallback picks JD-relevant skills (it never dumps the whole library)."
+    },
+    "target_pages": {
+      "default": 1,
+      "description": "Page budget the brain is targeting. 2 is a deliberate choice for senior/depth-heavy applications, never an accident. The bullet budget scales with this value (target_pages=2 doubles the word budget). The deterministic no-selection fallback always uses the 1-page budget.",
+      "enum": [
+        1,
+        2
+      ],
+      "type": "integer"
     },
     "headline": {
       "anyOf": [

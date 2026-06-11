@@ -56,6 +56,41 @@ def _apply_project_selection(
     return out
 
 
+def _apply_skill_selection(
+    selection: dict[str, Any], library_skills: dict[int, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Validate the brain's optional skill picks against the library and return
+    skill groups in the brain's order. Category order is the order of first
+    appearance in the brain's id list; items within a category keep the brain's
+    order. An unknown id is a hard failure with the same error/exit semantics as
+    unknown bullet or project ids."""
+    ids = [int(i) for i in (selection.get("selected_skill_ids") or [])]
+    if not ids:
+        return []
+    unknown = [i for i in ids if i not in library_skills]
+    if unknown:
+        raise ValueError(
+            "selection references ids that are not library skills: " + ", ".join(map(str, unknown))
+        )
+    # Group by category, preserving the brain's order (first appearance of a
+    # category determines category order; items within a category keep brain order).
+    cat_order: list[str] = []
+    cat_items: dict[str, list[str]] = {}
+    seen: set[int] = set()
+    for i in ids:
+        if i in seen:
+            continue
+        seen.add(i)
+        skill = library_skills[i]
+        cat = skill["category"] or "Other"
+        name = skill["name"]
+        if cat not in cat_items:
+            cat_order.append(cat)
+            cat_items[cat] = []
+        cat_items[cat].append(name)
+    return [{"category": cat, "items": cat_items[cat]} for cat in cat_order]
+
+
 def _apply_selection(
     selection: dict[str, Any], components: list[Component]
 ) -> tuple[list[int], dict[int, float], str]:
@@ -92,21 +127,25 @@ def _apply_selection(
         )
 
     # Rank-relevance: earlier in the brain's order = more important (drives the
-    # changes.md display). One-page safety belt: keep the brain's order, drop the
-    # lowest-priority (trailing) bullets once the body exceeds the word budget.
+    # changes.md display). Safety belt: keep the brain's order, drop the
+    # lowest-priority (trailing) bullets once the body exceeds the word budget
+    # scaled by target_pages (1 -> DEFAULT_WORD_BUDGET, 2 -> 2x the budget).
+    target_pages = int(selection.get("target_pages") or 1)
+    word_budget = DEFAULT_WORD_BUDGET * target_pages
     relevance = {cid: float(len(ordered) - rank) for rank, cid in enumerate(ordered)}
     text_by_id = {c.id: c.text for c in components}
     kept: list[int] = []
     used = 0
     for cid in ordered:
         words = len(text_by_id[cid].split())
-        if kept and used + words > DEFAULT_WORD_BUDGET:
+        if kept and used + words > word_budget:
             break
         kept.append(cid)
         used += words
     if len(kept) < len(ordered):
         log.info(
-            "one-page budget kept %d of %d selected bullets (dropped %d trailing)",
+            "page-%d budget kept %d of %d selected bullets (dropped %d trailing)",
+            target_pages,
             len(kept),
             len(ordered),
             len(ordered) - len(kept),

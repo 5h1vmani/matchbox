@@ -44,6 +44,7 @@ from matchbox.assemble_parts.diagnostics import _requirement_synth_id, _semantic
 from matchbox.assemble_parts.loaders import (
     _load_components,
     _load_job,
+    _load_library_skills,
     _load_profile,
     _load_requirements,
     _load_unverified_bullets,
@@ -57,6 +58,7 @@ from matchbox.assemble_parts.reporting import (
 from matchbox.assemble_parts.selection import (
     _apply_project_selection,
     _apply_selection,
+    _apply_skill_selection,
     validate_selection_payload,
 )
 from matchbox.core.db import PROJECT_ROOT, connect
@@ -124,7 +126,7 @@ def assemble_one(
     value explicitly.
     """
     log.info("assemble start run=%s job=%s", run_id, job_id)
-    _load_job(conn, job_id)  # ensure the job exists; raises LookupError
+    job_row = _load_job(conn, job_id)  # ensure the job exists; raises LookupError
     profile = _load_profile(conn)
     requirements = _load_requirements(conn, job_id)
     components, raw_bullets = _load_components(conn)
@@ -196,17 +198,28 @@ def assemble_one(
     if selection is not None and selection.get("selected_project_ids"):
         projects = _apply_project_selection(selection, _load_verified_projects(conn))
 
+    # Optional Skills section: brain-selected skill ids, or JD-filtered fallback.
+    selected_skills: list[dict[str, Any]] | None = None
+    if selection is not None and selection.get("selected_skill_ids"):
+        selected_skills = _apply_skill_selection(selection, _load_library_skills(conn))
+
+    # target_pages from selection (default 1 when no selection or not set).
+    target_pages = int((selection or {}).get("target_pages") or 1)
+
     # Build the CV JSON, bullets in the chosen order (the brain's order when
     # supplied, library order otherwise).
     comp_by_id = {c.id: c for c in components}
     chosen = [comp_by_id[i] for i in selected_ids]
     experiences = _experiences_in_order(chosen, raw_bullets)
-    cv_json = _build_cv_json(
+    jd_text: str | None = str(job_row.get("jd_text") or "") or None
+    cv_json, skills_summary_line = _build_cv_json(
         profile=profile,
         experiences=experiences,
         summary_text=summary_text,
         conn=conn,
         projects=projects,
+        selected_skills=selected_skills,
+        jd_text=jd_text,
     )
     # Fingerprint the selected bullets so re_render_cv can warn when the
     # DB has drifted (the user edited a bullet after this render).
@@ -227,7 +240,7 @@ def assemble_one(
     cv_json_path.write_text(json.dumps(cv_json, indent=2), encoding="utf-8")
 
     cv_pdf_path = out_dir / "cv.pdf"
-    _render_pdf(cv_json_path, cv_pdf_path, palette, font)
+    page_count = _render_pdf(cv_json_path, cv_pdf_path, palette, font)
 
     # Coverage reports.
     pdf_text = _extract_pdf_text(cv_pdf_path)
@@ -273,11 +286,10 @@ def assemble_one(
     coverage_path = out_dir / "coverage.json"
     coverage_path.write_text(json.dumps(coverage, indent=2), encoding="utf-8")
 
-    job = _load_job(conn, job_id)
     changes_path = _write_changes_md(
         out_dir=out_dir,
-        job_company=str(job["company"]),
-        job_title=str(job["title"]),
+        job_company=str(job_row["company"]),
+        job_title=str(job_row["title"]),
         selected_ids=selected_ids,
         components=components,
         requirements=requirements,
@@ -286,6 +298,9 @@ def assemble_one(
         raw_bullets=raw_bullets,
         semantic_gaps=semantic_gaps,
         keyword_presence=keyword_presence,
+        page_count=page_count,
+        target_pages=target_pages,
+        skills_summary_line=skills_summary_line,
     )
 
     log.info(
