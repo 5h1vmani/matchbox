@@ -558,6 +558,119 @@ def assemble_cover(
     return cover_pdf
 
 
+# ─── CLI: one handler per mode, main() parses and dispatches ──────────
+
+
+class _PayloadError(Exception):
+    """A payload file could not be read or parsed (the CLI exits 2)."""
+
+
+def _load_json(path: Path) -> Any:
+    """Read and parse a JSON payload file.
+
+    On OSError / JSONDecodeError, print the error to stderr (same wording
+    as ever) and raise _PayloadError so the handler can exit 2.
+    """
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except OSError as e:
+        print(f"error: cannot read {path}: {e}", file=sys.stderr)
+        raise _PayloadError from e
+    except json.JSONDecodeError as e:
+        print(f"error: invalid JSON in {path}: {e}", file=sys.stderr)
+        raise _PayloadError from e
+
+
+def _run_polish(args: argparse.Namespace, conn: sqlite3.Connection, palette: str, font: str) -> int:
+    """--polish: apply a polish payload to an already-rendered run."""
+    try:
+        payload = _load_json(args.polish)
+    except _PayloadError:
+        return 2
+    try:
+        summary = polish_run(
+            conn=conn,
+            run_id=args.run,
+            job_id=args.job,
+            palette=palette,
+            font=font,
+            payload=payload,
+        )
+    except FileNotFoundError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 5
+    except ValueError as e:
+        print(f"schema error: {e}", file=sys.stderr)
+        return 3
+    print(f"polish: applied {len(summary['applied'])}, rejected {len(summary['rejected'])}")
+    for r in summary["rejected"]:
+        print(f"  rejected bullet {r['id']}:")
+        for v in r["violations"]:
+            print(f"    {v['rule']}: {v['detail']}")
+    return 0
+
+
+def _run_cover(args: argparse.Namespace, conn: sqlite3.Connection, palette: str, font: str) -> int:
+    """--cover: render cover.txt the brain wrote into cover.pdf."""
+    try:
+        cover_path = assemble_cover(
+            conn=conn,
+            run_id=args.run,
+            job_id=args.job,
+            palette=palette,
+            font=font,
+        )
+    except FileNotFoundError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 5
+    print(f"cover: {cover_path}")
+    return 0
+
+
+def _run_assemble(
+    args: argparse.Namespace, conn: sqlite3.Connection, palette: str, font: str
+) -> int:
+    """Default mode: assemble the CV (brain selection via --selection, or
+    the deterministic matcher without it)."""
+    selection_payload: dict[str, Any] | None = None
+    if args.selection is not None:
+        try:
+            selection_payload = _load_json(args.selection)
+        except _PayloadError:
+            return 2
+        errors = validate_selection_payload(selection_payload)
+        if errors:
+            print("schema error: selection.json: " + "; ".join(errors), file=sys.stderr)
+            return 3
+    try:
+        result = assemble_one(
+            conn=conn,
+            run_id=args.run,
+            job_id=args.job,
+            palette=palette,
+            font=font,
+            selection=selection_payload,
+        )
+    except ValueError as e:
+        # An id that is not a verified bullet, or a summary that fails the
+        # voice gate. Loud, never silently dropped.
+        print(f"selection rejected: {e}", file=sys.stderr)
+        return 3
+
+    print(f"cv: {result.cv_path}")
+    print(f"selected components: {len(result.selected_component_ids)}")
+    if result.gaps:
+        print(f"semantic gaps ({len(result.gaps)}):")
+        for g in result.gaps:
+            print(f"  - {g}")
+    missing_keywords = [kp for kp in result.keyword_presence if not kp["present"]]
+    if missing_keywords:
+        print(f"ATS keyword misses ({len(missing_keywords)}):")
+        for kp in missing_keywords:
+            print(f"  - {kp['requirement']}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     configure_logging()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -592,94 +705,12 @@ def main(argv: list[str] | None = None) -> int:
         palette, font = _palette_and_font_for(conn, args.run, args.job)
 
         if args.polish is not None:
-            try:
-                payload = json.loads(args.polish.read_text(encoding="utf-8"))
-            except OSError as e:
-                print(f"error: cannot read {args.polish}: {e}", file=sys.stderr)
-                return 2
-            except json.JSONDecodeError as e:
-                print(f"error: invalid JSON in {args.polish}: {e}", file=sys.stderr)
-                return 2
-            try:
-                summary = polish_run(
-                    conn=conn,
-                    run_id=args.run,
-                    job_id=args.job,
-                    palette=palette,
-                    font=font,
-                    payload=payload,
-                )
-            except FileNotFoundError as e:
-                print(f"error: {e}", file=sys.stderr)
-                return 5
-            except ValueError as e:
-                print(f"schema error: {e}", file=sys.stderr)
-                return 3
-            print(f"polish: applied {len(summary['applied'])}, rejected {len(summary['rejected'])}")
-            for r in summary["rejected"]:
-                print(f"  rejected bullet {r['id']}:")
-                for v in r["violations"]:
-                    print(f"    {v['rule']}: {v['detail']}")
-            return 0
-
+            return _run_polish(args, conn, palette, font)
         if args.cover:
-            try:
-                cover_path = assemble_cover(
-                    conn=conn,
-                    run_id=args.run,
-                    job_id=args.job,
-                    palette=palette,
-                    font=font,
-                )
-            except FileNotFoundError as e:
-                print(f"error: {e}", file=sys.stderr)
-                return 5
-            print(f"cover: {cover_path}")
-            return 0
-
-        selection_payload: dict[str, Any] | None = None
-        if args.selection is not None:
-            try:
-                selection_payload = json.loads(args.selection.read_text(encoding="utf-8"))
-            except OSError as e:
-                print(f"error: cannot read {args.selection}: {e}", file=sys.stderr)
-                return 2
-            except json.JSONDecodeError as e:
-                print(f"error: invalid JSON in {args.selection}: {e}", file=sys.stderr)
-                return 2
-            errors = validate_selection_payload(selection_payload)
-            if errors:
-                print("schema error: selection.json: " + "; ".join(errors), file=sys.stderr)
-                return 3
-        try:
-            result = assemble_one(
-                conn=conn,
-                run_id=args.run,
-                job_id=args.job,
-                palette=palette,
-                font=font,
-                selection=selection_payload,
-            )
-        except ValueError as e:
-            # An id that is not a verified bullet, or a summary that fails the
-            # voice gate. Loud, never silently dropped.
-            print(f"selection rejected: {e}", file=sys.stderr)
-            return 3
+            return _run_cover(args, conn, palette, font)
+        return _run_assemble(args, conn, palette, font)
     finally:
         conn.close()
-
-    print(f"cv: {result.cv_path}")
-    print(f"selected components: {len(result.selected_component_ids)}")
-    if result.gaps:
-        print(f"semantic gaps ({len(result.gaps)}):")
-        for g in result.gaps:
-            print(f"  - {g}")
-    missing_keywords = [kp for kp in result.keyword_presence if not kp["present"]]
-    if missing_keywords:
-        print(f"ATS keyword misses ({len(missing_keywords)}):")
-        for kp in missing_keywords:
-            print(f"  - {kp['requirement']}")
-    return 0
 
 
 if __name__ == "__main__":
