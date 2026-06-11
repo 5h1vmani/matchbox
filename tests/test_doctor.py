@@ -6,9 +6,11 @@ import shutil
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 import matchbox.web.app as web_app
 from matchbox.doctor import Check, checks, main
+from matchbox.web.app import create_app
 
 EXPECTED_NAMES = [
     "python",
@@ -61,3 +63,18 @@ def test_main_returns_int(capsys: pytest.CaptureFixture[str]) -> None:
     assert isinstance(code, int)
     out = capsys.readouterr().out
     assert "python" in out
+
+
+def test_api_doctor_serializes_checks() -> None:
+    """GET /api/doctor: the same checks as JSON, so the UI can show real
+    environment status (e.g. claude CLI presence) in the handoff."""
+    with TestClient(create_app()) as client:
+        r = client.get("/api/doctor")
+    assert r.status_code == 200
+    payload = r.json()
+    assert [c["name"] for c in payload["checks"]] == EXPECTED_NAMES
+    for c in payload["checks"]:
+        assert set(c) == {"name", "ok", "required", "detail"}
+        assert isinstance(c["ok"], bool)
+        assert isinstance(c["required"], bool)
+        assert isinstance(c["detail"], str)

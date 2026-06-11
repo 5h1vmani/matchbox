@@ -50,6 +50,13 @@ export interface ReviewState {
   unverifiedAnswers: number;
 }
 
+/** The cheap ingest-progress poll: bullets landed / verified so far. */
+export interface ReviewCounts {
+  bullets: number;
+  verified: number;
+  experiences: number;
+}
+
 export interface BulletPatch {
   text?: string;
   has_metric?: boolean;
@@ -94,6 +101,8 @@ async function sendJSON<T>(url: string, method: string, fallback: T, body?: unkn
 }
 
 export const getReview = () => getJSON<ReviewState>("/api/review", EMPTY_REVIEW);
+
+export const getCounts = () => getJSON<ReviewCounts | null>("/api/review/counts", null);
 
 export const verifyBullet = (id: number) =>
   sendJSON<ReviewBullet | null>(`/api/review/bullets/${id}/verify`, "POST", null);

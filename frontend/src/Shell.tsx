@@ -10,6 +10,7 @@ import { cx } from "./lib/derive";
 import { Icon } from "./ui/icon";
 import * as tapi from "./api/client";
 import type { ProfileInfo, UserInfo } from "./api/client";
+import { getDoctorChecks } from "./api/doctor";
 import { getOnboarding } from "./api/onboarding";
 import * as dapi from "./discovery/api/client";
 import { useApps } from "./store/useApps";
@@ -288,6 +289,17 @@ export function Shell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Honest handoff: ask the doctor whether the claude CLI is actually on PATH
+  // before telling the user to paste into it. null = not yet known (say nothing).
+  const [claudeCli, setClaudeCli] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!handoff || claudeCli !== null) return;
+    void getDoctorChecks().then((checks) => {
+      const cli = checks.find((c) => c.name === "claude cli");
+      if (cli) setClaudeCli(cli.ok);
+    });
+  }, [handoff, claudeCli]);
+
   const flash = useCallback((msg: string, undo?: () => void) => {
     setToast({ msg, undo });
     if (timer.current) clearTimeout(timer.current);
@@ -412,8 +424,8 @@ export function Shell() {
   else if (nav === "offers") screen = <Offers flash={flash} />;
   else if (nav === "answers") screen = <Answers flash={flash} />;
   else if (nav === "apply") screen = <Apply flash={flash} apps={apps} />;
-  else if (nav === "verify") screen = <ReviewFacts flash={flash} />;
-  else if (nav === "onboarding") screen = <Intake flash={flash} />;
+  else if (nav === "verify") screen = <ReviewFacts flash={flash} onGoSources={() => setNav("sources")} />;
+  else if (nav === "onboarding") screen = <Intake flash={flash} onGoSources={() => setNav("sources")} />;
   else if (nav === "library") screen = <Library flash={flash} />;
   else if (nav === "sources") screen = <Sources flash={flash} />;
   else if (nav === "profile") screen = <Profile flash={flash} />;
@@ -443,11 +455,19 @@ export function Shell() {
         <div className="handoff">
           <button className="handoff__x" onClick={() => setHandoff(null)} title="Dismiss"><Icon name="x" size={16} /></button>
           <div className="handoff__h"><Icon name="sparkles" size={15} /> {handoff.count > 1 ? handoff.count + " roles queued to tailor" : "Queued to tailor"}</div>
-          <p className="handoff__p">Run this in Claude Code to draft {handoff.count > 1 ? "the CVs" : "your CV"}:</p>
+          <p className="handoff__p">In a terminal at the repo root, launch Claude Code:</p>
+          <div className="handoff__cmd"><code>claude</code></div>
+          <p className="handoff__p">Then run this to draft {handoff.count > 1 ? "the CVs" : "your CV"}:</p>
           <div className="handoff__cmd">
             <code>{handoff.prompt}</code>
             <button className="btn tiny" onClick={() => { void navigator.clipboard?.writeText(handoff.prompt); flash("Copied. Paste it into Claude Code."); }}>Copy</button>
           </div>
+          {claudeCli === false && (
+            <p className="handoff__p" style={{ color: "var(--warning)", display: "flex", alignItems: "flex-start", gap: 6 }}>
+              <Icon name="alert-circle" size={14} style={{ flex: "0 0 auto", marginTop: 2 }} />
+              <span>Claude Code not detected on this machine — install it or set an API key in Settings (coming) to run in-app.</span>
+            </p>
+          )}
         </div>
       )}
     </div>

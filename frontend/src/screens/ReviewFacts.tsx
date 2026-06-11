@@ -279,7 +279,7 @@ function AnswerCard({
   );
 }
 
-export function ReviewFacts({ flash }: { flash: (msg: string) => void }) {
+export function ReviewFacts({ flash, onGoSources }: { flash: (msg: string) => void; onGoSources?: () => void }) {
   const [state, setState] = useState<api.ReviewState | null>(null);
   const [loading, setLoading] = useState(true);
   const [verifyingAll, setVerifyingAll] = useState(false);
@@ -412,6 +412,26 @@ export function ReviewFacts({ flash }: { flash: (msg: string) => void }) {
           </>
         )}
       </p>
+
+      {totalUnverified === 0 && (
+        <section className="card" style={{ padding: "16px 20px", marginBottom: 22 }}>
+          <div className="sec-h" style={{ marginBottom: 12 }}>
+            <span className="t">Next: your first job</span>
+          </div>
+          <p className="sub" style={{ margin: "0 0 12px" }}>
+            Paste one job ad and tailor a CV against your verified facts. Nothing to configure first;
+            setting up ATS scanners is optional and can wait.
+          </p>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button className="btn primary" onClick={onGoSources}>
+              <Icon name="plus" size={14} /> Paste a job ad
+            </button>
+            <button className="btn ghost" onClick={onGoSources}>
+              <Icon name="rss" size={14} /> Automate your scan (optional, later)
+            </button>
+          </div>
+        </section>
+      )}
 
       {state.experiences.length > 0 && (
         <section style={{ marginBottom: 22 }}>

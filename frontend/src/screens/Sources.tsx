@@ -1,9 +1,12 @@
-/* Matchbox — Sources. The job-board connectors: each row points an ATS board
-   (Greenhouse, Lever, Ashby…) at a company, and a scan is a real, live network
-   fetch. Honest throughout — a bad slug is not validated away up front; it
-   surfaces as a calm warning after a scan (the "visible status" pattern). The
-   no-auth aggregators and an optional bring-your-own-key Adzuna feed round it
-   out. Nothing is invented: counts and statuses come straight from the server. */
+/* Matchbox — Sources. Paste-a-JD first: a newcomer's first role comes from
+   pasting one job ad by hand, so that form leads the screen. The job-board
+   connectors below it are the optional automation: each row points an ATS
+   board (Greenhouse, Lever, Ashby…) at a company, and a scan is a real, live
+   network fetch. Honest throughout — a bad slug is not validated away up
+   front; it surfaces as a calm warning after a scan (the "visible status"
+   pattern). The no-auth aggregators and an optional bring-your-own-key Adzuna
+   feed round it out. Nothing is invented: counts and statuses come straight
+   from the server. */
 import { useEffect, useState } from "react";
 import * as api from "../api/sources";
 import * as jobsApi from "../api/jobs";
@@ -299,11 +302,111 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
         <div>
           <h1>Sources</h1>
           <p className="sub">
-            The job boards you point at companies. A scan is a real, live fetch, and an honest one: a
+            Where roles come from. Pasting one job ad by hand is the quickest start; the ATS boards
+            below automate the same thing later. A scan is a real, live fetch, and an honest one: a
             bad slug shows up here as a warning after you scan, never guessed at.
           </p>
         </div>
       </div>
+
+      <section className="card" style={{ padding: "18px 20px", marginBottom: 18 }}>
+        <div className="sec-h" style={{ marginBottom: 12 }}>
+          <span className="t">Paste a job ad</span>
+        </div>
+        <p className="sub" style={{ margin: "0 0 14px" }}>
+          The fastest way to your first tailored CV. Paste any JD — LinkedIn, a careers page, a
+          referral — and it is scored by the same rubric as scanned roles, then shows up in Discover.
+        </p>
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <label className="fld" style={{ flex: 1, minWidth: 200 }}>
+            <span className="fld__l">Company</span>
+            <input
+              className="inp"
+              value={jobCompany}
+              onChange={(e) => setJobCompany(e.target.value)}
+              placeholder="Acme Inc."
+            />
+          </label>
+          <label className="fld" style={{ flex: 1, minWidth: 200 }}>
+            <span className="fld__l">Title</span>
+            <input
+              className="inp"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              placeholder="Senior Software Engineer"
+            />
+          </label>
+        </div>
+
+        <label className="fld" style={{ marginTop: 14 }}>
+          <span className="fld__l">URL</span>
+          <input
+            className="inp"
+            value={jobUrl}
+            onChange={(e) => setJobUrl(e.target.value)}
+            placeholder="the link to the posting"
+          />
+        </label>
+
+        <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+          <label className="fld" style={{ flex: 1, minWidth: 200 }}>
+            <span className="fld__l">Apply URL (optional)</span>
+            <input
+              className="inp"
+              value={jobApplyUrl}
+              onChange={(e) => setJobApplyUrl(e.target.value)}
+              placeholder="where to apply, if different"
+            />
+          </label>
+          <label className="fld" style={{ flex: 1, minWidth: 160 }}>
+            <span className="fld__l">Location (optional)</span>
+            <input
+              className="inp"
+              value={jobLocation}
+              onChange={(e) => setJobLocation(e.target.value)}
+              placeholder="e.g. Remote (US)"
+            />
+          </label>
+        </div>
+
+        <label className="fld" style={{ marginTop: 14 }}>
+          <span className="fld__l">JD text</span>
+          <textarea
+            className="inp"
+            value={jobText}
+            onChange={(e) => setJobText(e.target.value)}
+            placeholder="Paste the full job description here."
+            rows={8}
+          />
+        </label>
+
+        <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
+          <button
+            className="btn primary"
+            disabled={jobBusy}
+            onClick={() => void submitJob()}
+          >
+            <Icon name="plus" size={14} /> {jobBusy ? "Adding…" : "Add role"}
+          </button>
+          <button
+            className="btn ghost"
+            disabled={scoreBusy}
+            onClick={() => void scoreNew()}
+          >
+            <Icon name="radar" size={14} className={cx(scoreBusy && "spin")} />
+            {scoreBusy ? " Scoring…" : " Score new roles"}
+          </button>
+        </div>
+      </section>
+
+      <div className="sec-h" style={{ margin: "24px 0 6px" }}>
+        <span className="t">Automate your scan (optional, later)</span>
+      </div>
+      <p className="sub" style={{ margin: "0 0 14px" }}>
+        Point ATS boards and aggregators at companies you care about and scans pull roles in for
+        you. None of this is needed to tailor your first CV.
+      </p>
 
       <section className="card" style={{ padding: "18px 20px", marginBottom: 18 }}>
         <div className="sec-h" style={{ marginBottom: 14 }}>
@@ -487,97 +590,6 @@ export function Sources({ flash }: { flash: (msg: string) => void }) {
             onClick={() => void saveAdzuna()}
           >
             <Icon name="check" size={14} /> Save Adzuna key
-          </button>
-        </div>
-      </section>
-
-      <section className="card" style={{ padding: "18px 20px", marginBottom: 18 }}>
-        <div className="sec-h" style={{ marginBottom: 12 }}>
-          <span className="t">Add a role by hand</span>
-        </div>
-        <p className="sub" style={{ margin: "0 0 14px" }}>
-          Paste a JD that isn't on a polled ATS (LinkedIn, a careers page, a referral). It is scored by
-          the same rubric and shows up in Discover.
-        </p>
-
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <label className="fld" style={{ flex: 1, minWidth: 200 }}>
-            <span className="fld__l">Company</span>
-            <input
-              className="inp"
-              value={jobCompany}
-              onChange={(e) => setJobCompany(e.target.value)}
-              placeholder="Acme Inc."
-            />
-          </label>
-          <label className="fld" style={{ flex: 1, minWidth: 200 }}>
-            <span className="fld__l">Title</span>
-            <input
-              className="inp"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-              placeholder="Senior Software Engineer"
-            />
-          </label>
-        </div>
-
-        <label className="fld" style={{ marginTop: 14 }}>
-          <span className="fld__l">URL</span>
-          <input
-            className="inp"
-            value={jobUrl}
-            onChange={(e) => setJobUrl(e.target.value)}
-            placeholder="the link to the posting"
-          />
-        </label>
-
-        <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
-          <label className="fld" style={{ flex: 1, minWidth: 200 }}>
-            <span className="fld__l">Apply URL (optional)</span>
-            <input
-              className="inp"
-              value={jobApplyUrl}
-              onChange={(e) => setJobApplyUrl(e.target.value)}
-              placeholder="where to apply, if different"
-            />
-          </label>
-          <label className="fld" style={{ flex: 1, minWidth: 160 }}>
-            <span className="fld__l">Location (optional)</span>
-            <input
-              className="inp"
-              value={jobLocation}
-              onChange={(e) => setJobLocation(e.target.value)}
-              placeholder="e.g. Remote (US)"
-            />
-          </label>
-        </div>
-
-        <label className="fld" style={{ marginTop: 14 }}>
-          <span className="fld__l">JD text</span>
-          <textarea
-            className="inp"
-            value={jobText}
-            onChange={(e) => setJobText(e.target.value)}
-            placeholder="Paste the full job description here."
-            rows={8}
-          />
-        </label>
-
-        <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
-          <button
-            className="btn primary"
-            disabled={jobBusy}
-            onClick={() => void submitJob()}
-          >
-            <Icon name="plus" size={14} /> {jobBusy ? "Adding…" : "Add role"}
-          </button>
-          <button
-            className="btn ghost"
-            disabled={scoreBusy}
-            onClick={() => void scoreNew()}
-          >
-            <Icon name="radar" size={14} className={cx(scoreBusy && "spin")} />
-            {scoreBusy ? " Scoring…" : " Score new roles"}
           </button>
         </div>
       </section>

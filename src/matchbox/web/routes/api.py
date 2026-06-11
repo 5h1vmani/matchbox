@@ -8,6 +8,7 @@ updated application. Plus user listing/switching for the live profile switch.
 from __future__ import annotations
 
 import re
+from dataclasses import asdict
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response
@@ -16,6 +17,7 @@ from pydantic import BaseModel
 
 from matchbox.core.db import PROJECT_ROOT, connect, db_path, list_profiles
 from matchbox.core.migrations import migrate
+from matchbox.doctor import checks as doctor_checks
 from matchbox.tracker import repo, service
 from matchbox.web.deps import ACTIVE_PROFILE_COOKIE, ConnDep, ProfileDep
 
@@ -59,6 +61,13 @@ def _require(app: dict[str, Any] | None) -> dict[str, Any]:
 
 
 # ── reads ─────────────────────────────────────────────────────────────────────
+
+
+@router.get("/doctor")
+def doctor() -> dict[str, Any]:
+    """The matchbox-doctor checks as JSON, so the UI can show real environment
+    status (e.g. whether the claude CLI is on PATH) instead of guessing."""
+    return {"checks": [asdict(check) for check in doctor_checks()]}
 
 
 @router.get("/applications")

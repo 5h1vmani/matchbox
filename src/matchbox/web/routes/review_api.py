@@ -69,6 +69,23 @@ def review_state(conn: ConnDep) -> dict[str, Any]:
     }
 
 
+@router.get("/counts")
+def review_counts(conn: ConnDep) -> dict[str, int]:
+    """Cheap progress poll for the Onboarding screen: how many bullets the
+    ingest has landed and how many the user has verified. The screen polls this
+    while the user runs `ingest my files` in Claude Code, so progress is
+    visible in-app instead of only in the terminal."""
+    bullets = conn.execute(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(facts_verified), 0) AS v FROM bullet"
+    ).fetchone()
+    experiences = conn.execute("SELECT COUNT(*) AS n FROM experience").fetchone()
+    return {
+        "bullets": int(bullets["n"]),
+        "verified": int(bullets["v"]),
+        "experiences": int(experiences["n"]),
+    }
+
+
 @router.post("/bullets/{bullet_id}/verify")
 def verify_bullet(bullet_id: int, conn: ConnDep) -> dict[str, Any]:
     return _bullet_vm(lib.update_bullet(conn, bullet_id, facts_verified=True))

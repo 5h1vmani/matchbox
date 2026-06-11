@@ -4,15 +4,19 @@
    extracted fact at Review. No on-device magic is implied — a model reads the
    files when you ask it to, and you stay in the loop. The screen only stages
    files; the ingest itself is the `ingest my files` command you paste into
-   Claude Code. */
+   Claude Code. While files are staged it polls the counts endpoint so the
+   ingest's progress shows up here, and the next step after verification is
+   pasting one job ad by hand — ATS scanners are optional automation, later. */
 import { useEffect, useState } from "react";
 import * as tapi from "../api/client";
 import * as api from "../api/onboarding";
+import * as rapi from "../api/review";
 import { cx } from "../lib/derive";
 import { Icon } from "../ui/icon";
 
 const INGEST_CMD = "ingest my files";
 const ACCEPT = ".pdf,.docx,.doc,.txt,.md,.json,.html,.rtf";
+const POLL_MS = 5000;
 
 function humanSize(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
@@ -20,7 +24,7 @@ function humanSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-export function Intake({ flash }: { flash: (msg: string) => void }) {
+export function Intake({ flash, onGoSources }: { flash: (msg: string) => void; onGoSources?: () => void }) {
   const [staged, setStaged] = useState<api.StagedFile[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -29,11 +33,41 @@ export function Intake({ flash }: { flash: (msg: string) => void }) {
   const [slug, setSlug] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [counts, setCounts] = useState<rapi.ReviewCounts | null>(null);
 
   useEffect(() => {
     void api.getOnboarding().then((o) => setStaged(o.staged));
     void tapi.getProfile().then((p) => setSlug(p.slug));
   }, []);
+
+  // While files are staged the user is presumably running `ingest my files`
+  // in Claude Code; poll the cheap counts endpoint so the ingest's progress
+  // is visible here, not just in the terminal. The poll pauses while the tab
+  // is hidden (visibilitychange) to stay cheap.
+  useEffect(() => {
+    if (staged.length === 0) return;
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const tick = () => void rapi.getCounts().then(setCounts);
+    const start = () => {
+      if (interval === null) {
+        tick();
+        interval = setInterval(tick, POLL_MS);
+      }
+    };
+    const stop = () => {
+      if (interval !== null) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+    const onVisibility = () => (document.hidden ? stop() : start());
+    document.addEventListener("visibilitychange", onVisibility);
+    if (!document.hidden) start();
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [staged.length]);
 
   const createProfile = async () => {
     const trimmed = newName.trim();
@@ -268,11 +302,42 @@ export function Intake({ flash }: { flash: (msg: string) => void }) {
             <Icon name={copied ? "check" : "copy"} size={13} /> {copied ? "Copied" : "Copy"}
           </button>
         </div>
+        {staged.length > 0 && counts !== null && (
+          <p className="sub" style={{ margin: "12px 0 0", display: "flex", alignItems: "center", gap: 7 }}>
+            <span className="live" />
+            {counts.bullets > 0 ? (
+              <span>
+                <span className="mono">{counts.bullets}</span> bullet{counts.bullets === 1 ? "" : "s"} landed,{" "}
+                <span className="mono">{counts.verified}</span> verified.
+              </span>
+            ) : (
+              <span>Watching for the ingest. Nothing has landed yet.</span>
+            )}
+          </p>
+        )}
         {staged.length > 0 && (
           <p className="sub" style={{ margin: "12px 0 0" }}>
             Once you have ingested, head to Review to confirm the facts.
           </p>
         )}
+      </section>
+
+      <section className="card" style={{ padding: "16px 20px", marginTop: 18 }}>
+        <div className="sec-h" style={{ marginBottom: 12 }}>
+          <span className="t">Then: your first job</span>
+        </div>
+        <p className="sub" style={{ margin: "0 0 12px" }}>
+          Once your facts are verified, paste one job ad and tailor a CV against it. There is nothing
+          to configure first; setting up ATS scanners is optional and can wait.
+        </p>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button className="btn primary" onClick={onGoSources}>
+            <Icon name="plus" size={14} /> Paste a job ad
+          </button>
+          <button className="btn ghost" onClick={onGoSources}>
+            <Icon name="rss" size={14} /> Automate your scan (optional, later)
+          </button>
+        </div>
       </section>
     </div>
   );
