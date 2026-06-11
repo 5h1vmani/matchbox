@@ -1,10 +1,10 @@
-# Matchbox — instructions for the reasoning engine
+# Matchbox: instructions for the reasoning engine
 
 You are the brain for Matchbox. The app has prepared work for you.
 
 > **Canonical, model-agnostic instructions live in `AGENTS.md`.** It covers the
-> full SOTA flow — draining the `agent_task` queue, interview prep, follow-up and
-> thank-you drafts, offer benchmarking and negotiation — and the new CLIs
+> full SOTA flow (draining the `agent_task` queue, interview prep, follow-up and
+> thank-you drafts, offer benchmarking and negotiation) and the new CLIs
 > (`matchbox.agent_tasks`, `matchbox.artifacts`, `matchbox.offers`). Read it
 > first. The sections below remain accurate for onboarding and tailoring.
 
@@ -13,13 +13,13 @@ You are the brain for Matchbox. The app has prepared work for you.
 The contract between the app and you lives in `schemas/` as JSON Schema
 2020-12. Validate against the named schema before you write a file:
 
-* `schemas/ingest.v1.json` — onboarding payload
-* `schemas/job-requirements.v1.json` — extracted JD requirements
-* `schemas/job-facts.v1.json` — precise job facts for shortlisted roles
-* `schemas/work-queue.v1.json` — the app's tailoring queue
-* `schemas/status.v1.json` — your progress reports back to the app
-* `schemas/polish.v1.json` — the keyword-alignment polish payload
-* `schemas/selection.v1.json` — CV bullet selection + tailored summary
+* `schemas/ingest.v1.json`: onboarding payload
+* `schemas/job-requirements.v1.json`: extracted JD requirements
+* `schemas/job-facts.v1.json`: precise job facts for shortlisted roles
+* `schemas/work-queue.v1.json`: the app's tailoring queue
+* `schemas/status.v1.json`: your progress reports back to the app
+* `schemas/polish.v1.json`: the keyword-alignment polish payload
+* `schemas/selection.v1.json`: CV bullet selection + tailored summary
 
 A `schema_version` mismatch is a hard error. Stop and report.
 
@@ -31,7 +31,7 @@ models, never the JSON files.
 
 The scan's regex enrichment is coarse. When the user shortlists a job (or
 asks you to "enrich" one), read its full `jd_text` from the DB and save the
-precise facts the JD actually states — salary, employment type, seniority,
+precise facts the JD actually states: salary, employment type, seniority,
 years required, role family, remote scope, country, sponsorship/citizenship/
 clearance signals, application deadline:
 
@@ -41,14 +41,14 @@ python -m matchbox.jobfacts save --job <job_id> --file <facts.json>
 
 Per `schemas/job-facts.v1.json`. PARTIAL by design: include only the fields
 the JD states; omitted fields keep their scan-time values; an explicit null
-clears a wrong guess. Never infer a fact the JD does not state — the
+clears a wrong guess. Never infer a fact the JD does not state. The
 no-fabrication rule applies to job data exactly as it does to CV content.
 
 ## Hard rules (apply to every mode)
 
 * NEVER invent experience, employers, dates, metrics, or skills.
 * You MAY pick which verified bullets go on the CV and write a tailored
-  summary/headline — selection is judgment. Pass them to
+  summary/headline (selection is judgment). Pass them to
   `matchbox.assemble --selection` (per `schemas/selection.v1.json`); the
   core validates every id is a real verified bullet and voice-gates the
   summary. You emit ids only, never bullet text. Omit `--selection` to let
@@ -56,7 +56,7 @@ no-fabrication rule applies to job data exactly as it does to CV content.
 * Do NOT assemble or render PDFs yourself. Always call
   `matchbox.assemble`.
 * If the JD needs something the library lacks, leave it as an uncovered
-  requirement — never fill a gap with fiction.
+  requirement. Never fill a gap with fiction.
 * Polishing is rewording only, bounded by `shared/voice-rules.json`.
 
 ## Onboarding mode
@@ -79,7 +79,7 @@ When the user runs `ingest` (typically: "ingest my files"):
    * **summaries** (optional): if you find positioning paragraphs at the
      top of a CV, capture each as a `summary_variant` with a short label.
    * **profile** (optional): full name, email, phone, location, links,
-     headline — only if you find them.
+     headline. Only include if you find them.
    * **tags**: for each component, suggest tags per the slim taxonomy
      (`role_family`, `tech`, `seniority`, `impact`). Tag with restraint.
 3. Write the payload to `runs/ingest-<timestamp>.json`, then run:
@@ -114,7 +114,7 @@ For each job in the queue:
    best evidence each must-have (ordered by impact), and write a tailored
    `summary` and `headline`. When verified projects evidence a must-have
    better than any bullet (open-source work often does), include their ids
-   as `selected_project_ids` — they render as a Projects section. Pick
+   as `selected_project_ids` (they render as a Projects section). Pick
    skills the same way: `selected_skill_ids` keeps the Skills section to
    role-relevant lines (omitted -> the core's JD-matched fallback; the
    full library is never dumped). Declare page intent with `target_pages`
@@ -143,7 +143,7 @@ For each job in the queue:
    `keyword_presence` where `present` is false, find the most-relevant
    selected bullet (the matcher already chose it; you see it in
    `changes.md` under Selected) and rephrase it so the new wording
-   carries the missing keyword — **but only when the new wording is a
+   carries the missing keyword, **but only when the new wording is a
    truthful description of the same fact**. Never invent.
 
    The voice-rules guard form, not facts: `shared/voice-rules.json`
@@ -165,17 +165,17 @@ For each job in the queue:
    with the rule that failed. The CLI exits 0 on success, 3 on schema
    failure, 5 if there is no prior assemble to polish.
 
-5. **Cold-read gate (the SOTA bar) — required before a CV is final.**
+5. **Cold-read gate (the SOTA bar): required before a CV is final.**
    Re-read `shared/cv-rubric.md`. Self-check the seven dimensions while
    drafting, then run the cold read: spawn a FRESH-context reader (small
    fast model) that gets only the JD text, the rendered CV text, and the
-   recruiter persona from the rubric — never the construction artifacts.
+   recruiter persona from the rubric. Never pass the construction artifacts.
    Ship at >= 6/7 passes with no fail on narrative arithmetic, evidence
    completeness, or the 6-second test. Below the bar: revise the
    selection/summary/polish and re-read, at most twice, then surface the
    disagreement to the user. Record the scores in the run notes. When a
    dimension fails because the library lacks evidence, draft the missing
-   bullet for the user to verify in Review — that is a library gap, not a
+   bullet for the user to verify in Review. That is a library gap, not a
    wording problem.
 
 6. **(M7+) Cover letter.** If `want_cover` is true, write the body to

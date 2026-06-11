@@ -6,12 +6,23 @@
 [![Type checked: mypy strict](https://img.shields.io/badge/type%20checked-mypy%20strict-2bbc8a.svg)](pyproject.toml)
 [![Code style: ruff](https://img.shields.io/badge/lint%20%2B%20format-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 
-> Local desktop app that turns your career history into a tagged library,
-> scans ATS boards for matching roles, and assembles tailored CVs with
-> Claude Code as the reasoning engine. Your data stays on your laptop.
-> Matchbox holds no LLM credentials.
+> Local desktop app that turns your career history into a verified fact
+> library, scans ATS boards for matching roles, and tailors a CV per job
+> with Claude Code as the reasoning engine. The AI can only select from
+> facts you confirmed: it cannot invent a word of your CV. Your data
+> stays on your laptop, and Matchbox holds no LLM credentials.
 
-## How it works (v0.3)
+![Today: the day's actions across your pipeline](docs/screenshots/today.png)
+
+<p align="center">
+  <img src="docs/screenshots/applications.png" width="49%" alt="Applications: pipeline tracker with apply and CV links per row">
+  <img src="docs/screenshots/browse.png" width="49%" alt="Browse roles: fit and eligibility reads on every card">
+</p>
+
+*(Screens above run in sample mode: `/?sample` renders the whole app
+with built-in demo data.)*
+
+## How it works
 
 Two halves joined by a file-based handoff:
 
@@ -19,16 +30,25 @@ Two halves joined by a file-based handoff:
   ATS pollers, deterministic scoring, HTML/weasyprint PDF rendering. Holds no
   LLM client (a BYOK localhost proxy can stream the user's own key, optionally).
 * **The brain** ([Claude Code](https://claude.com/claude-code)): parses
-  your old CVs, extracts JD requirements, polishes wording. Drives the
-  CLIs (`matchbox-ingest`, `matchbox-jobreqs`, `matchbox-assemble`)
-  through a versioned JSON contract in `runs/` and `schemas/`.
+  your old CVs, extracts JD requirements, selects which verified bullets go
+  on each CV and writes the tailored summary, polishes wording. Drives the
+  CLIs (`matchbox-ingest`, `matchbox-jobreqs`, `matchbox-assemble`) through
+  a versioned JSON contract in `runs/` and `schemas/`.
 
-Selection (which bullets land on a given CV) is deterministic math, not
-LLM judgement. The brain does only what is genuinely irreducible:
-parsing messy input, extracting JD requirements, optional wording
-polish.
+Selection (which verified bullets land on a CV, plus the tailored summary
+and headline) is the brain's judgement, but the deterministic core
+*validates* it: every id must be a real verified bullet and the summary
+clears the voice gate before anything renders, so selected text is never
+fabricated. With no model available, a deterministic matcher (BM25 +
+embeddings + MMR) picks instead (the offline fallback). The brain does the
+irreducible judgement: parsing messy input, extracting requirements,
+selecting and wording, optional polish.
 
 ## Prerequisites
+
+Supported on macOS and Linux. On Windows, use WSL: weasyprint needs a
+GTK runtime that is painful to set up natively, and everything works
+out of the box under WSL2.
 
 * Python 3.12+ (3.13 supported and tested)
 * weasyprint for PDF rendering. It is a declared dependency (pulled in by
@@ -40,9 +60,22 @@ polish.
 
 ## Install
 
+With [uv](https://docs.astral.sh/uv/) (recommended; the repo ships a
+`uv.lock`, so this is reproducible):
+
 ```bash
 git clone https://github.com/5h1vmani/matchbox.git
 cd matchbox
+uv sync
+```
+
+Then prefix commands with `uv run` (e.g. `uv run matchbox-web`). macOS
+note: if weasyprint cannot load Pango at runtime, `brew install pango`
+and use the system Python: `UV_PYTHON_PREFERENCE=only-system uv sync`.
+
+Or with plain pip:
+
+```bash
 pip install -e ".[dev]"
 ```
 
@@ -53,7 +86,7 @@ Build the frontend SPA the server serves (the server returns HTTP 503
 cd frontend && npm install && npm run build
 ```
 
-For UI development use `npm run dev` instead — Vite serves the SPA and
+For UI development use `npm run dev` instead. Vite serves the SPA and
 proxies `/api` to the FastAPI process on `:8765`.
 
 The first time `matchbox-assemble` runs it downloads a ~30 MB ONNX
@@ -65,8 +98,12 @@ embedding model (`BAAI/bge-small-en-v1.5`) via `fastembed`.
 matchbox-web                  # starts http://127.0.0.1:8765
 ```
 
-Open `http://127.0.0.1:8765`. The whole app is one React SPA; an empty
-profile lands you on the **Onboarding** screen:
+Open `http://127.0.0.1:8765`. Want to see the app working before you
+feed it your data? Open `http://127.0.0.1:8765/?sample`. Every screen
+renders with built-in sample data, nothing is written.
+
+The whole app is one React SPA; an empty profile lands you on the
+**Onboarding** screen:
 
 1. **Onboarding.** Drag in old CVs (PDF/DOCX), LinkedIn exports, plain
    text notes, anything that describes your work. Or paste freeform
@@ -96,10 +133,10 @@ profile lands you on the **Onboarding** screen:
    "Test the slug" before saving to verify the endpoint. Click
    "Scan all enabled" to fetch jobs. See
    [docs/supported-ats.md](docs/supported-ats.md) for live-verified
-   example slugs per vendor. Workable is deferred — their public
-   no-auth API was removed by the vendor.
+   example slugs per vendor. Workable is deferred (their public
+   no-auth API was removed by the vendor).
 
-6. **Triage.** The **Discover** surface in the SPA. The five-dimension
+6. **Triage.** The **Discover** surface in the SPA. The six-dimension
    rubric scores every new job; per role: Skip, Dismiss, Track, or send
    to a tailoring run. Eligibility and fit are shown honestly; ineligible
    roles are set aside, not hidden.
@@ -131,7 +168,7 @@ runs/<id>/              app writes work-queue.json              brain reads
                         brain writes status.json                app polls
 
 people/<slug>/matchbox.db    one SQLite DB per profile
-shared/rubric.json           deterministic 5-dimension scoring
+shared/rubric.json           deterministic six-dimension job scoring
 shared/voice-rules.json      polish-pass guardrails
 schemas/*.v1.json            JSON Schema contracts
 src/matchbox/
@@ -144,7 +181,8 @@ src/matchbox/
   templates/html/            cv.html (weasyprint); cover HTML is built inline in render_html.py
   web/                       FastAPI JSON API (the React SPA lives in frontend/;
                              the retired Jinja/HTMX UI is under archive/jinja/)
-  assemble.py                deterministic select + render orchestrator
+  assemble.py                select (brain's --selection, validated; else the
+                             matcher) + render orchestrator
   jobreqs.py                 brain's requirements writer
 ```
 
@@ -154,13 +192,31 @@ src/matchbox/
 matchbox-web                                          # web UI on 127.0.0.1:8765
 matchbox-ingest --file payload.json                   # brain writes the library
 matchbox-jobreqs save --job 42 --file reqs.json       # brain saves JD requirements
-matchbox-assemble --run <run-id> --job 42             # select + render CV
+matchbox-assemble --run <run-id> --job 42             # render CV (fallback matcher selects)
+matchbox-assemble --run <run-id> --job 42 \
+    --selection selection.json                        # brain's bullet ids + tailored summary
 matchbox-assemble --run <run-id> --job 42 --cover     # render cover letter
 matchbox-assemble --run <run-id> --job 42 \
     --polish polish.json                              # apply the polish pass
 ```
 
 CLAUDE.md at the repo root tells Claude Code how to drive these.
+
+## Privacy: what stays local
+
+Everything personal is gitignored, so a public fork or clone of this
+repo never carries user data:
+
+* `people/`: one directory per profile (the SQLite DB, rendered CVs).
+  Only the `people/demo/` placeholder is committed.
+* `inbox/`: files you drop in during onboarding.
+* `runs/`: work queues and rendered run artifacts.
+* `archive/`: local archived material.
+
+Your documents, the DB, and every rendered PDF stay on your machine.
+The committed examples under `docs/examples/` use a fictional persona.
+Matchbox holds no LLM credentials; Claude Code runs under your own
+account.
 
 ## Security
 
@@ -171,15 +227,15 @@ path-traversal guards.
 
 ## Documentation
 
-* [Testing guide](docs/testing-guide.md) — step-by-step runbook for
+* [Testing guide](docs/testing-guide.md): step-by-step runbook for
   testers (shortcut + real flow)
-* [Supported ATS](docs/supported-ats.md) — per-vendor live status with
+* [Supported ATS](docs/supported-ats.md): per-vendor live status with
   verified example slugs
-* [v0.3 design](docs/v0.3-design.md) — the design document this build
+* [v0.3 design](docs/v0.3-design.md): the design document this build
   follows
-* [Live-fire walkthrough](docs/examples/livefire-walkthrough.md) — the
+* [Live-fire walkthrough](docs/examples/livefire-walkthrough.md): the
   end-to-end verification record
-* [Decision records](docs/decisions/) — durable architectural choices
+* [Decision records](docs/decisions/): durable architectural choices
 * [Contributing](CONTRIBUTING.md)
 * [Security policy](SECURITY.md)
 * [Changelog](CHANGELOG.md)
@@ -192,4 +248,4 @@ section.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

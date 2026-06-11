@@ -6,10 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.4.0] - 2026-06-11
+
 ### Added
 
 * **v1.2 honest core (backend).** Discovery serializes real salary and reads coverage from the tailoring artifact; a deterministic `role_family` tagger un-deads salary role-scoping. `coverage.json` gains a three-state `band` (covered/partial/uncovered, partial keying off `facts_verified`) and an `evidence_bullet_id`.
-* **BYOK live layer (optional, additive to the manual handoff).** `GET /api/library/facts` (verified grounding), `POST /api/voice-check` (form only, prose-scoped tiers), `POST /api/ai/stream` (localhost SSE proxy to the user's Anthropic/OpenAI key — the app still holds no LLM client), `GET/POST/DELETE /api/ai/{config,key}`. The provider key lives in a `0600` file beside the profile DB, never in the browser.
+* **BYOK live layer (optional, additive to the manual handoff).** `GET /api/library/facts` (verified grounding), `POST /api/voice-check` (form only, prose-scoped tiers), `POST /api/ai/stream` (localhost SSE proxy to the user's Anthropic/OpenAI key; the app still holds no LLM client), `GET/POST/DELETE /api/ai/{config,key}`. The provider key lives in a `0600` file beside the profile DB, never in the browser.
 * **Answer library** (migration 008): reusable Q&A with the `facts_verified` gate and `used_count`, `/api/answers`, and ingest support.
 * **Interview loop** (migration 009): `interview_round` + `debrief`, `/api/applications/{id}/rounds` + `/api/rounds/{id}` + one-tap debrief; prep agent-tasks carry prior debriefs as assisted context.
 * **Momentum coach + rejection learning**: `/api/insights/momentum` (real weekly pace + rest/healthy/push threshold) and structured `close_reason` (migration 010) with a deterministic category rollup (`/api/insights/rejection-reasons`).
@@ -21,13 +25,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 * `SECURITY.md` with vulnerability-reporting policy and threat model.
 * `.github/` issue + pull-request templates, `CODEOWNERS`, Dependabot config.
 * Markdown lint, link check, and typo check in CI and pre-commit.
+* **Apply-ready tracker.** Every application row, board card, and the detail drawer link to the job posting and the tailored CV. New sandboxed route `GET /api/applications/{id}/cv`; when `cv_path` is unset the serializer falls back to the newest run output on disk.
+* **Tailor from the tracker.** Saved roles without a CV get a one-click "Tailor a CV" action (row and drawer) that queues a run and surfaces the handoff prompt; queued-but-undrafted roles show the copyable `process run` command instead.
+* **Skills selection in the brain contract.** `selected_skill_ids` in `selection.v1.json`: the brain picks role-relevant skills, and without it a JD-matched fallback caps the section. The full library is never dumped. changes.md reports `Skills: N of M rendered`.
+* **Deliberate page count.** `target_pages` (1 or 2) in the selection scales the bullet budget; changes.md reports `Pages: N (target M)`. The rubric gains a page-discipline rule: one page tight, or two pages full.
+* **Readable drafts.** The detail drawer shows follow-up and thank-you draft bodies with a Copy button; marking sent also updates the artifact status.
+* **Mobile and accessibility pass.** Top-bar nav under 760px, grid overflow fixes on Browse/Insights/Workspace, touch-visible actions, keyboard focus parity, WCAG AA contrast, aria-live toasts.
+* URL/history sync with per-screen titles, loading states on every store, and a favicon (the brand matchstick).
+* Apply packet: Open PDF and Download buttons, "Open posting" on the Submit tab, and a recoverable `process run` command with Copy.
+
+### Changed
+
+* The CV header renders the tailored headline as its own bold line under the name.
+* Metric emphasis bolds signal only: currency, percentages, multipliers, magnitudes, and counts. Years and version numbers are no longer bold.
+* Profile links on the CV are scheme-safe (no doubled `https://`), and extra links render instead of being dropped.
+* Honest copy: "Mark sent" instead of "Send"; deleting an experience and "Verify everything" now ask for confirmation.
+* Toast Undo reverts the decision on the server, not just in the UI.
+
+### Removed
+
+* The Apply screen's palette/font restyle controls (the renderer ignored them by design).
+
+### Fixed
+
+* The Browse roles grid no longer overflows the viewport with no scrollbar.
 
 ## [0.3.0] - 2026-04-26
 
 ### Added
 
 * New web dashboard: FastAPI + HTMX + Jinja + Tailwind, replacing the v0.2 Streamlit UI.
-* Four redesigned UI surfaces — Inbox, Insights, Profile, Settings.
+* Four redesigned UI surfaces: Inbox, Insights, Profile, Settings.
 * Cmd+K command palette with keyboard navigation.
 * Live re-score preview on the Profile page (sliders for the six scoring weights, top-10 delta table, biggest climber/faller, tier-band-change count).
 * Bulk tailor with cumulative cost preview, server-enforced confirmation above threshold, cap at 5 jobs.

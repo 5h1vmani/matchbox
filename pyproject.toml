@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "matchbox"
-version = "0.3.0"
+version = "0.4.0"
 description = "Local desktop app: scan ATS boards, score by fit, assemble tailored CVs from a tagged library. Claude Code is the reasoning engine; the app holds no LLM client."
 readme = "README.md"
 license = { text = "MIT" }

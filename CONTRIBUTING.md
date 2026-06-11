@@ -1,6 +1,6 @@
 # Contributing to Matchbox
 
-Thanks for considering a contribution. Matchbox is a personal-tools project that we share publicly because the patterns might be useful to others — every PR is read carefully and we'd rather close one quickly than leave it lingering.
+Thanks for considering a contribution. Matchbox is a personal-tools project that we share publicly because the patterns might be useful to others. Every PR is read carefully and we'd rather close one quickly than leave it lingering.
 
 For a quick overview of how the project is laid out, see the **Architecture** section of the [README](README.md#architecture-one-screen), or the deeper [docs/v1-engineering-spec.md](docs/v1-engineering-spec.md).
 
@@ -23,7 +23,7 @@ All four must pass. Pre-commit and CI enforce the same set, so if pre-commit is 
 
 ## Setup
 
-You need Python 3.12 or 3.13 — CI runs both in a matrix, so target either. The
+You need Python 3.12 or 3.13. CI runs both in a matrix, so target either. The
 dev install pulls in:
 
 * `pytest` + `pytest-asyncio` for tests
@@ -31,7 +31,7 @@ dev install pulls in:
 * `ruff` (lint + format)
 * `httpx` (used by FastAPI's `TestClient`)
 * `weasyprint` (>=60) for HTML-to-PDF rendering. It needs Pango and Cairo
-  system libraries at runtime — on macOS `brew install pango` covers it; on
+  system libraries at runtime. On macOS `brew install pango` covers it; on
   Debian/Ubuntu install `libpango-1.0-0 libpangoft2-1.0-0 libgdk-pixbuf-2.0-0
   libcairo2` (see the apt step in `.github/workflows/ci.yml`).
 
@@ -40,7 +40,7 @@ Optional but recommended:
 * [uv](https://github.com/astral-sh/uv) for fast resolves: `uv sync --dev`
 
 The core CLIs (`matchbox`, `matchbox-web`, `matchbox-ingest`,
-`matchbox-assemble`, `matchbox-jobreqs`) need no API key — there is no
+`matchbox-assemble`, `matchbox-jobreqs`) need no API key. There is no
 in-process LLM client. The AI reasoning is a manual handoff: the app queues
 typed intents and surfaces a "process run `<id>`" prompt you paste into Claude
 Code, which drains the queue and runs `matchbox-assemble`.
@@ -53,7 +53,7 @@ matchbox-web                                   # serve on 127.0.0.1:8765
 ```
 
 `matchbox web` is the same server (it accepts only `--host`/`--port`). For
-frontend iteration use `npm run dev` from `frontend/` — Vite proxies `/api`
+frontend iteration use `npm run dev` from `frontend/`. Vite proxies `/api`
 to the running server. The server returns HTTP 503 ("SPA not built") if the
 build output is missing.
 
@@ -93,7 +93,7 @@ chore(deps): pin ruff and bump the toolchain to latest
 ci: declare weasyprint dependency + install its system libs
 ```
 
-Multi-line commit messages are encouraged for non-trivial changes — explain the *why*, not just the *what*.
+Multi-line commit messages are encouraged for non-trivial changes. Explain the *why*, not just the *what*.
 
 ## SSOT rules
 
@@ -102,7 +102,7 @@ These are non-negotiable; PRs that violate them will be asked to refactor.
 * One SQLite database per profile (`people/<slug>/matchbox.db`) is the single
   source of truth for candidate facts. The active profile is chosen by
   `MATCHBOX_PROFILE` (or an explicit `MATCHBOX_DB` path).
-* `core/db.py` owns the connection layer — `db_path()`, `connect()`, and the
+* `core/db.py` owns the connection layer: `db_path()`, `connect()`, and the
   `transaction()` context manager. Code that touches the DB connects through
   those helpers rather than opening its own path.
 * The web layer is a JSON API: routes under `web/routes/*_api.py` return JSON,
@@ -164,17 +164,17 @@ only `people/demo/` is committed.
 
 ## Testing conventions
 
-* `tests/test_data_layer.py` — the core models + DB layer.
-* `tests/test_migrations.py` — schema migrations.
-* `tests/test_scoring.py` — the scoring rubric and `score_job()` (deterministic).
-* `tests/test_discovery.py` / `tests/test_aggregators.py` — pollers and aggregators.
+* `tests/test_data_layer.py`: the core models + DB layer.
+* `tests/test_migrations.py`: schema migrations.
+* `tests/test_scoring.py`: the scoring rubric and `score_job()` (deterministic).
+* `tests/test_discovery.py` / `tests/test_aggregators.py`: pollers and aggregators.
 * Web routes are covered by the `*_web.py` suites (for example
   `tests/test_ai_web.py`, `tests/test_review_run_web.py`,
   `tests/test_library_crud_web.py`) using FastAPI's `TestClient`.
 * New tests go in `tests/test_<module>.py`.
 * For anything that touches the database, use the `tmp_db` fixture in
   `tests/conftest.py`: it builds a migrated, isolated SQLite DB at
-  `tmp_path/matchbox.db` (`connect(...)` then `migrate(...)`) — one fresh DB per
+  `tmp_path/matchbox.db` (`connect(...)` then `migrate(...)`) -- one fresh DB per
   test, no shared on-disk state.
 
 ## Documentation
@@ -186,7 +186,7 @@ For architectural decisions, add an ADR to `docs/decisions/`. See the existing o
 ## Pull request flow
 
 1. Fork the repo or create a feature branch (`feat/...`, `fix/...`, `docs/...`).
-2. Make your changes — small, focused PRs are easier to review.
+2. Make your changes. Small, focused PRs are easier to review.
 3. Make sure pre-commit passes (`pre-commit run --all-files`).
 4. Push and open a PR using the template.
 5. We'll review within a few days. Feedback is direct; don't read brusqueness as hostility.
@@ -197,7 +197,7 @@ For architectural decisions, add an ADR to `docs/decisions/`. See the existing o
 * Changes that add dependencies without a clear payoff. The live UI is a
   React + Vite + TypeScript SPA under `frontend/` with its own Node build; new
   frontend dependencies still need to earn their place. (The earlier project
-  history ran an HTMX + Tailwind-via-CDN, no-Node UI — see `docs/decisions/`;
+  history ran an HTMX + Tailwind-via-CDN, no-Node UI (see `docs/decisions/`);
   it now lives, retired, under `archive/jinja/`.)
 * New backend web frameworks (Django, Flask). The FastAPI JSON-API choice is
   documented in `docs/decisions/`.

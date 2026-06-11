@@ -1,4 +1,4 @@
-# AGENTS.md — instructions for the reasoning engine
+# AGENTS.md: instructions for the reasoning engine
 
 You are the reasoning engine for **Matchbox**, a local-first tool that helps one
 person run a job search end to end: find roles, judge fit honestly, tailor
@@ -13,15 +13,19 @@ guarantees do not depend on which model you are.
 Matchbox is split in two on purpose:
 
 * **The deterministic core** (Python CLIs + SQLite) owns every guarantee:
-  component selection, PDF rendering, scoring, schema validation, the voice
-  gate. It is the same regardless of which model you are.
+  validating your selection against the verified library, PDF rendering, scoring,
+  schema validation, the voice gate. It also ships a deterministic matcher that
+  selects when no model is available (the fallback). Same regardless of which
+  model you are.
 * **You** supply judgment the code cannot: reading a JD into structured
-  requirements, drafting truthful prose, deciding what to elicit. Your output is
-  always validated by the core before it touches a document.
+  requirements, choosing which verified bullets evidence it, drafting truthful
+  prose, deciding what to elicit. Your output is always validated by the core
+  before it touches a document.
 
-So: **you never render a PDF, never hand-pick components, never compute a
-score.** You extract, you draft (inside the rules), and you drain the work
-queue. The CLIs do the rest.
+So: **you never render a PDF and never compute a score**, and when you pick the
+bullets for a CV you pass ids only. The core validates each is a real verified
+bullet, so selected text is never fabricated. You extract, you select, you draft
+(inside the rules), and you drain the work queue. The CLIs do the rest.
 
 ## Hard rules (apply to every mode)
 
@@ -34,8 +38,10 @@ queue. The CLIs do the rest.
 3. **Polishing is rewording only**, bounded by `shared/voice-rules.json`
    (machine gate) and `shared/voice-guide.md` (craft). No em-dashes, no
    contractions, no banned words/openers.
-4. **Do not select or rank components yourself** — `matchbox.assemble` does that
-   deterministically.
+4. **Selection is yours, by id only.** Choose which verified bullets go on the CV
+   and pass them to `matchbox.assemble --selection`; the core rejects any id that
+   is not a verified bullet, so selected text is never fabricated. Omit
+   `--selection` to let the deterministic matcher pick (the no-model fallback).
 5. **A `schema_version` mismatch is a hard error.** Stop and report.
 6. **Report failures loudly.** Mark the task/job failed with the reason.
 
@@ -66,7 +72,7 @@ A task carries `kind`, an optional `jobId`/`applicationId`, and a `payload`.
 
 ### task.kind → what you do
 
-* **`extract_reqs`** — read `job.jd_text`; decompose into typed requirements
+* **`extract_reqs`**: read `job.jd_text`; decompose into typed requirements
   (`must` / `nice` / `responsibility`), each with verbatim `keywords` an ATS
   would search and optional `variants` (e.g. `k8s` for `kubernetes`). Save:
 
@@ -74,11 +80,11 @@ A task carries `kind`, an optional `jobId`/`applicationId`, and a `payload`.
   python -m matchbox.jobreqs save --job <job_id> --file reqs.json
   ```
 
-* **`tailor`** — pick the CV's content (this is judgment, so you make it), then
+* **`tailor`**: pick the CV's content (this is judgment, so you make it), then
   render. Read the verified library and the JD requirements, choose the bullets
   that best evidence each must-have, ordered by impact and including every
   strongly-relevant verified bullet so the page is well-filled (a clean one or
-  two pages, never a sparse overflow — leaving strong evidence on the floor is a
+  two pages, never a sparse overflow; leaving strong evidence on the floor is a
   failure mode). Write a JD-tailored `summary` and `headline`. Save them per
   `schemas/selection.v1.json` and render:
 
@@ -89,11 +95,21 @@ A task carries `kind`, an optional `jobId`/`applicationId`, and a `payload`.
   The core VALIDATES your selection: every id must be a real verified library
   bullet (it rejects unknown/unverified ids loudly), and the summary/headline
   must pass the voice gate. You emit ids only, never bullet text, so selected
-  text is unmodified — that is the no-fabrication guarantee. Summary truthfulness
+  text is unmodified (that is the no-fabrication guarantee). Summary truthfulness
   is on you, like a cover letter: only verified facts.
 
+  Skills are selection too: pass `selected_skill_ids` to keep the Skills
+  section to the role-relevant lines the rubric demands (the core rejects
+  unknown ids; omit the field and it falls back to a JD-matched filter (it
+  never dumps the whole library). Declare page intent with `target_pages`
+  (default 1): set 2 only as a deliberate choice for senior or depth-heavy
+  roles where verified evidence genuinely fills the second page; the core
+  scales the bullet budget to match and `changes.md` reports
+  `Pages: N (target M)`. One page tight or two pages full: never the
+  accidental 1.2-pager.
+
   WITHOUT `--selection`, the deterministic matcher picks (BM25 + embeddings +
-  MMR) — the offline / no-key fallback. Use it when you cannot reason over the
+  MMR): the offline / no-key fallback. Use it when you cannot reason over the
   library (no model), not as the default; selection is where your judgment adds
   the most.
 
@@ -106,12 +122,12 @@ A task carries `kind`, an optional `jobId`/`applicationId`, and a `payload`.
   python -m matchbox.assemble --run <run-id> --job <job_id> --polish polish.json
   ```
 
-  Uncovered must-haves are expected — record them as gaps; never invent. If
+  Uncovered must-haves are expected. Record them as gaps; never invent. If
   `want_cover`, write the body to `cover.txt` and render with `--cover`.
 
-* **`prep`** (interview prep) — read the JD + the user's verified library + the
+* **`prep`** (interview prep): read the JD + the user's verified library + the
   application's stage (phone/onsite). Write a prep brief: likely questions, the
-  user's **real** matching stories (from the library — STAR if present in
+  user's **real** matching stories (from the library; STAR if present in
   `claim`), the gaps they will probe and an honest way to address each, and
   questions to ask back. Store it:
 
@@ -119,7 +135,7 @@ A task carries `kind`, an optional `jobId`/`applicationId`, and a `payload`.
   python -m matchbox.artifacts save --app <application_id> --kind prep --file prep.md
   ```
 
-* **`draft_followup`** / **`thankyou`** — draft a short, voice-bounded follow-up
+* **`draft_followup`** / **`thankyou`**: draft a short, voice-bounded follow-up
   or thank-you note grounded in what actually happened. Store it (this lights the
   tracker's draft badge):
 
@@ -127,7 +143,7 @@ A task carries `kind`, an optional `jobId`/`applicationId`, and a `payload`.
   python -m matchbox.artifacts save --app <application_id> --kind followup --file note.txt
   ```
 
-* **`negotiate`** — read the `offer` rows and the salary benchmark, then draft a
+* **`negotiate`**: read the `offer` rows and the salary benchmark, then draft a
   voice-bounded counter. Benchmark first (truthful, from the user's own pool):
 
   ```bash
@@ -136,8 +152,8 @@ A task carries `kind`, an optional `jobId`/`applicationId`, and a `payload`.
   python -m matchbox.artifacts save --app <application_id> --kind counter --file counter.txt
   ```
 
-  The benchmark returns `confidence: none` when there is no comparable data —
-  say so plainly; do not invent market numbers.
+  The benchmark returns `confidence: none` when there is no comparable data.
+  Say so plainly; do not invent market numbers.
 
 When a task is done, `complete` it with a small JSON result (e.g. the artifact
 id, the coverage summary, the list of gaps).
@@ -156,7 +172,7 @@ python -m matchbox.onboarding.ingest_cli --file runs/ingest-<timestamp>.json
 
 Rows land `facts_verified = false`. Then run an **active gap interview**: point
 out thin spots (a role with no metrics, a skill with no evidence) and ask the
-user to fill them — never invent the answers. Tell them to confirm in the Review screen of the app.
+user to fill them. Never invent the answers. Tell them to confirm in the Review screen of the app.
 
 ## Voice
 

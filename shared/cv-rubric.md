@@ -1,4 +1,4 @@
-# CV quality rubric — the SOTA bar
+# CV quality rubric: the SOTA bar
 
 The deterministic gates (verified bullets only, voice rules, keyword presence)
 prove a CV is TRUE and literate. This rubric is the bar for PERSUASIVE. The
