@@ -74,6 +74,7 @@ matchbox-jobreqs = "matchbox.jobreqs:main"
 matchbox-jobfacts = "matchbox.jobfacts:main"
 matchbox-assemble = "matchbox.assemble:main"
 matchbox-ingest = "matchbox.onboarding.ingest_cli:main"
+matchbox-doctor = "matchbox.doctor:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/matchbox"]

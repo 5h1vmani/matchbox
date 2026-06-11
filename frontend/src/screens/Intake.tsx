@@ -6,6 +6,7 @@
    files; the ingest itself is the `ingest my files` command you paste into
    Claude Code. */
 import { useEffect, useState } from "react";
+import * as tapi from "../api/client";
 import * as api from "../api/onboarding";
 import { cx } from "../lib/derive";
 import { Icon } from "../ui/icon";
@@ -25,10 +26,24 @@ export function Intake({ flash }: { flash: (msg: string) => void }) {
   const [dragging, setDragging] = useState(false);
   const [notes, setNotes] = useState("");
   const [copied, setCopied] = useState(false);
+  const [slug, setSlug] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
 
   useEffect(() => {
     void api.getOnboarding().then((o) => setStaged(o.staged));
+    void tapi.getProfile().then((p) => setSlug(p.slug));
   }, []);
+
+  const createProfile = async () => {
+    const trimmed = newName.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    const made = await tapi.createUser(trimmed);
+    setBusy(false);
+    if (made) window.location.reload();
+    else flash("Could not create that profile. Try a different name.");
+  };
 
   const upload = async (files: File[]) => {
     if (files.length === 0 || busy) return;
@@ -110,6 +125,40 @@ export function Intake({ flash }: { flash: (msg: string) => void }) {
           </p>
         </div>
       </div>
+
+      {slug === "demo" && (
+        <section
+          className="card"
+          style={{ padding: "12px 20px", marginBottom: 18, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+        >
+          <Icon name="info" size={15} style={{ color: "var(--muted-foreground)", flex: "0 0 auto" }} />
+          <span className="sub" style={{ flex: 1, minWidth: 220, margin: 0 }}>
+            You are viewing the sample profile — create your own to begin
+          </span>
+          {creating ? (
+            <form
+              onSubmit={(e) => { e.preventDefault(); void createProfile(); }}
+              style={{ display: "flex", gap: 8, alignItems: "center" }}
+            >
+              <input
+                className="inp"
+                autoFocus
+                value={newName}
+                placeholder="Your name"
+                aria-label="Your name"
+                onChange={(e) => setNewName(e.target.value)}
+              />
+              <button className="btn tiny" type="submit" disabled={busy || !newName.trim()}>
+                Create
+              </button>
+            </form>
+          ) : (
+            <button className="btn tiny" onClick={() => setCreating(true)}>
+              <Icon name="user-plus" size={13} /> Create my profile
+            </button>
+          )}
+        </section>
+      )}
 
       <section className="card" style={{ padding: "16px 20px", marginBottom: 18 }}>
         <div className="sec-h" style={{ marginBottom: 14 }}>

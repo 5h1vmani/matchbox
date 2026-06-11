@@ -87,3 +87,14 @@ export async function switchUser(slug: string): Promise<void> {
     /* ignore; caller reloads */
   }
 }
+
+/** Create a fresh profile; the server slugs the name, creates the DB, and sets
+    the active-profile cookie. Null on rejection (bad name, duplicate). */
+export async function createUser(name: string): Promise<{ slug: string } | null> {
+  try {
+    const r = await fetch("/api/users", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name }) });
+    return r.ok ? ((await r.json()) as { slug: string }) : null;
+  } catch {
+    return null;
+  }
+}

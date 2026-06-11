@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from matchbox.core.logging import configure_logging
@@ -36,6 +36,26 @@ from matchbox.web.routes import (
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Shown instead of a raw 503 when the SPA bundle has not been built yet.
+_SPA_MISSING_PAGE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Matchbox — one more step</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 34rem; margin: 14vh auto;
+         padding: 0 1.5rem; color: #27272a; line-height: 1.6; }
+  h1 { font-size: 1.3rem; color: #09090b; }
+  pre { background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 6px;
+        padding: 0.8rem 1rem; overflow-x: auto; }
+  p.small { color: #52525b; font-size: 0.9rem; }
+</style></head><body>
+<h1>Almost there — the web UI just needs one build</h1>
+<p>The server is running fine; the browser bundle has not been built yet.
+Run this once from the repo root, then refresh this page:</p>
+<pre>cd frontend &amp;&amp; npm install &amp;&amp; npm run build</pre>
+<p class="small">No npm? Install Node.js from nodejs.org first, or run
+<code>./scripts/setup.sh</code> which does all of this for you.
+The JSON API and the CLIs already work without this step.</p>
+</body></html>"""
 
 
 def create_app() -> FastAPI:
@@ -72,23 +92,24 @@ def create_app() -> FastAPI:
 
     spa_index = STATIC_DIR / "app" / "index.html"
 
-    def _spa() -> FileResponse:
-        """Serve the built single-page app (the shell switches on the URL path)."""
+    def _spa() -> Response:
+        """Serve the built single-page app (the shell switches on the URL path).
+
+        When the bundle is missing, answer with a human-readable page instead of
+        raw JSON: a newcomer following the quickstart reads "503" as broken, not
+        as "run one more command"."""
         if not spa_index.exists():
-            raise HTTPException(
-                status_code=503,
-                detail="SPA not built (run: cd frontend && npm run build)",
-            )
+            return HTMLResponse(status_code=503, content=_SPA_MISSING_PAGE)
         return FileResponse(str(spa_index))
 
     @app.get("/tracker", include_in_schema=False)
-    def tracker() -> FileResponse:
+    def tracker() -> Response:
         """Serve the React applications-tracker SPA (built from frontend/)."""
         return _spa()
 
     @app.get("/discover", include_in_schema=False)
     @app.get("/discover/{rest:path}", include_in_schema=False)
-    def discover(rest: str = "") -> FileResponse:
+    def discover(rest: str = "") -> Response:
         """Serve the React Discovery SPA (same bundle; main.tsx renders the
         Discovery shell for /discover paths)."""
         return _spa()

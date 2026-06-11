@@ -7,6 +7,7 @@ updated application. Plus user listing/switching for the live profile switch.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response
@@ -14,6 +15,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from matchbox.core.db import PROJECT_ROOT, connect, db_path, list_profiles
+from matchbox.core.migrations import migrate
 from matchbox.tracker import repo, service
 from matchbox.web.deps import ACTIVE_PROFILE_COOKIE, ConnDep, ProfileDep
 
@@ -44,6 +46,10 @@ class NoteBody(BaseModel):
 
 class SwitchBody(BaseModel):
     slug: str
+
+
+class CreateUserBody(BaseModel):
+    name: str
 
 
 def _require(app: dict[str, Any] | None) -> dict[str, Any]:
@@ -107,6 +113,34 @@ def users(profile: ProfileDep) -> list[dict[str, Any]]:
             conn.close()
         out.append({"slug": slug, "name": name, "active": slug == profile})
     return out
+
+
+@router.post("/users")
+def create_user(body: CreateUserBody, response: Response) -> dict[str, str]:
+    """Create a fresh profile DB at people/<slug>/ and make it active."""
+    name = body.name.strip()
+    if name.startswith("_"):
+        raise HTTPException(status_code=400, detail="profile names may not start with '_'")
+    slug = re.sub(r"[^a-z0-9-]", "", name.lower().replace(" ", "-")).strip("-")
+    if not slug:
+        raise HTTPException(status_code=400, detail="that name does not make a usable profile")
+    if slug == "demo":
+        raise HTTPException(status_code=400, detail="'demo' is the reserved sample profile")
+    if slug in set(list_profiles()):
+        raise HTTPException(status_code=409, detail=f"profile '{slug}' already exists")
+    conn = connect(db_path(slug))  # connect() mkdirs people/<slug>/
+    try:
+        migrate(conn)
+    finally:
+        conn.close()
+    response.set_cookie(
+        ACTIVE_PROFILE_COOKIE,
+        slug,
+        httponly=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 365,
+    )
+    return {"slug": slug}
 
 
 @router.post("/users/switch")

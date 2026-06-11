@@ -51,12 +51,19 @@ GTK runtime that is painful to set up natively, and everything works
 out of the box under WSL2.
 
 * Python 3.12+ (3.13 supported and tested)
+* Node.js + npm, to build the web UI once (`cd frontend && npm run build`)
 * weasyprint for PDF rendering. It is a declared dependency (pulled in by
   `pip install -e ".[dev]"`) but needs system Pango/Cairo at runtime:
   `brew install pango` (macOS) or the libpango/libcairo packages on
   Debian/Ubuntu (see the apt step in `.github/workflows/ci.yml`).
 * [Claude Code](https://claude.com/claude-code) installed and runnable
-  from your terminal. The app never talks to an LLM API directly.
+  from your terminal. Note: Claude Code requires a paid Anthropic plan or
+  API credits; it is the reasoning engine for parsing and tailoring. The
+  app itself never talks to an LLM API directly and holds no credentials.
+
+One-command setup (installs deps, builds the UI, then diagnoses your
+environment): `./scripts/setup.sh`. To check an existing install at any
+time: `matchbox-doctor`.
 
 ## Install
 
@@ -92,7 +99,7 @@ proxies `/api` to the FastAPI process on `:8765`.
 The first time `matchbox-assemble` runs it downloads a ~30 MB ONNX
 embedding model (`BAAI/bge-small-en-v1.5`) via `fastembed`.
 
-## Quickstart (real flow, ~10 minutes)
+## Quickstart (sample mode: 2 minutes; first real run: 15-25 minutes)
 
 ```bash
 matchbox-web                  # starts http://127.0.0.1:8765

@@ -10,6 +10,7 @@ import { cx } from "./lib/derive";
 import { Icon } from "./ui/icon";
 import * as tapi from "./api/client";
 import type { ProfileInfo, UserInfo } from "./api/client";
+import { getOnboarding } from "./api/onboarding";
 import * as dapi from "./discovery/api/client";
 import { useApps } from "./store/useApps";
 import { useAppsMemory } from "./store/useAppsMemory";
@@ -118,21 +119,61 @@ function initialNav(): string {
 
 function UserSwitcher({ profile, users }: { profile: ProfileInfo; users: UserInfo[] }) {
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [createFailed, setCreateFailed] = useState(false);
   const pick = (slug: string) => {
     setOpen(false);
     if (slug === profile.slug) return;
     void tapi.switchUser(slug).then(() => window.location.reload());
   };
+  const create = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const made = await tapi.createUser(trimmed);
+    if (made) window.location.reload();
+    else setCreateFailed(true);
+  };
   return (
     <div className="side__foot" style={{ position: "relative" }}>
-      {open && users.length > 0 && (
+      {open && (
         <div className="menu up" style={{ position: "absolute", bottom: "100%", left: 8, right: 8, marginBottom: 8 }}>
-          <div className="menu__sec">Switch profile</div>
-          {users.map((u) => (
-            <button key={u.slug} className="mitem" onClick={() => pick(u.slug)}>
-              <Icon name={u.active ? "check" : "user"} size={15} /> {u.name}
+          {users.length > 0 && (
+            <>
+              <div className="menu__sec">Switch profile</div>
+              {users.map((u) => (
+                <button key={u.slug} className="mitem" onClick={() => pick(u.slug)}>
+                  <Icon name={u.active ? "check" : "user"} size={15} /> {u.slug === "demo" ? `${u.name} (sample data)` : u.name}
+                </button>
+              ))}
+            </>
+          )}
+          {creating ? (
+            <form
+              onSubmit={(e) => { e.preventDefault(); void create(); }}
+              style={{ display: "flex", gap: 6, padding: "6px 8px" }}
+            >
+              <input
+                className="inp"
+                autoFocus
+                value={name}
+                placeholder="Your name"
+                aria-label="Your name"
+                onChange={(e) => { setName(e.target.value); setCreateFailed(false); }}
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              <button className="btn tiny" type="submit" disabled={!name.trim()}>Create</button>
+            </form>
+          ) : (
+            <button className="mitem" onClick={() => setCreating(true)}>
+              <Icon name="user-plus" size={15} /> Create my profile
             </button>
-          ))}
+          )}
+          {createFailed && (
+            <div className="sub" style={{ padding: "0 8px 6px", color: "var(--danger)" }}>
+              Could not create that profile. Try a different name.
+            </div>
+          )}
         </div>
       )}
       <button
@@ -222,6 +263,20 @@ export function Shell() {
   }, []);
 
   const [nav, setNav] = useState(initialNav);
+
+  // First run: an empty profile lands on Onboarding instead of an empty Today.
+  // Only the root default is redirected; an explicit deep link (any path in
+  // PATH_NAV, e.g. /discover) is never hijacked, and ?sample keeps its demo.
+  useEffect(() => {
+    const seg = window.location.pathname.split("/")[1] || "";
+    if (PATH_NAV[seg] !== undefined || USE_SAMPLE) return;
+    let alive = true;
+    void getOnboarding().then((o) => {
+      if (alive && !o.hasProfile) setNav((cur) => (cur === "today" ? "onboarding" : cur));
+    });
+    return () => { alive = false; };
+  }, []);
+
   const [view, setView] = useState("list");
   const [filter, setFilter] = useState("all");
   const [detail, setDetail] = useState<{ id: string; note: boolean } | null>(null);
