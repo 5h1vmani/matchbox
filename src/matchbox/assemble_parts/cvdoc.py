@@ -37,15 +37,19 @@ def _is_degree_role(role: str | None) -> bool:
 
 
 def _exp_date_key(date_str: str | None) -> tuple[int, int]:
-    """Sortable (year, month) from a free-text experience date.
+    """Sortable (year, month) from an experience date in either format the DB
+    holds: free-text ("Aug 2025", bare "2014") or ISO ("2024-08-01", "2024-08").
 
     "present"/"" -> (9999, 13) so an ongoing role sorts newest. "Aug 2025" ->
-    (2025, 8); a bare "2014" -> (2014, 0). Unparsable text sinks to (0, 0) rather
-    than corrupting the order. Tolerant of month name + year in either position.
+    (2025, 8); "2024-08-01" -> (2024, 8); a bare "2014" -> (2014, 0). Unparsable
+    text sinks to (0, 0) rather than corrupting the order.
     """
     s = (date_str or "").strip().lower()
     if not s or s == "present":
         return (9999, 13)
+    iso = re.match(r"(\d{4})-(\d{2})", s)
+    if iso:
+        return (int(iso.group(1)), int(iso.group(2)))
     month = 0
     year = 0
     for tok in s.replace(",", " ").split():

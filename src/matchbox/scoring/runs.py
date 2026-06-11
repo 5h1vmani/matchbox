@@ -64,7 +64,9 @@ def _resolve_profile_db(conn: sqlite3.Connection) -> str:
         slug = os.environ.get("MATCHBOX_PROFILE", "demo")
         p = PROJECT_ROOT / "people" / slug / "matchbox.db"
     try:
-        return str(p.relative_to(PROJECT_ROOT))
+        # as_posix so the path in work-queue.json uses forward slashes on every
+        # OS (str() would emit backslashes on Windows and break the contract).
+        return p.relative_to(PROJECT_ROOT).as_posix()
     except ValueError:
         return str(p)
 

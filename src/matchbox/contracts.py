@@ -26,6 +26,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from matchbox.core.db import PROJECT_ROOT
+from matchbox.core.models import Facet, Proficiency
 
 SCHEMAS_DIR = PROJECT_ROOT / "schemas"
 _SCHEMA_ID_BASE = "https://matchbox.local/schemas/"
@@ -38,10 +39,11 @@ NonEmptyStr = Annotated[str, Field(min_length=1)]
 # YYYY-MM-DD-NNN run ids, monotonic within a day.
 _RUN_ID_PATTERN = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{3}$"
 
+# Facet and Proficiency are the domain vocab; they live in core.models (the DB
+# layer that owns tags and skills) and are imported above so the contract and the
+# library can never define them differently.
 Palette = Literal["slate", "ink", "forest", "claret", "bronze"]
 Font = Literal["source-serif", "source-sans", "inter", "atkinson-hyperlegible"]
-Proficiency = Literal["working", "fluent", "expert"]
-Facet = Literal["role_family", "tech", "seniority", "impact"]
 RequirementType = Literal["must-have", "responsibility", "nice"]
 JobStatus = Literal["pending", "running", "done", "skipped", "error"]
 RunStatus = Literal["queued", "running", "done", "error"]
