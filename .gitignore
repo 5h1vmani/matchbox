@@ -17,6 +17,10 @@ people/*/matchbox.db-*
 runs/*
 !runs/.gitkeep
 
+# Working notes — local plans and audit reports, never committed.
+plans/
+audit/
+
 # Onboarding staging — user files, never committed.
 inbox/*
 !inbox/.gitkeep
