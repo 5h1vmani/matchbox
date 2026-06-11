@@ -78,6 +78,11 @@ matchbox-doctor = "matchbox.doctor:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/matchbox"]
+# Ship the built SPA inside release wheels even though it is gitignored
+# (hatchling's `artifacts` exists for exactly this), so an installed package
+# serves the UI without the user running npm at all. Build the frontend
+# (cd frontend && npm run build) before cutting a release.
+artifacts = ["src/matchbox/web/static/app"]
 
 [tool.ruff]
 src = ["src"]

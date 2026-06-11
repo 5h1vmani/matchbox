@@ -27,13 +27,19 @@ with built-in demo data.)*
 Two halves joined by a file-based handoff:
 
 * **The app** (this repo): SQLite, a FastAPI JSON API + React single-page UI,
-  ATS pollers, deterministic scoring, HTML/weasyprint PDF rendering. Holds no
-  LLM client (a BYOK localhost proxy can stream the user's own key, optionally).
-* **The brain** ([Claude Code](https://claude.com/claude-code)): parses
-  your old CVs, extracts JD requirements, selects which verified bullets go
-  on each CV and writes the tailored summary, polishes wording. Drives the
-  CLIs (`matchbox-ingest`, `matchbox-jobreqs`, `matchbox-assemble`) through
-  a versioned JSON contract in `runs/` and `schemas/`.
+  ATS pollers, deterministic scoring, HTML/weasyprint PDF rendering. Ships no
+  LLM credentials of its own.
+* **The brain**: parses your old CVs, extracts JD requirements, selects which
+  verified bullets go on each CV and writes the tailored summary, polishes
+  wording. Two ways to run it, same contracts and the same validation gates:
+  * **In-app with your own key** (simplest): add an Anthropic or OpenAI key in
+    Settings and use "Parse my files in-app" / "Run in app" — the localhost
+    server calls the API with your key and streams progress. The key lives in
+    a local 0600 file, never in the browser, never shipped.
+  * **[Claude Code](https://claude.com/claude-code)** (no key in the app):
+    paste the prompts the UI shows you; Claude Code drives the CLIs
+    (`matchbox-ingest`, `matchbox-jobreqs`, `matchbox-assemble`) through the
+    versioned JSON contract in `runs/` and `schemas/`.
 
 Selection (which verified bullets land on a CV, plus the tailored summary
 and headline) is the brain's judgement, but the deterministic core
@@ -46,9 +52,12 @@ selecting and wording, optional polish.
 
 ## Prerequisites
 
-Supported on macOS and Linux. On Windows, use WSL: weasyprint needs a
-GTK runtime that is painful to set up natively, and everything works
-out of the box under WSL2.
+Supported on macOS and Linux natively. On Windows, three options, best
+first: (1) WSL2 — everything works out of the box; (2) native Windows with
+the Chromium PDF backend — `pip install "matchbox[chromium]"`, then
+`playwright install chromium` and set `MATCHBOX_PDF_BACKEND=chromium`
+(no GTK needed); (3) Docker — `docker build -t matchbox . && docker run
+--rm -p 127.0.0.1:8765:8765 -v "$PWD/people:/app/people" matchbox`.
 
 * Python 3.12+ (3.13 supported and tested)
 * Node.js + npm, to build the web UI once (`cd frontend && npm run build`)
