@@ -5,7 +5,7 @@ prove a CV is TRUE and literate. This rubric is the bar for PERSUASIVE. The
 tailoring brain self-checks against it while drafting, and every CV that will
 actually be submitted must pass a cold read (below) before it is final.
 
-## The seven dimensions
+## The eight dimensions
 
 Each scores pass / fail for the specific job being applied to.
 
@@ -29,6 +29,23 @@ Each scores pass / fail for the specific job being applied to.
    over it.
 7. **The 6-second test.** Headline + summary + first two bullets, alone, would
    make this recruiter keep reading.
+8. **Timeline continuity.** No unexplained employment gap longer than roughly
+   three months. A gap is closed by a compressed entry even when it is
+   topically irrelevant to the role, framed by its strongest facet -- a
+   sabbatical or volunteer stint becomes a one-line operations or leadership
+   entry, not a hole. Dropping a real role to save space is a fail the moment
+   it opens a visible gap; cut bullets within the role instead.
+
+## Page discipline
+
+One page tight, or two pages full -- never the accidental 1.2-pager. The
+selection's `target_pages` declares the intent (default 1); the core scales
+the bullet budget to match and changes.md reports `Pages: N (target M)`.
+Choose 2 deliberately: senior or depth-heavy roles where the verified
+library holds enough evidence to genuinely fill the second page, and page 1
+alone still wins the 6-second test. A thin second page reads as accident,
+not seniority -- if a target-2 render lands under roughly 1.5 pages, cut
+back to a tight single page instead.
 
 ## The cold read
 
@@ -47,8 +64,8 @@ built. The cold reader sees what a recruiter sees: the page.
 
 ## Gate and loop bounds
 
-* First pass: ONE cold reader scores the seven dimensions. Ship at >= 6/7
-  with no fail on dimensions 1, 2, or 7.
+* First pass: ONE cold reader scores the eight dimensions. Ship at >= 7/8
+  with no fail on dimensions 1, 2, 7, or 8.
 * Below the bar: revise, then compare PAIRWISE -- never re-score in absolute.
   Single-reader absolute scores are too noisy to compare across reads (two
   different judges gave the same pipeline's drafts 7/7 and 4/7 in testing).

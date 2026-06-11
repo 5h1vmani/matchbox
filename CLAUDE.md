@@ -114,8 +114,17 @@ For each job in the queue:
    best evidence each must-have (ordered by impact), and write a tailored
    `summary` and `headline`. When verified projects evidence a must-have
    better than any bullet (open-source work often does), include their ids
-   as `selected_project_ids` — they render as a Projects section. Save it
-   all per `schemas/selection.v1.json`, then render:
+   as `selected_project_ids` — they render as a Projects section. Pick
+   skills the same way: `selected_skill_ids` keeps the Skills section to
+   role-relevant lines (omitted -> the core's JD-matched fallback; the
+   full library is never dumped). Declare page intent with `target_pages`
+   (default 1): set 2 only as a deliberate choice for senior or
+   depth-heavy roles; the core scales the bullet budget and changes.md
+   reports `Pages: N (target M)`. Close any employment gap over ~3 months
+   with a compressed entry even when it is off-topic (a sabbatical or
+   volunteer stint becomes a one-line operations or leadership entry);
+   omitting a role that opens a visible gap is a defect, not a space saving.
+   Save it all per `schemas/selection.v1.json`, then render:
 
    ```bash
    python -m matchbox.assemble --run <run-id> --job <job_id> --selection <sel.json>
