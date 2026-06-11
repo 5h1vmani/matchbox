@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from matchbox.core.text import parse_iso_date
+
 # Linear progression; `rejected` ("Closed") is off-flow and terminal.
 FLOW = ["saved", "applied", "phone", "onsite", "offer"]
 
@@ -78,13 +80,9 @@ def today() -> date:
     return date.today()
 
 
-def _d(s: str | None) -> date | None:
-    if not s:
-        return None
-    try:
-        return date.fromisoformat(s[:10])
-    except ValueError:
-        return None
+# The one shared ISO-date parser (matchbox.core.text), aliased to the local name
+# the call sites below already use.
+_d = parse_iso_date
 
 
 def days_since(s: str | None) -> int | None:
