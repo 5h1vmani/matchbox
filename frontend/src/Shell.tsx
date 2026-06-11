@@ -14,6 +14,7 @@ import { getAIConfig } from "./api/ai";
 import { isDone, isError, isStep, runBrainTailor, type BrainEvent } from "./api/brain";
 import { getDoctorChecks } from "./api/doctor";
 import { getOnboarding } from "./api/onboarding";
+import { getSetupState, type SetupState } from "./api/setup";
 import * as dapi from "./discovery/api/client";
 import { useApps } from "./store/useApps";
 import { useAppsMemory } from "./store/useAppsMemory";
@@ -37,6 +38,7 @@ import { Review } from "./discovery/screens/Review";
 import { Browse } from "./discovery/screens/Browse";
 import { JDDrawer, Watchlist } from "./discovery/screens/WatchlistJD";
 import { CommandPalette, type Command } from "./ui/Palette";
+import { SetupRail } from "./ui/SetupRail";
 
 const DIR = "ledger" as const;
 const QUEUE_CAP = 20;
@@ -280,6 +282,28 @@ export function Shell() {
     return () => { alive = false; };
   }, []);
 
+  // Setup progress rail ("Step N of 7"): re-fetched on nav changes (cheap,
+  // derived server-side from existing rows), never on a timer. Hidden in
+  // sample mode; once every step is done the dismissal is persisted per
+  // profile so finished users never see it again.
+  const [setup, setSetup] = useState<SetupState | null>(null);
+  useEffect(() => {
+    if (USE_SAMPLE || !profile.slug) return;
+    const doneKey = `mb-setup-done:${profile.slug}`;
+    if (localStorage.getItem(doneKey) === "1") return;
+    let alive = true;
+    void getSetupState().then((s) => {
+      if (!alive) return;
+      if (s && s.current >= s.steps.length) {
+        localStorage.setItem(doneKey, "1");
+        setSetup(null);
+      } else {
+        setSetup(s);
+      }
+    });
+    return () => { alive = false; };
+  }, [nav, profile.slug]);
+
   const [view, setView] = useState("list");
   const [filter, setFilter] = useState("all");
   const [detail, setDetail] = useState<{ id: string; note: boolean } | null>(null);
@@ -468,7 +492,16 @@ export function Shell() {
   return (
     <div className="shell" data-dir={DIR} data-density="regular">
       <Sidebar nav={nav} onNav={onNav} onPalette={() => setPaletteOpen(true)} appsCount={apps.length} todoCount={todoCount} queueCount={queueCount} profile={profile} users={users} />
-      <div className="main"><div className="pad">{screen}</div></div>
+      <div className="main"><div className="pad">
+        {setup && setup.current < setup.steps.length && (
+          <SetupRail
+            steps={setup.steps}
+            current={setup.current}
+            onGo={(navId) => { const it = NAV.find((n) => n.id === navId); if (it) onNav(it); }}
+          />
+        )}
+        {screen}
+      </div></div>
 
       {paletteOpen && <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />}
 

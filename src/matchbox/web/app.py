@@ -32,6 +32,7 @@ from matchbox.web.routes import (
     profile_api,
     review_api,
     review_run,
+    setup,
     sources_api,
     targets_api,
 )
@@ -89,6 +90,7 @@ def create_app() -> FastAPI:
     app.include_router(profile_api.router)
     app.include_router(review_api.router)
     app.include_router(review_run.router)
+    app.include_router(setup.router)
     app.include_router(sources_api.router)
     app.include_router(targets_api.router)
 

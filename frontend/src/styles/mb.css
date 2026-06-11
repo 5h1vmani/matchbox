@@ -48,6 +48,22 @@ body { margin: 0; background: var(--background); color: var(--foreground); -webk
 .main { overflow-y: auto; overflow-x: hidden; }
 .pad { max-width: 1060px; margin: 0 auto; padding: 30px 40px 80px; }
 
+/* Setup rail — the "Step N of 7" onboarding strip above screen content.
+   Done = check + muted, active = highlighted full label, upcoming = dim. */
+.setuprail { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 8px; margin-bottom: 20px; box-shadow: var(--shadow-sm); }
+.setuprail__step { display: inline-flex; align-items: center; gap: 7px; border: 0; background: none; cursor: pointer; font-family: var(--font-sans); font-size: 12.5px; line-height: 1.2; padding: 5px 9px; border-radius: var(--radius-pill); color: var(--faint-foreground); transition: var(--transition); white-space: nowrap; }
+.setuprail__step:hover { background: var(--muted); }
+.setuprail__dot { width: 18px; height: 18px; border-radius: 50%; background: var(--muted); color: var(--muted-foreground); display: inline-flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 600; font-family: var(--font-mono); flex: 0 0 auto; }
+.setuprail__step.done { color: var(--muted-foreground); }
+.setuprail__step.done .setuprail__dot { background: #e7f0ea; color: var(--success); }
+.setuprail__step.active { background: var(--oat-100); color: var(--oat-700); font-weight: 600; }
+.setuprail__step.active .setuprail__dot { background: var(--oat-600); color: #fff; }
+.setuprail__part { font-style: normal; font-weight: 500; color: var(--oat-500); }
+/* Narrow screens: keep the rail slim — dots for every step, label only on the active one. */
+@media (max-width: 980px) {
+  .setuprail__step:not(.active) .setuprail__lbl { display: none; }
+}
+
 .phead { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
 .phead h1 { margin: 0; font-size: 29px; letter-spacing: -.022em; }
 .phead .sub { margin: 7px 0 0; color: var(--muted-foreground); font-size: 14px; }
