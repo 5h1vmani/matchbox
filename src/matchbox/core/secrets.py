@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import os
 import stat
+import sys
 from pathlib import Path
 
 from matchbox.core.db import db_path
@@ -56,7 +57,12 @@ def write_key(value: str, profile: str | None = None) -> None:
         os.write(fd, value.strip().encode("utf-8"))
     finally:
         os.close(fd)
-    os.chmod(path, _OWNER_RW)
+    # POSIX owner-only perms. Windows has no 0600 equivalent (os.chmod there only
+    # toggles the read-only bit), so we skip it; the secret then relies on the OS
+    # user account's profile isolation -- the single-user assumption this whole
+    # app is built on.
+    if not sys.platform.startswith("win"):
+        os.chmod(path, _OWNER_RW)
 
 
 def clear_key(profile: str | None = None) -> None:

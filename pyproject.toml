@@ -63,6 +63,9 @@ dev = [
     "httpx>=0.28.1",  # also used by FastAPI TestClient
     "types-jsonschema>=4.22",
 ]
+# Cross-platform PDF rendering without system libraries (Windows-friendly). With
+# this extra: `playwright install chromium`, then MATCHBOX_PDF_BACKEND=chromium.
+chromium = ["playwright>=1.40"]
 
 [project.scripts]
 matchbox = "matchbox.cli:app"
@@ -96,6 +99,12 @@ plugins = ["pydantic.mypy"]
 # weasyprint *does* resolve types).
 [[tool.mypy.overrides]]
 module = ["weasyprint"]
+ignore_missing_imports = true
+
+# Optional [chromium] extra; lazy-imported in pdf_backend and absent from the
+# default/dev environments, so declare it untyped here.
+[[tool.mypy.overrides]]
+module = ["playwright.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

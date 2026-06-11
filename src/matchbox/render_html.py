@@ -29,6 +29,7 @@ from typing import Any
 
 from matchbox.core.db import PROJECT_ROOT
 from matchbox.core.text import METRIC_UNIT_WORDS
+from matchbox.pdf_backend import html_to_pdf
 
 TEMPLATE = PROJECT_ROOT / "src" / "matchbox" / "templates" / "html" / "cv.html"
 FONTS_DIR = PROJECT_ROOT / "shared" / "fonts"
@@ -351,16 +352,14 @@ def render_cv_pdf(
 
     Returns the number of pages in the rendered PDF so callers can log
     or warn on multi-page spills without a separate reader pass.
-    """
-    from weasyprint import HTML
 
+    The HTML->PDF step goes through pdf_backend so it works on Windows (Chromium)
+    as well as macOS/Linux (weasyprint); see MATCHBOX_PDF_BACKEND.
+    """
     cv = json.loads(cv_json_path.read_text(encoding="utf-8"))
     html_str = cv_json_to_html(cv, palette=palette, font=font)
     (cv_json_path.parent / "cv.html").write_text(html_str, encoding="utf-8")
-    document = HTML(string=html_str, base_url=str(cv_json_path.parent)).render()
-    page_count = len(document.pages)
-    document.write_pdf(str(out_path))
-    return page_count
+    return html_to_pdf(html_str, out_path, base_url=str(cv_json_path.parent))
 
 
 # ─── cover-letter renderer ────────────────────────────────────────────────────
@@ -510,8 +509,6 @@ def render_cover_pdf(
 
     A sibling cover.html is written beside out_path for inspection.
     """
-    from weasyprint import HTML
-
     if isinstance(cover_txt_path_or_text, Path):
         body_text = cover_txt_path_or_text.read_text(encoding="utf-8")
     else:
@@ -519,4 +516,4 @@ def render_cover_pdf(
 
     html_str = cover_data_to_html(body_text=body_text, profile=profile, palette=palette, font=font)
     (out_path.parent / "cover.html").write_text(html_str, encoding="utf-8")
-    HTML(string=html_str, base_url=str(out_path.parent)).write_pdf(str(out_path))
+    html_to_pdf(html_str, out_path, base_url=str(out_path.parent))
