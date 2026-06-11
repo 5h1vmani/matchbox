@@ -19,6 +19,7 @@ from matchbox.web.routes import (
     answers,
     api,
     artifacts,
+    brain,
     discovery,
     insights,
     interviews,
@@ -75,6 +76,7 @@ def create_app() -> FastAPI:
     app.include_router(answers.router)
     app.include_router(api.router)
     app.include_router(artifacts.router)
+    app.include_router(brain.router)
     app.include_router(discovery.router)
     app.include_router(insights.router)
     app.include_router(interviews.router)

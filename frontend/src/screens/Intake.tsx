@@ -8,6 +8,8 @@
    ingest's progress shows up here, and the next step after verification is
    pasting one job ad by hand — ATS scanners are optional automation, later. */
 import { useEffect, useState } from "react";
+import { getAIConfig } from "../api/ai";
+import { isDone, isError, isStep, runBrainIngest, type BrainEvent } from "../api/brain";
 import * as tapi from "../api/client";
 import * as api from "../api/onboarding";
 import * as rapi from "../api/review";
@@ -34,10 +36,17 @@ export function Intake({ flash, onGoSources }: { flash: (msg: string) => void; o
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [counts, setCounts] = useState<rapi.ReviewCounts | null>(null);
+  // In-app brain (BYOK): when a key is configured, the user can parse without a
+  // second terminal. No key -> the Claude Code handoff below is unchanged.
+  const [hasKey, setHasKey] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [steps, setSteps] = useState<string[]>([]);
 
   useEffect(() => {
     void api.getOnboarding().then((o) => setStaged(o.staged));
     void tapi.getProfile().then((p) => setSlug(p.slug));
+    void getAIConfig().then((c) => setHasKey(c.hasKey && c.on));
   }, []);
 
   // While files are staged the user is presumably running `ingest my files`
@@ -145,6 +154,27 @@ export function Intake({ flash, onGoSources }: { flash: (msg: string) => void; o
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
     flash("Copied. Paste it into Claude Code.");
+  };
+
+  // Parse in-app with the user's own key. Streams progress lines into the ingest
+  // card; on completion refreshes the counts the screen already shows.
+  const runInApp = async () => {
+    setConfirming(false);
+    setRunning(true);
+    setSteps([]);
+    const onEvent = (e: BrainEvent) => {
+      if (isStep(e)) setSteps((s) => [...s, e.detail]);
+      else if (isError(e)) flash(`Ingest failed: ${e.error}`);
+      else if (isDone(e)) flash(`Parsed ${e.bullets ?? 0} bullets. Confirm them at Review.`);
+    };
+    const start = await runBrainIngest(onEvent);
+    setRunning(false);
+    if (!start.ok) {
+      // 409 = no key (should not happen, the button is gated); 429 = busy.
+      flash(start.status === 429 ? "A run is already in progress." : "Could not start the in-app parse.");
+      return;
+    }
+    void rapi.getCounts().then(setCounts);
   };
 
   return (
@@ -292,9 +322,59 @@ export function Intake({ flash, onGoSources }: { flash: (msg: string) => void; o
         <div className="sec-h" style={{ marginBottom: 12 }}>
           <span className="t">Run the ingest</span>
         </div>
+
+        {hasKey && (
+          <div style={{ marginBottom: 16 }}>
+            <p className="sub" style={{ margin: "0 0 10px" }}>
+              You have an API key set, so Matchbox can parse your files here, no second terminal
+              needed. It uses your own key and may cost a few cents.
+            </p>
+            {!confirming && !running && (
+              <button
+                className="btn primary"
+                disabled={staged.length === 0}
+                onClick={() => setConfirming(true)}
+              >
+                <Icon name="sparkles" size={14} /> Parse my files in-app
+              </button>
+            )}
+            {confirming && (
+              <div className="card" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <span className="sub" style={{ margin: 0 }}>
+                  This calls your configured API key to read the staged files and may cost a few
+                  cents. Continue?
+                </span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn primary tiny" onClick={() => void runInApp()}>
+                    Yes, parse them
+                  </button>
+                  <button className="btn ghost tiny" onClick={() => setConfirming(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {(running || steps.length > 0) && (
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                {steps.map((s, i) => (
+                  <p key={i} className="sub mono" style={{ margin: 0, display: "flex", alignItems: "center", gap: 7 }}>
+                    <Icon name="check" size={12} style={{ color: "var(--muted-foreground)", flex: "0 0 auto" }} /> {s}
+                  </p>
+                ))}
+                {running && (
+                  <p className="sub" style={{ margin: 0, display: "flex", alignItems: "center", gap: 7 }}>
+                    <span className="live" /> Working…
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="sub" style={{ margin: "0 0 12px" }}>
-          When your files are staged, paste this into Claude Code. It reads what you staged and pulls
-          out your experience.
+          {hasKey
+            ? "Prefer your terminal? Paste this into Claude Code instead. It reads what you staged and pulls out your experience."
+            : "When your files are staged, paste this into Claude Code. It reads what you staged and pulls out your experience."}
         </p>
         <div className="handoff__cmd" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <code style={{ flex: 1 }}>{INGEST_CMD}</code>

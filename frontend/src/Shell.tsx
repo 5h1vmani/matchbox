@@ -10,6 +10,8 @@ import { cx } from "./lib/derive";
 import { Icon } from "./ui/icon";
 import * as tapi from "./api/client";
 import type { ProfileInfo, UserInfo } from "./api/client";
+import { getAIConfig } from "./api/ai";
+import { isDone, isError, isStep, runBrainTailor, type BrainEvent } from "./api/brain";
 import { getDoctorChecks } from "./api/doctor";
 import { getOnboarding } from "./api/onboarding";
 import * as dapi from "./discovery/api/client";
@@ -285,9 +287,17 @@ export function Shell() {
   const [jdRole, setJdRole] = useState<Role | null>(null);
   const [sel, setSel] = useState<Set<string>>(() => new Set());
   const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null);
-  const [handoff, setHandoff] = useState<{ runId: string; prompt: string; count: number } | null>(null);
+  const [handoff, setHandoff] = useState<{ runId: string; prompt: string; count: number; jobId?: number } | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // In-app brain (BYOK): when a key is configured the handoff offers "Run in
+  // app" instead of only the Claude Code copy-paste. No key -> handoff unchanged.
+  const [hasKey, setHasKey] = useState(false);
+  useEffect(() => { void getAIConfig().then((c) => setHasKey(c.hasKey && c.on)); }, []);
+  const [brainRunning, setBrainRunning] = useState(false);
+  const [brainSteps, setBrainSteps] = useState<string[]>([]);
+  const [brainResult, setBrainResult] = useState<{ runId: string; jobId: number } | null>(null);
 
   // Honest handoff: ask the doctor whether the claude CLI is actually on PATH
   // before telling the user to paste into it. null = not yet known (say nothing).
@@ -314,20 +324,42 @@ export function Shell() {
   [apps]);
 
   // ── discovery ──
-  const surfaceRun = useCallback((run: Promise<RunHandoff> | undefined, count: number) => {
-    if (run) void run.then((h) => { if (h) setHandoff({ ...h, count }); });
+  const surfaceRun = useCallback((run: Promise<RunHandoff> | undefined, count: number, jobId?: number) => {
+    if (run) void run.then((h) => { if (h) { setHandoff({ ...h, count, jobId }); setBrainSteps([]); setBrainResult(null); } });
   }, []);
   const onDecide = useCallback((role: Role, decision: DecisionInput) => {
     const { undo, run } = decide([role.id], decision);
     flash(DECISION_TOAST[decision] || "Done", undo);
     surfaceRun(run, 1);
   }, [decide, flash, surfaceRun]);
-  // Tailor straight from the tracker: queue a run for the application's job.
+  // Tailor straight from the tracker: queue a run for the application's job. The
+  // numeric job id is carried so the handoff can offer the in-app brain path.
   const onTailorApp = useCallback((app: Application) => {
     const { run } = decide([String(app.jobId)], "tailoring");
     flash(DECISION_TOAST.tailoring);
-    surfaceRun(run, 1);
+    surfaceRun(run, 1, Number(app.jobId));
   }, [decide, flash, surfaceRun]);
+  // Run the tailoring in-app with the user's own key, streaming step lines into
+  // the handoff modal and closing with a link to the run output. Confirmation is
+  // implicit: the user already clicked "Run in app" knowing it uses their key.
+  const runTailorInApp = useCallback(async (jobId: number) => {
+    setBrainRunning(true);
+    setBrainSteps([]);
+    setBrainResult(null);
+    let runId = "";
+    const onEvent = (e: BrainEvent) => {
+      if (isStep(e)) setBrainSteps((s) => [...s, e.detail]);
+      else if (isError(e)) flash(`Tailoring failed: ${e.error}`);
+      else if (isDone(e)) runId = e.run_id ?? "";
+    };
+    const start = await runBrainTailor(jobId, onEvent);
+    setBrainRunning(false);
+    if (!start.ok) {
+      flash(start.status === 429 ? "A run is already in progress." : "Could not start the in-app run.");
+      return;
+    }
+    if (runId) setBrainResult({ runId, jobId });
+  }, [flash]);
   const toggleSel = useCallback((id: string) => {
     setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }, []);
@@ -453,19 +485,58 @@ export function Shell() {
       )}
       {handoff && (
         <div className="handoff">
-          <button className="handoff__x" onClick={() => setHandoff(null)} title="Dismiss"><Icon name="x" size={16} /></button>
+          <button className="handoff__x" onClick={() => { setHandoff(null); setBrainSteps([]); setBrainResult(null); }} title="Dismiss"><Icon name="x" size={16} /></button>
           <div className="handoff__h"><Icon name="sparkles" size={15} /> {handoff.count > 1 ? handoff.count + " roles queued to tailor" : "Queued to tailor"}</div>
-          <p className="handoff__p">In a terminal at the repo root, launch Claude Code:</p>
+
+          {/* In-app path: only for a single job (the brain endpoint is per-job)
+              and only when a key is configured. Claude Code stays the fallback. */}
+          {hasKey && handoff.jobId !== undefined && handoff.count === 1 && (
+            <div style={{ marginBottom: 14 }}>
+              {brainResult ? (
+                <>
+                  <p className="handoff__p">Your CV is ready.</p>
+                  <a className="btn primary" href={`/runs/${brainResult.runId}/output/${brainResult.jobId}/cv.pdf`} target="_blank" rel="noreferrer">
+                    <Icon name="file-text" size={14} /> Open the CV
+                  </a>
+                </>
+              ) : (
+                <>
+                  <p className="handoff__p">Run it here with your API key (uses your own credits, a few cents):</p>
+                  {!brainRunning && brainSteps.length === 0 && (
+                    <button className="btn primary" onClick={() => void runTailorInApp(handoff.jobId as number)}>
+                      <Icon name="sparkles" size={14} /> Run in app
+                    </button>
+                  )}
+                  {(brainRunning || brainSteps.length > 0) && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {brainSteps.map((s, i) => (
+                        <p key={i} className="handoff__p mono" style={{ margin: 0, display: "flex", alignItems: "center", gap: 7 }}>
+                          <Icon name="check" size={12} style={{ flex: "0 0 auto" }} /> {s}
+                        </p>
+                      ))}
+                      {brainRunning && (
+                        <p className="handoff__p" style={{ margin: 0, display: "flex", alignItems: "center", gap: 7 }}>
+                          <span className="live" /> Working…
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          <p className="handoff__p">{hasKey && handoff.jobId !== undefined && handoff.count === 1 ? "Prefer your terminal? Launch Claude Code at the repo root:" : "In a terminal at the repo root, launch Claude Code:"}</p>
           <div className="handoff__cmd"><code>claude</code></div>
           <p className="handoff__p">Then run this to draft {handoff.count > 1 ? "the CVs" : "your CV"}:</p>
           <div className="handoff__cmd">
             <code>{handoff.prompt}</code>
             <button className="btn tiny" onClick={() => { void navigator.clipboard?.writeText(handoff.prompt); flash("Copied. Paste it into Claude Code."); }}>Copy</button>
           </div>
-          {claudeCli === false && (
+          {claudeCli === false && !hasKey && (
             <p className="handoff__p" style={{ color: "var(--warning)", display: "flex", alignItems: "flex-start", gap: 6 }}>
               <Icon name="alert-circle" size={14} style={{ flex: "0 0 auto", marginTop: 2 }} />
-              <span>Claude Code not detected on this machine — install it or set an API key in Settings (coming) to run in-app.</span>
+              <span>Claude Code not detected on this machine — install it or set an API key in Settings to run in-app.</span>
             </p>
           )}
         </div>
