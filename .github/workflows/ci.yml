@@ -67,6 +67,34 @@ jobs:
         # suite drops below it.
         run: uv run --no-sync pytest tests/ -v --cov=src/matchbox --cov-report=term
 
+  security:
+    # The unbypassable backstop for the privacy model. Local pre-commit and
+    # pre-push hooks can be skipped (--no-verify) or never installed; this job
+    # cannot. Reuses the same scripts as the hooks, so the rules never drift.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history so gitleaks scans every commit ever pushed, not just
+          # the tip. A secret committed long ago and still in history is exposed.
+          fetch-depth: 0
+
+      - name: Install gitleaks (pinned, matches .pre-commit-config.yaml)
+        run: |
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP/gitleaks" gitleaks
+          echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"
+
+      - name: Secret scan (gitleaks, full history)
+        run: gitleaks detect --no-banner --redact --source .
+
+      - name: PII + people-guard scan (same scripts as the hooks)
+        run: |
+          git ls-files -z | xargs -0 .githooks/people-guard.sh
+          git ls-files -z | xargs -0 .githooks/pii-scan.sh
+
   docs-lint:
     runs-on: ubuntu-latest
     timeout-minutes: 5

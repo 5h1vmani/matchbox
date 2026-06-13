@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+* **CI `security` job + pre-push hook.** A dedicated, unbypassable CI job runs gitleaks (full history) plus the existing PII and people-guard scripts on every push and PR. A matching `pre-push` hook (`.githooks/pre-push-guard.sh`) runs the same scans locally as a last gate before code leaves the machine. The two custom scripts are now reused verbatim across pre-commit, pre-push, and CI, so the rules never drift.
+
+### Changed
+
+* CV typography: Projects-section URLs now render with the scheme stripped and the same muted-underline style as the contact line (previously raw `https://` with default link styling); the tailored headline moves from 13px to 15px so it reads as a distinct tier above the 12.5px body.
 
 ## [0.4.0] - 2026-06-11
 
