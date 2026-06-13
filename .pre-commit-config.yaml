@@ -2,8 +2,9 @@
 # Strictness hooks (mypy --strict, pytest, conventional-commits) are
 # deferred until after Phase 3.1 ships the first real tailored application.
 #
-# Install:  pre-commit install --install-hooks
+# Install:  pre-commit install --install-hooks --hook-type pre-commit --hook-type pre-push
 # Run all:  pre-commit run --all-files
+# Pre-push: pre-commit run --hook-stage pre-push --all-files
 
 repos:
 
@@ -82,6 +83,17 @@ repos:
         name: Block people/{name}/ commits except demo
         entry: .githooks/people-guard.sh
         language: script
+
+      # Last local gate before code leaves the machine. Full-history secret
+      # scan + PII/people guard over all tracked files. Mirrors the CI
+      # `security` job. Needs: pre-commit install --hook-type pre-push
+      - id: pre-push-guard
+        name: Pre-push secret + PII gate
+        entry: .githooks/pre-push-guard.sh
+        language: script
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
 
       - id: mypy
         name: Type check (mypy) — mirrors CI
