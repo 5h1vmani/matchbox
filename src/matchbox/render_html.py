@@ -301,7 +301,11 @@ def cv_json_to_html(cv: dict[str, Any], *, palette: str = "slate", font: str = "
 
     proj_html = ""
     for p in cv.get("projects", []):
-        url = f' <a href="{_esc(p["url"])}">{_esc(p["url"])}</a>' if p.get("url") else ""
+        if p.get("url"):
+            display = re.sub(r"^https?://", "", p["url"])  # match the contact-line style
+            url = f' <a href="{_esc(_ensure_https(p["url"]))}">{_esc(display)}</a>'
+        else:
+            url = ""
         proj_html += (
             '<div class="entry"><div class="entry-header">'
             f'<div class="entry-title">{_esc(p.get("name", ""))}</div></div>'
